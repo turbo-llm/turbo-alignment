@@ -1,6 +1,6 @@
 # Hello! 🎉
 After reading this guide, you'll understand what's happening in the turbo-alignment configs.
-more configs you can find [here](tests/fixtures/configs)
+More configs you can find [here](../tests/fixtures/configs)
 
 ## Table of Contents
 - [Default Settings](#default-settings)
@@ -151,13 +151,13 @@ Only for cherry_pick_settings: <br>
 if **random_cut = True**, then the end is chosen as a random bot message from messages.
 
 ### LORA Adapter train
-Check out this config: [LORA Adapter](configs/exp/train/sft/llama/default_chat_tuning_llama_7b.json)
+Check out this config: [LORA Adapter](configs/exp/train/sft/sft.json)
 
 
 ### P-tuning train 
 No problem u can use
 PrefixTuning|Lora|PromptTuning| PTuning <br>
-Check this out: [P-Tuning](configs/exp/train/sft/llama/ptuning.json)<br>
+Check this out: [P-Tuning](../tests/fixtures/configs/train/sft/prompt_tuning.json)<br>
 
 ```json
 "peft_settings": {"name": "P_TUNING","num_virtual_tokens": 32}
@@ -166,7 +166,6 @@ Check this out: [P-Tuning](configs/exp/train/sft/llama/ptuning.json)<br>
 ### Custom Modifications
 #### is model pay attention to specific doc?
 We prepare the dataset in advance with separators **<doc_sep>** initialized simply as **<sep>** (or you could use 'Document' or whatever else you like).
-Add the corresponding metric **retrieval_utility** ([link](configs/exp/train/sft/llama/sft_with_retrieval_utility.json) and see what happens!
 
 #### any other creative idea you come up with:
 - Prepare the dataset 🧑‍🔬
