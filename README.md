@@ -1,7 +1,3 @@
-<div align="center">
-  <img src="https://your-logo-url.com/logo.png" alt="turbo-alignment" height="110">
-</div>
-
 # 🚀 Turbo-Alignment
 > Library for industrial alignment.
 
@@ -10,22 +6,21 @@
 - [What is Turbo-Alignment?](#-what-is-turbo-alignment)
 - [Key Features](#-key-features)
 - [Supported Methods](#-supported-methods)
-- [Implemented metrics](#implemented-metrics)
-- [Installation](#-installation)
-  - [Python Package](#-python-package)
-  - [From Source](#-from-source)
-  - [Repository](#-repository)
+- [Implemented metrics](#-implemented-metrics)
 - [How to Use](#-how-to-use)
+- [Installation](#-installation)
 - [Command Line Interface (CLI)](#cli)
 - [Development](#-development)
 - [Library Roadmap](#-library-roadmap)
 - [FAQ](#-faq)
 - [License](#-license)
 
+<a name="-what-is-turbo-alignment"></a>
 ## 🌟 What is Turbo-Alignment?
 
 Turbo-Alignment is a library designed to streamline the fine-tuning and alignment of large language models, leveraging advanced techniques to enhance efficiency and scalability.
 
+<a name="-key-features"></a>
 ## ✨ Key Features
 
 - **📊 Comprehensive Metrics and Logging**: Includes a wide range of metrics such as self-bleu, KL divergence, and diversity, all supported out of the box.
@@ -37,6 +32,7 @@ Turbo-Alignment is a library designed to streamline the fine-tuning and alignmen
 - **🔄 End-to-End Pipelines**: From data preprocessing to model alignment.
 - **🔧 Adaptive Integration**: Facilitates the incorporation of new methodologies into established systems, ensuring compatibility and extending functionality without disrupting existing operations.
 
+<a name="-supported-methods"></a>
 ## 🛠️ Supported Methods
 
 
@@ -52,7 +48,8 @@ Turbo-Alignment supports a wide range of methods for model training and alignmen
 - **🗂️** Retrieval-Augmented Generation ([RAG](#RAG))
 - **🌁** Vision Language Modeling using MLP from [LLaVA](#LLaVA) or C-Abstractor from [HoneyBee](#HoneyBee) trainable projection model
 
-## Implemented Metrics
+<a name="-implemented-metrics"></a>
+## 🧮 Implemented Metrics
 - **🔠 Distinctness**
 - **🌈 Diversity**
 - **➗ KL-divergence**
@@ -62,9 +59,10 @@ Turbo-Alignment supports a wide range of methods for model training and alignmen
 - **🏆 Reward**
 - **📜 ROUGE**
 - **🔵 Self-BLEU** 
-- **📐RAGAS**
+- **📐 RAGAS**
 - **🔍 Retrieval Utility**
 
+<a name="-how-to-use"></a>
 ## 🤖 How to Use
 
 Turbo-Alignment offers an intuitive interface for training and aligning large language models. Refer to the detailed examples and configuration files in the documentation to get started quickly with your specific use case.
@@ -145,12 +143,10 @@ python -m turbo_alignment random_sample --experiment_settings_path path/to/rando
 ```
 
 <a name="-installation"></a>
-##
-
- 🚀 Installation
+## 🚀 Installation
 
 ### 📦 Python Package
-⌛ in progress..
+⌛️ in progress..
 
 ### 🛠️ From Source
 For the latest features before an official release:
