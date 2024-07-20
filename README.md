@@ -37,16 +37,16 @@ Turbo-Alignment is a library designed to streamline the fine-tuning and alignmen
 
 
 Turbo-Alignment supports a wide range of methods for model training and alignment, including:
-- **🎯** Supervised Fine-Tuning ([SFT](#SFT))
-- **🏆** Reward Modeling ([RM](#RM))
-- **👍** Direct Preference Optimization ([DPO](#DPO))
-- **🌟** Sequence Likelihood Calibration with Human Feedback ([SLiC](#SLiC))
-- **🧠** Kahneman & Tversky Optimization ([KTO](#KTO)) Paired/Unpaired
-- **📊** Statistical Rejection Sampling Optimization([RSO](#RSO))
-- **🔄** Contrastive Preference Optimization ([CPO](#CPO))
-- **🎭** Identity Preference Optimisation ([IPO](#IPO))
-- **🗂️** Retrieval-Augmented Generation ([RAG](#RAG))
-- **🌁** Vision Language Modeling using MLP from [LLaVA](#LLaVA) or C-Abstractor from [HoneyBee](#HoneyBee) trainable projection model
+- **🎯** Supervised Fine-Tuning (SFT)
+- **🏆** Reward Modeling (RM)
+- **👍** Direct Preference Optimization (DPO)
+- **🌟** Sequence Likelihood Calibration with Human Feedback (SLiC-HF)
+- **🧠** Kahneman & Tversky Optimization (KTO) Paired/Unpaired
+- **📊** Statistical Rejection Sampling Optimization (RSO)
+- **🔄** Contrastive Preference Optimization (CPO)
+- **🎭** Identity Preference Optimisation (IPO)
+- **🗂️** Retrieval-Augmented Generation (RAG)
+- **🌁** Vision Language Modeling using MLP from (LLaVA) or C-Abstractor from (HoneyBee) trainable projection model
 
 <a name="-implemented-metrics"></a>
 ## 🧮 Implemented Metrics
@@ -88,7 +88,7 @@ python -m turbo_alignment train_sft --experiment_settings_path ./fixtures/config
 <a name="-preftune"></a>
 ## Reward Modeling / Direct Preference Optimization / Kahneman & Tversky Optimization (Paired)  / CPO / IPO
 - **Prepare your dataset** in the `pair_preferences` format.
-- **Suitable config**: [rm](configs/train/rm/rm.json), [dpo](tests/fixtures/configs/train/dpo/base.json), [kto](tests/fixtures/configs/train/kto/base.json)
+- **Suitable config**: [rm](tests/fixtures/configs/train/rm/base.json), [dpo](tests/fixtures/configs/train/dpo/base.json), [kto](tests/fixtures/configs/train/kto/base.json)
 
 <a name="-multimodal"></a>
 ## Multimodal Tasks 
