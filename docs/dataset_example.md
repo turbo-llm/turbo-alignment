@@ -1,6 +1,6 @@
 ## Dataset Descriptions
 
-[All datasets](tests/fixtures/datasets) are in **JSONL format**, where:
+[All datasets](../tests/fixtures/datasets) are in **JSONL format**, where:
 
 
 
@@ -93,4 +93,4 @@ Example:
 
 
 ## For MULTIMODAL:
-examples [here](tests/fixtures/datasets/multimodal)
+examples [here](../tests/fixtures/datasets/multimodal)
