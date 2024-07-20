@@ -105,8 +105,8 @@ Don't forget to specify that your model is for classification😏   [classificat
 
 ```json
 "model_settings": { "model_type": "seq_cls",
-          "model_kwargs": {"num_labels": 2,"problem_type": "single_label_classification"},
-"dataset_type": "classification”
+          "model_kwargs": {"num_labels": 2,"problem_type": "single_label_classification"}},
+"dataset_type": "classification"
 ```
 
 
@@ -135,7 +135,7 @@ if you're dealing with RAG, this part should already be familiar to you.
 ``` 
 During training, you might want to add your special tokens, e.g., for RAG **<doc_sep>** is useful, for multimodal tasks you might want to specify a particular **<modal_name>**.
 
-In this case, we add the token **<RS>** by initializing its weights with the token **<s>**, and the token "<super_bot>" by averaging the tokens that split the string "the best bot ever"
+In this case, we add the token **<RS>** by initializing its weights with the token **<bos>**, and the token "<super_bot>" by averaging the tokens that split the string "the best bot ever"
 
 #### train_dataset_settings
 similiar as inference_dataset but 
@@ -180,7 +180,7 @@ Add the corresponding metric **retrieval_utility** ([link](configs/exp/train/sft
 {"dataset_type": "classification",
 "model_type": "seq_cls",
 "model_kwargs": {"num_labels": 2, "return_dict": true, "problem_type": "single_label_classification"},
-"peft_setting": {"task_type": "SEQ_CLS"}}}
+"peft_setting": {"task_type": "SEQ_CLS"}}
 ```
 
 
