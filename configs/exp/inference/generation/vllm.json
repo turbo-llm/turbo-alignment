@@ -1,0 +1,54 @@
+{
+    "inference_settings": [
+      {
+        "model_settings": {
+          "model_path": "/from_s3/model",
+          "model_type": "causal",
+          "transformers_settings": {}
+        },
+        "tokenizer_settings": {
+          "use_fast": false,
+          "tokenizer_path": "/from_s3/model"
+        },
+        "generation_settings": [
+          {
+            "transformers_settings": {
+              "num_beams": 1,
+              "max_new_tokens": 500,
+              "repetition_penalty": 1.2,
+              "top_p": 0.1,
+              "top_k": 10,
+              "temperature": 0.6,
+              "do_sample": true
+            },
+            "custom_settings": {
+              "generation_eos_token": "</RS>",
+              "skip_special_tokens": true
+            }
+          }
+        ],
+        "use_vllm": true
+      }
+    ],
+    "dataset_settings": {
+      "sources": [
+        {
+          "name": "data",
+          "records_path": "data.jsonl",
+          "num_samples": 25
+        }
+      ],
+      "prompt_template": {
+          "role_tag_mapping": {
+              "bot": "<bot>",
+              "user": "<user>",
+              "system": "<system>"
+          },
+          "prefix_template": "<RS>{role}",
+          "suffix_template": "</RS>"
+      },
+      "dataset_type": "chat",
+      "max_tokens_count": 2000
+    },
+    "save_path": "inference_output"
+  }

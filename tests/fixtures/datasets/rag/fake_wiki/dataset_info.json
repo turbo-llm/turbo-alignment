@@ -1,0 +1,53 @@
+{
+  "builder_name": "wikipedia",
+  "citation": "@ONLINE {wikidump,\n    author = {Wikimedia Foundation},\n    title  = {Wikimedia Downloads},\n    url    = {https://dumps.wikimedia.org}\n}\n",
+  "config_name": "20220301.simple",
+  "dataset_size": 235072360,
+  "description": "Wikipedia dataset containing cleaned articles of all languages.\nThe datasets are built from the Wikipedia dump\n(https://dumps.wikimedia.org/) with one split per language. Each example\ncontains the content of one full Wikipedia article with cleaning to strip\nmarkdown and unwanted sections (references, etc.).\n",
+  "download_checksums": {},
+  "download_size": 239682796,
+  "features": {
+    "title": {
+      "dtype": "string",
+      "id": null,
+      "_type": "Value"
+    },
+    "text": {
+      "dtype": "string",
+      "id": null,
+      "_type": "Value"
+    },
+    "embeddings": {
+      "feature": {
+        "dtype": "float64",
+        "id": null,
+        "_type": "Value"
+      },
+      "length": -1,
+      "id": null,
+      "_type": "Sequence"
+    }
+  },
+  "homepage": "https://dumps.wikimedia.org",
+  "license": "",
+  "post_processed": null,
+  "post_processing_size": null,
+  "size_in_bytes": 474755156,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 235072360,
+      "num_examples": 205328,
+      "dataset_name": "wikipedia"
+    }
+  },
+  "supervised_keys": null,
+  "task_templates": null,
+  "version": {
+    "version_str": "2.0.0",
+    "description": "",
+    "major": 2,
+    "minor": 0,
+    "patch": 0
+  }
+}

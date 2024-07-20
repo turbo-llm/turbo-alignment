@@ -1,0 +1,41 @@
+{
+  "_name_or_path": "ydshieh/tiny-random-gptj-for-sequence-classification",
+  "activation_function": "gelu_new",
+  "architectures": [
+    "GPTJForSequenceClassification"
+  ],
+  "attention_probs_dropout_prob": 0.0,
+  "attn_pdrop": 0.0,
+  "bos_token_id": 98,
+  "embd_pdrop": 0.0,
+  "eos_token_id": 98,
+  "gradient_checkpointing": false,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.0,
+  "id2label": {
+    "0": "LABEL_0"
+  },
+  "initializer_range": 0.02,
+  "intermediate_size": 37,
+  "label2id": {
+    "LABEL_0": 0
+  },
+  "layer_norm_epsilon": 1e-05,
+  "model_type": "gptj",
+  "n_ctx": 512,
+  "n_embd": 32,
+  "n_head": 4,
+  "n_inner": null,
+  "n_layer": 5,
+  "n_positions": 512,
+  "pad_token_id": 98,
+  "resid_pdrop": 0.0,
+  "rotary_dim": 8,
+  "scale_attn_weights": true,
+  "tie_word_embeddings": false,
+  "torch_dtype": "float32",
+  "transformers_version": "4.31.0",
+  "type_vocab_size": 16,
+  "use_cache": true,
+  "vocab_size": 1000
+}

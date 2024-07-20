@@ -1,0 +1,24 @@
+{
+  "dataset_settings": {
+      "sources": [{
+        "name": "test",
+        "records_path": "tests/fixtures/datasets/sampling/inference_out.jsonl",
+        "sample_rate": 1.0
+    }],
+    "chat_dataset":{
+      "prompt_template": {
+        "role_tag_mapping": {
+            "bot": "<bot>",
+            "user": "<user>",
+            "system": "<system>"
+        },
+        "prefix_template": "<RS>{role}",
+        "suffix_template": "</RS>"
+      },
+      "max_tokens_count": 150
+    },
+    "dataset_type": "sampling"
+  },
+  "N": 3,
+  "save_path": "test_base_sampling_output"
+}

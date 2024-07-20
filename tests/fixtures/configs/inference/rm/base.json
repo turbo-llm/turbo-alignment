@@ -1,0 +1,41 @@
+{
+  "inference_settings": [
+    {
+      "model_settings": {
+        "model_path": "tests/fixtures/models/gptj_tiny_for_seq_cls",
+        "model_type": "seq_cls",
+        "transformers_settings": {
+        },
+        "model_kwargs": {
+          "num_labels": 1
+        },
+        "adapter_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/trainer/adapter_model"
+      },
+      "tokenizer_settings": {
+        "use_fast": false,
+        "tokenizer_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/tokenizer_with_special_tokens"
+      }
+    }
+  ],
+  "dataset_settings": {
+    "sources": [
+      {
+        "name": "rm_test",
+        "records_path": "tests/fixtures/datasets/rm/val_inference.jsonl",
+        "sample_rate": 1
+      }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+          "bot": "<bot>",
+          "user": "<user>",
+          "system": "<system>"
+      },
+      "prefix_template": "<RS>{role}",
+      "suffix_template": "</RS>"
+    },
+    "dataset_type": "rm",
+    "max_tokens_count": 150
+  },
+  "save_path": "test_inference_rm_output"
+}

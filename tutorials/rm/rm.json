@@ -1,0 +1,116 @@
+{
+    "train_dataset_settings": {
+        "sources": [
+                {
+                "name": "train_preferences",
+                  "records_path": "train_preferences.jsonl",
+                  "num_samples": 10
+              }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "assistant",
+                    "user": "user",
+                    "system": "system"
+                },
+                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                "suffix_template": "<|eot_id|>"
+            },
+            "max_tokens_count": 2000
+        },
+        "add_labels": false,
+        "dataset_type": "pair_preferences"
+      },
+      "val_dataset_settings": {
+          "sources": [
+              {
+                "name": "val_preferences",
+                  "records_path": "val_preferences.jsonl",
+                  "num_samples": 5
+              }
+          ],
+          "chat_settings":{
+              "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "assistant",
+                    "user": "user",
+                    "system": "system"
+                },
+                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                "suffix_template": "<|eot_id|>"
+            },
+              "max_tokens_count": 2000
+          },
+          "add_labels": false,
+          "dataset_type": "pair_preferences"
+      },
+      "cherry_pick_settings": {
+        "dataset_settings":{
+            "sources": [
+                {
+                    "name": "val_preferences",
+                    "records_path": "val_preferences.jsonl",
+                    "num_samples": 3
+                }
+            ],
+            "chat_settings":{
+                "prompt_template": {
+                    "role_tag_mapping": {
+                        "bot": "assistant",
+                        "user": "user",
+                        "system": "system"
+                    },
+                    "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                    "suffix_template": "<|eot_id|>"
+                },
+                "max_tokens_count": 2000
+            },
+            "add_labels": false,
+            "dataset_type": "pair_preferences"
+          },
+          "metric_settings": []
+      },
+      "model_settings": {
+          "model_path": "yujiepan/llama-3-tiny-random",
+          "model_type": "seq_cls",
+          "transformers_settings": {},
+          "model_kwargs": {
+                "num_labels": 1
+          }
+      },
+      "tokenizer_settings": {},
+      "trainer_settings": {
+        "evaluation_strategy": "steps",
+        "per_device_train_batch_size": 1,
+        "per_device_eval_batch_size": 1,
+        "gradient_accumulation_steps": 16,
+        "load_best_model_at_end": false,
+        "eval_steps": 32,
+        "save_steps": 32,
+        "logging_steps": 1,
+        "learning_rate": 1e-6,
+        "num_train_epochs": 2,
+        "lr_scheduler_type": "cosine",
+        "warmup_ratio": 0.3,
+        "fp16": false,
+        "bf16": true,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.95,
+        "adam_epsilon": 1e-12,
+        "max_grad_norm": 2.0,
+        "weight_decay": 0.0,
+        "optim": "adamw_torch",
+        "save_total_limit": 16,
+        "dataloader_num_workers": 18,
+        "gradient_checkpointing": true,
+        "save_only_model": true
+      },
+      "wandb_settings": {
+            "project_name": "alignment",
+            "run_name": "rm",
+            "entity": "turbo-alignment"
+      },
+      "seed": 0,
+      "log_path": "train_output"
+}

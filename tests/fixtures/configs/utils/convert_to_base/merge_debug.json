@@ -1,0 +1,10 @@
+{
+    "model_settings": {
+      "model_path": "tests/fixtures/models/llama2_tiny",
+      "model_type": "causal",
+      "transformers_settings": {}
+    },
+    "adapter_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/trainer",
+    "tokenizer_settings": {},
+    "save_path": "test_merge_output"
+  }

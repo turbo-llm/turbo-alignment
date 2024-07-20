@@ -1,0 +1,9 @@
+{"id": "0", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}], "label": 0}
+{"id": "1", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "good"}, {"role": "bot", "content": "hi"}], "label": 1}
+{"id": "2", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "bad"}], "label": 0}
+{"id": "3", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}], "label": 0}
+{"id": "4", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "good"}, {"role": "bot", "content": "hi"}], "label": 1}
+{"id": "5", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "bad"}], "label": 0}
+{"id": "6", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}], "label": 0}
+{"id": "7", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "good"}, {"role": "bot", "content": "hi"}], "label": 1}
+{"id": "8", "messages": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "bad"}], "label": 1}

@@ -1,0 +1,13 @@
+{
+  "model_settings": {
+    "model_path": "/from_s3/model",
+    "model_type": "causal",
+    "transformers_settings": {}
+  },
+  "tokenizer_settings": {
+    "tokenizer_path": "/from_s3/tokenizer",
+    "use_fast": false
+  },
+  "adapter_path": "/from_s3/adapters",
+  "save_path": "merged"
+}

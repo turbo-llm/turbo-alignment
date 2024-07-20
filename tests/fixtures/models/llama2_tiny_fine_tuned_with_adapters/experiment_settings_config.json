@@ -1,0 +1,74 @@
+{
+    "trainer_settings": {
+        "evaluation_strategy": "steps",
+        "per_device_train_batch_size": 1,
+        "per_device_eval_batch_size": 1,
+        "gradient_accumulation_steps": 1,
+        "eval_steps": 4,
+        "save_steps": 4,
+        "logging_steps": 1,
+        "learning_rate": 0.0003,
+        "num_train_epochs": 1,
+        "lr_scheduler_type": "cosine",
+        "warmup_steps": 1,
+        "fp16": false,
+        "bf16": false,
+        "torch_compile": false,
+        "optim": "adamw_torch",
+        "deepspeed": null,
+        "save_total_limit": 1,
+        "no_cuda": true
+    },
+    "model_settings": {
+        "model_path": "tests/fixtures/models/reciprocate_llama2_tiny",
+        "model_type": "causal",
+        "load_in_8bit": false,
+        "omit_base_model_save": false,
+        "trust_remote_code": false,
+        "load_in_float16": true
+    },
+    "generation_settings": {
+        "num_beams": 5,
+        "max_new_tokens": 15
+    },
+    "tokenizer_settings": {
+        "use_fast": false,
+        "trust_remote_code": false,
+        "tokenizer_path": null
+    },
+    "dataset_settings": {
+        "mode": "instruct",
+        "only_answer_loss": true,
+        "train_sample_rate": 1.0,
+        "train_file": "tests/fixtures/datasets/instruction/train_instructions.jsonl",
+        "val_sample_rate": 0.1,
+        "val_file": "tests/fixtures/datasets/instruction/val_instructions.jsonl",
+        "prompt_template_path": "tests/fixtures/datasets/instruction/prompt_template.json",
+        "type": "instruct_sft_train",
+        "max_prompt_tokens_count": 1500,
+        "max_answer_tokens_count": 548,
+        "max_tokens_count": null
+    },
+    "log_path": "train_output",
+    "seed": 42,
+    "wandb_settings": {
+        "project_name": "alignment",
+        "run_name": "fine_tune_llama",
+        "entity": "vladislavkruglikov",
+        "notes": null,
+        "tags": [],
+        "mode": "online"
+    },
+    "peft_settings": {
+        "name": "lora",
+        "r": 8,
+        "lora_alpha": 16,
+        "lora_dropout": 0.05,
+        "bias": "none",
+        "target_modules": [
+            "q_proj",
+            "v_proj"
+        ],
+        "task_type": "CAUSAL_LM"
+    }
+}

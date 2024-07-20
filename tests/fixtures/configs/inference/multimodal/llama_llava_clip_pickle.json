@@ -1,0 +1,91 @@
+{
+  "inference_settings": [
+    {
+      "metric_settings": [
+        {
+          "type": "meteor",
+          "parameters": {
+            "need_average": [
+              true,
+              false
+            ]
+          }
+        }
+      ],
+      "model_settings": {
+        "model_path": "tests/fixtures/models/llama2_tiny",
+        "projections_path": "tests/fixtures/models/llama2_tiny_multimodal_clip_mlp/projections/modality_adapters.pt",
+        "n_modality_embeddings": 225,
+        "model_type": "causal",
+        "transformers_settings": {},
+        "adapter_path": "tests/fixtures/models/llama2_tiny_multimodal_clip_mlp/adapter"
+      },
+      "modality_encoder_settings_mapping": {
+        "image": {
+          "modality_encoder_type": "clip",
+          "is_pickle": true,
+          "encoder_path": "tests/fixtures/models/clip_tiny"
+        },
+        "audio": null
+      },
+      "modality_projector_mapping": {
+        "image": "llava",
+        "audio": null
+      },
+      "tokenizer_settings": {
+        "use_fast": false,
+        "tokenizer_path": "tests/fixtures/models/llama2_tiny_multimodal_clip_mlp/tokenizer"
+      },
+      "generation_settings": [
+        {
+          "transformers_settings": {
+            "num_beams": 1,
+            "max_new_tokens": 8
+          },
+          "custom_settings": {}
+        }
+      ],
+      "use_vllm": false,
+      "batch": 1,
+      "micro_batch": 1
+    }
+  ],
+  "dataset_settings": {
+    "sources": [
+      {
+        "name": "chat_test",
+        "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+        "sample_rate": 1
+      }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+        "bot": "<bot>",
+        "user": "<user>",
+        "system": "<system>"
+      },
+      "prefix_template": "<RS>{role}",
+      "suffix_template": "</RS>"
+    },
+    "dataset_type": "multimodal",
+    "max_tokens_count": 2000,
+    "n_modality_embeddings": 225,
+    "start_modality_token": "<MS>",
+    "end_modality_token": "</MS>",
+    "only_answer_loss": true,
+    "modality_token_mapping": {
+      "image": "<img>",
+      "audio": "<audio>"
+    },
+    "modality_reader_settings_mapping": {
+      "image": {
+        "reader_type": "pickle",
+        "reader_path": null
+      },
+      "audio": null
+    },
+    "truncate_top": false,
+    "random_cut": true
+  },
+  "save_path": "llama_clip_multimodal_inference"
+}

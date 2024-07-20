@@ -1,0 +1,71 @@
+[tool.poetry]
+name = "turbo-alignment"
+version = "0.1.0"
+description = "turbo-alignment repository"
+authors = ["T Mega Alignment Team <n.surnachev@tcsbank.ru>" ]
+
+
+[tool.poetry.dependencies]
+python = "^3.10"
+transformers = "4.42.0"
+peft = "0.8.2"
+typer ="^0.9.0"
+wandb ="^0.15.3"
+scipy = "^1.1.0"
+torch = "^2.0.0"
+numpy = "^1.21"
+tomlkit ="^0.11.8"
+platformdirs ="^3.5.3"
+loguru ="^0.7.0"
+sentencepiece ="^0.1.99"
+bitsandbytes ="^0.41.1"
+einops ="^0.6.1"
+hvac ="^1.1.1"
+python-dotenv ="^1.0.0"
+sentence-transformers ="^2.2.2"
+protobuf ="^3.20.0"
+allenai-common = "^1.1.2"
+rouge-score ="^0.1.2"
+ftfy ="^6.1.1"
+iopath ="^0.1.10"
+torchaudio ="^2.0.2"
+pytorchvideo ="^0.1.5"
+jupyter ="^1.0.0"
+evaluate ="^0.4.1"
+albumentations ="^1.3.1"
+soundfile ="^0.12.1"
+wheel ="^0.42.0"
+datasets ="^2.18.0"
+pydantic-settings ="^2.2.1"
+pydantic ="^2.7.0"
+timm ="^0.9.7"
+opencv-python = "^4.10.0.84"
+ragas = "^0.1.10"
+langchain-huggingface = "^0.0.3"
+
+[tool.poetry.group.deepspeed.dependencies]
+accelerate = "0.27"
+deepspeed = "0.12"
+
+[tool.poetry.group.gpu.dependencies]
+faiss-gpu ="^1.7.2"
+xformers = "^0.0.23.post1"
+vllm = "^0.4.0.post1"
+
+[tool.poetry.dev-dependencies]
+coverage = "^7.2.7"
+pytest = "^7.3.2"
+black = "^23.3.0"
+isort = "^5.12.0"
+unify = "^0.5"
+mypy = "^1.3.0"
+flake8 = "^6.0.0"
+pylint = "^2.17.4"
+pylint-gitlab = "^1.2.0"
+pydantic-core = "^2.18.2"
+annotated-types = "^0.6.0"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

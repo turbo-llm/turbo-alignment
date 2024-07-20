@@ -1,0 +1,117 @@
+{
+    "train_dataset_settings": {
+        "sources": [
+            {
+                "name": "chat_test",
+                "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "prompt_template": {
+            "role_tag_mapping": {
+                "bot": "<bot>",
+                "user": "<user>",
+                "system": "<system>"
+            },
+            "prefix_template": "<RS>{role}",
+            "suffix_template": "</RS>"
+        },
+        "dataset_type": "chat",
+        "max_tokens_count": 150,
+        "only_answer_loss": true
+    },
+    "val_dataset_settings": {
+        "sources": [
+            {
+                "name": "chat_test",
+                "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "prompt_template": {
+            "role_tag_mapping": {
+                "bot": "<bot>",
+                "user": "<user>",
+                "system": "<system>"
+            },
+            "prefix_template": "<RS>{role}",
+            "suffix_template": "</RS>"
+        },
+        "dataset_type": "chat",
+        "max_tokens_count": 150,
+        "only_answer_loss": true
+    },
+    "model_settings": {
+        "model_path": "tests/fixtures/models/llama2_tiny",
+        "model_type": "causal",
+    "transformers_settings": {},
+    "peft_settings": {
+        "task_type": "CAUSAL_LM",
+        "name": "PROMPT_TUNING",
+        "num_virtual_tokens": 32
+    },
+    "embeddings_initialization_strategy": {
+      "<RS>": "<s>",
+      "</RS>": "</s>",
+      "<bot>": "<unk>",
+      "<user>": "<unk>",
+      "<system>": "<unk>"
+  }
+    },
+    "cherry_pick_settings": {
+        "generator_transformers_settings": {
+            "num_beams": 1,
+            "max_new_tokens": 35,
+            "repetition_penalty": 1.1,
+            "do_sample": true
+        },
+        "custom_generation_settings": {
+            "generation_eos_token": "</RS>",
+            "skip_special_tokens": false
+        },
+        "dataset_settings": {
+            "sources": [
+                {
+                    "name": "chat_test",
+                    "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+                    "num_samples": 2
+                }
+            ],
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "dataset_type": "chat",
+            "max_tokens_count": 200,
+            "random_cut": true,
+            "only_answer_loss": true
+        },
+        "metric_settings": []
+    },
+    "tokenizer_settings": {},
+    "trainer_settings": {
+        "evaluation_strategy": "steps",
+        "per_device_train_batch_size": 1,
+        "per_device_eval_batch_size": 1,
+        "gradient_accumulation_steps": 1,
+        "eval_steps": 1,
+        "save_steps": 1,
+        "logging_steps": 3,
+        "learning_rate": 0.0003,
+        "num_train_epochs": 2,
+        "lr_scheduler_type": "cosine",
+        "warmup_steps": 1,
+        "fp16": false,
+        "bf16": false,
+        "optim": "adamw_torch",
+        "save_total_limit": 1,
+        "no_cuda": true
+    },
+    "wandb_settings":null,
+    "log_path": "test_sft_chat_llama_train_output"
+}

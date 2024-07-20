@@ -1,0 +1,144 @@
+{
+  "train_dataset_settings": {
+    "sources": [
+      {
+        "name": "train",
+        "records_path": "/from_s3/dataset/train.jsonl",
+        "sample_rate": 1.0
+      }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+        "bot": "<bot>",
+        "user": "<user>",
+        "system": "<system>"
+      },
+      "prefix_template": "<RS>{role}",
+      "suffix_template": "</RS>"
+    },
+    "dataset_type": "chat",
+    "max_tokens_count": 2000,
+    "only_answer_loss": true
+  },
+  "val_dataset_settings": {
+    "sources": [
+      {
+        "name": "test",
+        "records_path": "/from_s3/dataset/test.jsonl",
+        "sample_rate": 1.0
+      }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+        "bot": "<bot>",
+        "user": "<user>",
+        "system": "<system>"
+      },
+      "prefix_template": "</RS>{role}",
+      "suffix_template": "<RS>"
+    },
+    "dataset_type": "chat",
+    "max_tokens_count": 2000,
+    "only_answer_loss": true
+  },
+  "model_settings": {
+    "generator_settings": {
+      "model_path": "/from_s3/model",
+      "model_type": "causal",
+      "transformers_settings": {},
+      "peft_settings": {
+        "r": 16,
+        "lora_alpha": 16,
+        "lora_dropout": 0.05,
+        "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj"],
+        "task_type": "CAUSAL_LM",
+        "modules_to_save": [
+          "embed_tokens",
+          "lm_head"
+        ],
+        "name": "LORA"
+      }
+    },
+    "question_encoder_settings": {
+      "model_path": "encoder/path",
+      "model_type": "encoder",
+      "transformers_settings": {},
+      "embeddings_initialization_strategy": {}
+    },
+    "index_settings": {
+      "index_path": "/from_s3/dataset/docs_dataset.faiss",
+      "passages_path": "/from_s3/dataset/docs_dataset"
+    },
+    "retrieval_settings": {
+      "n_docs": 1,
+      "max_doc_length": 1500,
+      "query_encoder_max_length": 512
+    }
+  },
+  "cherry_pick_settings": {
+    "generator_transformers_settings": {
+      "num_beams": 1,
+      "max_new_tokens": 35,
+      "repetition_penalty": 1.2,
+      "do_sample": false
+    },
+    "custom_generation_settings": {
+      "generation_eos_token": "</RS>",
+      "skip_special_tokens": false,
+      "remove_prompt": false
+    },
+    "dataset_settings": {
+      "sources": [
+        {
+          "name": "test",
+          "records_path": "/from_s3/dataset/test.jsonl",
+          "num_samples": 15
+        }
+      ],
+      "prompt_template": {
+        "role_tag_mapping": {
+          "bot": "<bot>",
+          "user": "<user>",
+          "system": "<system>"
+        },
+        "prefix_template": "<RS>{role}",
+        "suffix_template": "</RS>"
+      },
+      "dataset_type": "chat",
+      "max_tokens_count": 2000,
+      "random_cut": true,
+      "only_answer_loss": true
+    },
+    "metric_settings": []
+  },
+  "tokenizer_settings": {},
+  "trainer_settings": {
+    "evaluation_strategy": "steps",
+    "save_strategy": "steps",
+    "per_device_train_batch_size": 1,
+    "per_device_eval_batch_size": 1,
+    "gradient_accumulation_steps": 32,
+    "logging_steps": 1,
+    "eval_steps": 8,
+    "save_steps": 16,
+    "learning_rate": 0.00004,
+    "num_train_epochs": 2,
+    "lr_scheduler_type": "linear",
+    "warmup_steps": 1,
+    "fp16": false,
+    "bf16": true,
+    "optim": "adamw_torch",
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "adam_epsilon": 1e-6,
+    "weight_decay": 0.01,
+    "max_grad_norm": 0.11,
+    "save_total_limit": 3
+  },
+  "wandb_settings": {
+    "project_name": "alignment",
+    "run_name": "rag",
+    "entity": "biglm"
+  },
+  "log_path": "train_output"
+}

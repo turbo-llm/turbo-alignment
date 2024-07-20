@@ -1,0 +1,201 @@
+{
+    "train_dataset_settings": {
+      "sources": [
+        {
+          "name": "train",
+          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+          "sample_rate": 1
+        }
+      ],
+      "prompt_template": {
+        "role_tag_mapping": {
+          "bot": "<bot>",
+          "user": "<user>",
+          "system": "<system>"
+        },
+        "prefix_template": "<RS>{role}",
+        "suffix_template": "</RS>"
+      },
+      "modality_token_mapping": {
+        "image": "<img>",
+        "audio": "<audio>"
+      },
+      "modality_reader_settings_mapping": {
+        "image": {
+          "reader_type": "pickle",
+          "reader_path": null
+        },
+        "audio": null
+      },
+      "n_modality_embeddings": 225,
+      "start_modality_token": "<MS>",
+      "end_modality_token": "</MS>",
+      "dataset_type": "multimodal",
+      "max_tokens_count": 2000,
+      "only_answer_loss": true,
+      "truncate_top": false
+    },
+    "val_dataset_settings": {
+      "sources": [
+        {
+          "name": "test",
+          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+          "sample_rate": 1
+        }
+      ],
+      "prompt_template": {
+        "role_tag_mapping": {
+          "bot": "<bot>",
+          "user": "<user>",
+          "system": "<system>"
+        },
+        "prefix_template": "<RS>{role}",
+        "suffix_template": "</RS>"
+      },
+      "modality_token_mapping": {
+        "image": "<img>",
+        "audio": "<audio>"
+      },
+      "modality_reader_settings_mapping": {
+        "image": {
+          "reader_type": "pickle",
+          "reader_path": null
+        },
+        "audio": null
+      },
+      "n_modality_embeddings": 225,
+      "start_modality_token": "<MS>",
+      "end_modality_token": "</MS>",
+      "dataset_type": "multimodal",
+      "max_tokens_count": 2000,
+      "only_answer_loss": true,
+      "truncate_top": false
+    },
+    "model_settings": {
+      "model_path": "tests/fixtures/models/llama2_tiny",
+      "model_type": "causal",
+      "transformers_settings": {},
+      "peft_settings": {
+        "r": 16,
+        "lora_alpha": 16,
+        "lora_dropout": 0.05,
+        "target_modules": [
+          "q_proj",
+          "k_proj"
+        ],
+        "task_type": "CAUSAL_LM",
+        "modules_to_save": [
+          "embed_tokens",
+          "lm_head"
+        ],
+        "name": "LORA"
+      },
+      "embeddings_initialization_strategy": {
+        "<RS>": "bot",
+        "</RS>": "bot",
+        "<MS>": "bot",
+        "</MS>": "bot",
+        "<bot>": "bot",
+        "<user>": "bot",
+        "<system>": "bot",
+        "<img>": "bot",
+        "<audio>": "bot"
+      }
+    },
+    "tokenizer_settings": {},
+    "trainer_settings": {
+      "evaluation_strategy": "epoch",
+      "save_strategy": "epoch",
+      "per_device_train_batch_size": 1,
+      "per_device_eval_batch_size": 1,
+      "gradient_accumulation_steps": 1,
+      "logging_steps": 1,
+      "learning_rate": 0.00002,
+      "num_train_epochs": 1,
+      "lr_scheduler_type": "cosine",
+      "warmup_steps": 0,
+      "fp16": false,
+      "bf16": false,
+      "optim": "adamw_torch",
+      "save_total_limit": 1,
+      "no_cuda": true
+    },
+    "wandb_settings": null,
+    "modality_encoder_settings_mapping": {
+      "image": {
+        "modality_encoder_type": "clip",
+        "is_pickle": true,
+        "encoder_path": "tests/fixtures/models/clip_tiny"
+      },
+      "audio": null
+    },
+    "modality_projector_mapping": {
+      "image": "llava",
+      "audio": null
+    },
+    "modality_projector_initialization_mapping": {
+      "image": null,
+      "audio": null
+    },
+    "cherry_pick_settings": {
+      "generator_transformers_settings": {
+        "num_beams": 1,
+        "max_new_tokens": 4,
+        "repetition_penalty": 1.1,
+        "do_sample": false
+      },
+      "custom_generation_settings": {
+        "generation_eos_token": "</RS>",
+        "skip_special_tokens": true
+      },
+      "dataset_settings": {
+        "sources": [
+          {
+            "name": "cherry_picks",
+            "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+            "sample_rate": 1
+          }
+        ],
+        "prompt_template": {
+          "role_tag_mapping": {
+            "bot": "<bot>",
+            "user": "<user>",
+            "system": "<system>"
+          },
+          "prefix_template": "<RS>{role}",
+          "suffix_template": "</RS>"
+        },
+        "dataset_type": "multimodal",
+        "max_tokens_count": 2000,
+        "n_modality_embeddings": 225,
+        "start_modality_token": "<MS>",
+        "end_modality_token": "</MS>",
+        "only_answer_loss": true,
+        "modality_token_mapping": {
+          "image": "<img>",
+          "audio": "<audio>"
+        },
+        "modality_reader_settings_mapping": {
+          "image": {
+            "reader_type": "pickle",
+            "reader_path": null
+          },
+          "audio": null
+        },
+        "truncate_top": false,
+        "random_cut": true
+      },
+      "metric_settings": [
+        {
+          "type": "meteor",
+          "parameters": {
+            "need_average": [
+              true,
+              false
+            ]
+          }
+        }
+      ]
+    },
+    "log_path": "multimodal_train_output"
+  }

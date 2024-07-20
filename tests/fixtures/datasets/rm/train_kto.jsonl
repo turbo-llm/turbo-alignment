@@ -1,0 +1,4 @@
+{"id": "0", "context": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}], "answer": {"role": "bot", "content": "how are you"}, "is_desirable": false}
+{"id": "1", "context": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "good"}], "answer": {"role": "bot", "content": "hi"}, "is_desirable": true}
+{"id": "2", "context": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}, {"role": "bot", "content": "good"}], "answer": {"role": "bot", "content": "kek"}, "is_desirable": false}
+{"id": "3", "context": [{"role": "user", "content": "hi"}, {"role": "bot", "content": "hi"}, {"role": "user", "content": "how are you"}],"answer": {"role": "bot", "content": "bad"}, "is_desirable": true}
