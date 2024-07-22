@@ -4,25 +4,25 @@
 
 
 ### Common Attributes
-- `id`: str - a unique string identifier
+- `id`: str - A distinct identifier for each data entry, represented as a string.
 
 ### Dataset Types:
 - [Chat Dataset](#-chat-dataset)
 - [Pair Preferences Dataset](#-pair-preferences-dataset)
 - [KTO Dataset](#-kto-dataset)
 - [Sampling Dataset](#-sampling-dataset)
-- [Multimodal Dataset](#-multimodal-dataset)
+- [Multimodal Dataset ](#-multimodal-dataset) (⌛️ Work in progress...)
 - [Classification Dataset](#-classification-dataset)
-- [DPPO Dataset](#-ddpo-dataset)
+- [DPPO Dataset](#-ddpo-dataset) (⌛️ Work in progress...)
 
 
 
 <a name="-chat-dataset"></a>
-### For Chat Dataset
+### Chat Dataset
 
-- `messages`: `list[ChatMessage]` — chat history, where `ChatMessage` is structured as:
-  - `role` - the role of the speaker (e.g., user, bot).
-  - `content` - the message content.
+- `messages`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history. Each `ChatMessage` includes:
+  - `role` - The participant's role in the conversation (e.g., `user` or `bot`).
+  - `content` -  The textual content of the message.
 
 Example:
 ```json
@@ -41,9 +41,9 @@ Example:
 <a name="-pair-preferences-dataset"></a>
 ### Pair Preferences Dataset
 
-- `context`: `list[ChatMessage]` — chat history
-- `answer_w`: `ChatMessage` — the good response
-- `answer_l`: `ChatMessage` — the poor response
+- `context`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answer_w`: `ChatMessage` — The more preferable response.
+- `answer_l`: `ChatMessage` — The less preferable response.
 
 Example:
 ```json
@@ -61,10 +61,10 @@ Example:
 
 
 <a name="-kto-dataset"></a>
-### For KTO Dataset
-- `context`: `list[ChatMessage]` — chat history
-- `answer`: `ChatMessage` — response
-- `is_desirable`: `bool` — whether the response is desirable
+### KTO Dataset
+- `context`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answer`: `ChatMessage` — The given response.
+- `is_desirable`: `bool` —  Indicator if the provided response is considered as desirable or no.
 
 Example:
 ```json
@@ -91,11 +91,11 @@ Example:
 
 
 <a name="-sampling-dataset"></a>
-## For Sampling Dataset
-- `messages`: `list[ChatMessage]` — chat history
-- `answers`: `list[ChatInferenceOutput]` - list of answers, where `ChatInferenceOutput` is structured as:
-  - `id` : The number or id of generated completion
-  - `content` The content of generated completion
+## Sampling Dataset
+- `messages`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answers`: `list[ChatInferenceOutput]` - A list of generated responses. Each `ChatInferenceOutput` is structured as:
+  - `id`: `str` -  A unique identifier for the generated response.
+  - `content`: `str` - The content of generated completion
 
 Example:
 ```json
@@ -117,16 +117,15 @@ Example:
 
 
 <a name="-multimodal-dataset"></a>
-## For Multimodal Dataset
+## Multimodal Dataset
 ⌛️ in progress..
-examples [here](../tests/fixtures/datasets/multimodal)
 
 
 
 <a name="-classification-dataset"></a>
-### For Classification Dataset
-- `messages`: `list[ChatMessage]` — chat history
-- `label`: `int` — class labels
+### Classification Dataset
+- `messages`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `label`: `int` — Label of provided chat history.
 
 Example: 
 ```json
