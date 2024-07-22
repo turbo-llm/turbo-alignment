@@ -1,3 +1,4 @@
+# mypy: disable-error-code="call-overload"
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
@@ -267,9 +268,9 @@ class DPOTrainer(Trainer):
         self.sync_ref_settings = args.sync_ref_settings
 
         if hasattr(args, 'loss_settings'):
-            self.loss_type = args.loss_settings['loss_type']
+            self.loss_type = args.loss_settings['loss_type']  # type: ignore[index]
             loss_args = args.loss_settings
-            loss_args.pop('loss_type')
+            loss_args.pop('loss_type')  # type: ignore[union-attr]
             self.dpo_loss_registry = DPOLossRegistry.by_name(self.loss_type)(**loss_args)
 
         self._stored_metrics: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
@@ -309,7 +310,7 @@ class DPOTrainer(Trainer):
         self.add_callback(PrinterCallback if self.args.disable_tqdm else ProgressCallback)
         self.control: TrainerControl = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
-        if self.sync_ref_settings['sync_ref_model']:
+        if self.sync_ref_settings['sync_ref_model']:  # type: ignore[index]
             self.add_callback(SyncRefModelCallback(sync_ref_settings=self.sync_ref_settings))
 
     def dpo_loss(
