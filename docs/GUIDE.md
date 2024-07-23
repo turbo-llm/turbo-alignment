@@ -31,11 +31,14 @@ More configs you can find [here](../tests/fixtures/configs)
 Basic settings to load the model.
 
 ```json
-"model_settings": {
-        "model_path": "/from_s3/model", "model_type": "causal",
+"model_settings": 
+    {
+        "model_path": "/from_s3/model", 
+        "model_type": "causal",
         "adapter_path": "/from_s3/adapters",
-        "transformers_settings": {}, "model_kwargs": {}
-      }
+        "transformers_settings": {}, 
+        "model_kwargs": {}
+    }
 ```
 
 **model_kwargs**  -- the place to specify something like "attn_implementation": "flash_attention_2" <br>
@@ -47,7 +50,11 @@ merge config for vLLM [here](configs/utils/convert_to_base/llama.json)
 ### Tokenizer Settings
 Basic settings to load the tokenizer <br>
 ```json
-"tokenizer_settings": {"use_fast": false, "tokenizer_path": "/from_s3/tokenizer"}
+"tokenizer_settings": 
+    {
+        "use_fast": false, 
+        "tokenizer_path": "/from_s3/tokenizer"
+    }
 ```
 **use_fast** -- critical for some models
 
@@ -56,10 +63,18 @@ Basic settings to load the tokenizer <br>
 **custom_settings** -- useful for display. for example, you can choose to display or not display the prompt/special tokens
 
 ```json
-"generation_settings": [{
-          "transformers_settings": {"num_beams": 3,"max_new_tokens": 500,"repetition_penalty": 1.02 },
-          "custom_settings": {"generation_eos_token": "</RS>", "skip_special_tokens": false}
-        }]
+"generation_settings": [
+    {
+        "transformers_settings": {
+            "num_beams": 3,
+            "max_new_tokens": 500,
+            "repetition_penalty": 1.02
+        },
+        "custom_settings": {
+            "generation_eos_token": "</RS>", "skip_special_tokens": false
+        }
+    }
+]
 ```
 **generation_eos_token** -- varies between models, or you might have trained your own
 
@@ -68,12 +83,23 @@ Basic settings to load the tokenizer <br>
 **chat_settings** -- how your messages will be processed for input into the llm
 ```json
 "dataset_settings": {
-    "sources": [{"name": "val","records_path": "/from_s3/dataset/val_chat.jsonl", "sample_rate": 1}],
-    "prompt_template": {"role_tag_mapping": {"bot": "<bot>","user": "<user>"},
+    "sources": [
+        {
+            "name": "val",
+            "records_path": "/from_s3/dataset/val_chat.jsonl", "sample_rate": 1
+        }
+    ],
+    "prompt_template": {
+        "role_tag_mapping": {
+            "bot": "<bot>",
+            "system": "<system>",
+            "user": "<user>"
+        },
         "prefix_template": "<RS>{role}",
-        "suffix_template": "</RS>"},
+        "suffix_template": "</RS>"
+    },
     "dataset_type": "chat",
-    "max_tokens_count": 150,
+    "max_tokens_count": 150
   }
 ```
 **prompt_template** -- For each message from **dataset[’messages’][i]** which looks like {role: role, content: content}, we get a string of **[Prefix_template + content + Suffix_template]** then we combine all obtained strings into a single text.
@@ -104,8 +130,13 @@ Don't forget to specify that your model is for classification😏   [classificat
 
 
 ```json
-"model_settings": { "model_type": "seq_cls",
-          "model_kwargs": {"num_labels": 2,"problem_type": "single_label_classification"}},
+"model_settings": {
+    "model_type": "seq_cls",
+    "model_kwargs": {
+            "num_labels": 2,
+            "problem_type": "single_label_classification"
+        }
+    },
 "dataset_type": "classification"
 ```
 
@@ -120,9 +151,9 @@ For this, check this config: [rag_inference](configs/exp/inference/rag/rag_infer
 if you're dealing with RAG, this part should already be familiar to you.
 
 ```json
-{"question_encoder_settings": {}
-"index_settings": {}
-"retrieval_settings": {}}
+"question_encoder_settings": {},
+"index_settings": {},
+"retrieval_settings": {}
 ```
 
 
@@ -131,7 +162,10 @@ if you're dealing with RAG, this part should already be familiar to you.
 #### embeddings_initialization_strategy:
 
 ```json
-{"embeddings_initialization_strategy": {"<RS>": "<s>", "<super_bot>": "the best bot ever"}}
+"embeddings_initialization_strategy": {
+    "<RS>": "<s>", 
+    "<super_bot>": "the best bot ever"
+}
 ``` 
 During training, you might want to add your special tokens, e.g., for RAG **<doc_sep>** is useful, for multimodal tasks you might want to specify a particular **<modal_name>**.
 
@@ -142,7 +176,8 @@ similiar as inference_dataset but
 Pay attention to **"only_answer_loss": true**:
 This parameter means the model will calculate the error only on the last message from dataset[’messages’]. In most cases, you want the last message to be from the role: **bot**, otherwise, you're training the model to mimic the user! 😏
 ```json
-{"keep_start": "bool", "keep_end": "bool"}
+"keep_start": "bool", 
+"keep_end": "bool"
 ```
  **CUT**: if keep_start -> [:max_tokens_count] elif keep_end -> [-max_tokens_count:]; <br>
  cuts off the last fully entered message in the dialogue. <br>
@@ -160,7 +195,10 @@ PrefixTuning|Lora|PromptTuning| PTuning <br>
 Check this out: [P-Tuning](../tests/fixtures/configs/train/sft/prompt_tuning.json)<br>
 
 ```json
-"peft_settings": {"name": "P_TUNING","num_virtual_tokens": 32}
+"peft_settings": {
+    "name": "P_TUNING",
+    "num_virtual_tokens": 32
+}
 ```
 
 ### Custom Modifications
@@ -176,10 +214,18 @@ We prepare the dataset in advance with separators **<doc_sep>** initialized simp
 [classification train](configs/exp/train/classification/classification.json)
 
 ```json
-{"dataset_type": "classification",
-"model_type": "seq_cls",
-"model_kwargs": {"num_labels": 2, "return_dict": true, "problem_type": "single_label_classification"},
-"peft_setting": {"task_type": "SEQ_CLS"}}
+{
+    "dataset_type": "classification",
+    "model_type": "seq_cls",
+    "model_kwargs": {
+            "num_labels": 2, 
+            "return_dict": true, 
+            "problem_type": "single_label_classification"
+        },
+    "peft_setting": {
+        "task_type": "SEQ_CLS"
+    }
+}
 ```
 
 
@@ -192,9 +238,13 @@ We prepare the dataset in advance with separators **<doc_sep>** initialized simp
 ### Reward Model
 Preferences are everything → prepare the pair_preference dataset→ run config [RM](configs/exp/train/rm/rm.json)
 ```json
-    {"add_labels": false,
-    "dataset_type": "pair_preferences"
-    "model_settings": {"model_type": "seq_cls"}}
+{
+    "add_labels": false,
+    "dataset_type": "pair_preferences",
+    "model_settings": {
+        "model_type": "seq_cls"
+    }
+}
 ```
 
 ### Multimodal Tasks
