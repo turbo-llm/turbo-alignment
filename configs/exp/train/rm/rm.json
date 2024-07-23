@@ -3,22 +3,22 @@
         "sources": [
             {
                 "name": "train_preference",
-                "records_path": "train_preferences.jsonl",
+                "records_path": "/from_s3/dataset/train_preferences.jsonl",
                 "sample_rate": 1.0
             }
         ],
         "chat_settings":{
             "prompt_template": {
                 "role_tag_mapping": {
-                    "bot": "<bot>",
-                    "user": "<user>",
-                    "system": "<system>"
+                    "bot": "assistant",
+                    "user": "user",
+                    "system": "system"
                 },
-                "prefix_template": "<RS>{role}",
-                "suffix_template": "</RS>"
+                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                "suffix_template": "<|eot_id|>"
             },
             "keep_end": true,
-            "max_tokens_count": 1024
+            "max_tokens_count": 2000
         },
         "add_labels": false,
         "dataset_type": "pair_preferences"
@@ -27,22 +27,22 @@
         "sources": [
             {
                 "name": "val_preference",
-                "records_path": "val_preferences.jsonl",
+                "records_path": "/from_s3/dataset/val_preferences.jsonl",
                 "sample_rate": 1.0
             }
         ],
         "chat_settings":{
             "prompt_template": {
                 "role_tag_mapping": {
-                    "bot": "<bot>",
-                    "user": "<user>",
-                    "system": "<system>"
+                    "bot": "assistant",
+                    "user": "user",
+                    "system": "system"
                 },
-                "prefix_template": "<RS>{role}",
-                "suffix_template": "</RS>"
+                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                "suffix_template": "<|eot_id|>"
             },
             "keep_end": true,
-            "max_tokens_count": 1024
+            "max_tokens_count": 2000
         },
         "add_labels": false,
         "dataset_type": "pair_preferences"
@@ -51,22 +51,22 @@
         "dataset_settings":{
             "sources": [
                 {
-                    "name": "rm_preferences_test",
-                    "records_path": "tests/fixtures/datasets/rm/val_preferences.jsonl",
-                    "sample_rate": 1
+                    "name": "cherrypick_preferences",
+                    "records_path": "/from_s3/dataset/cherrypick_preferences.jsonl",
+                    "num_samples": 150
                 }
             ],
             "chat_settings":{
                 "prompt_template": {
                     "role_tag_mapping": {
-                        "bot": "<bot>",
-                        "user": "<user>",
-                        "system": "<system>"
+                        "bot": "assistant",
+                        "user": "user",
+                        "system": "system"
                     },
-                    "prefix_template": "<RS>{role}",
-                    "suffix_template": "</RS>"
+                    "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                    "suffix_template": "<|eot_id|>"
                 },
-                "max_tokens_count": 120
+                "max_tokens_count": 2000
             },
             "add_labels": false,
             "dataset_type": "pair_preferences"
@@ -74,19 +74,15 @@
         "metric_settings": []
     },
     "model_settings": {
-        "model_path": "models/rm",
+        "model_path": "/from_s3/model",
         "model_type": "seq_cls",
         "transformers_settings": {},
         "model_kwargs": {
             "num_labels": 1,
-            "return_dict": true,
-            "torch_dtype": "bfloat16",
             "attn_implementation": "flash_attention_2"
         }
     },
-    "tokenizer_settings": {
-        "use_fast": false
-    },
+    "tokenizer_settings": {},
     "trainer_settings": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
@@ -110,7 +106,7 @@
         "weight_decay": 0.0,
         "optim": "adamw_torch",
         "save_total_limit": 1,
-        "deepspeed": "configs/exp/deepspeed/ds_config_zero3.json"
+        "deepspeed": "configs/exp/deepspeed/stage2.json"
     },
     "wandb_settings": {
         "project_name": "alignment",
