@@ -1,1 +1,7 @@
-from sampling import BaseSamplingSettings, BaseSamplingWithRMSettings, RandomSamplingSettings, RSOSamplingSettings
+from .sampling import (
+    BaseSamplingSettings,
+    BaseSamplingWithRMSettings,
+    RandomSamplingSettings,
+    RSOSamplingSettings,
+    SamplingWithRMSettings,
+)

@@ -29,9 +29,9 @@ class RagasMetrics(Metric):
             # use openai endpoints if api key is provided
             from langchain_openai import OpenAI, OpenAIEmbeddings
 
-            self._llm = OpenAI(openai_api_key=self._settings.openai_api_key, model="gpt-3.5-turbo-instruct")
+            self._llm = OpenAI(openai_api_key=self._settings.openai_api_key, model='gpt-3.5-turbo-instruct')
             self._embeddings = OpenAIEmbeddings(
-                openai_api_key=self._settings.openai_api_key, model="text-embedding-3-large"
+                openai_api_key=self._settings.openai_api_key, model='text-embedding-3-large'
             )
 
         elif self._settings.mistralai_api_key is not None:

@@ -1,1 +1,1 @@
-from merge_adapters_to_base import MergeAdaptersToBaseModelSettings
+from .merge_adapters_to_base import MergeAdaptersToBaseModelSettings
