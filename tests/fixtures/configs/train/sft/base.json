@@ -5,11 +5,6 @@
                 "name": "chat_test",
                 "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
                 "sample_rate": 1
-            },
-            {
-                "name": "support",
-                "records_path": "tests/fixtures/datasets/chat/train_chat_rag.jsonl",
-                "num_samples": 1
             }
         ],
         "prompt_template": {
@@ -31,11 +26,6 @@
                 "name": "chat_test",
                 "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
                 "sample_rate": 1
-            },
-            {
-                "name": "support",
-                "records_path": "tests/fixtures/datasets/chat/train_chat_rag.jsonl",
-                "num_samples": 1
             }
         ],
         "prompt_template": {
@@ -91,11 +81,6 @@
                     "name": "chat_test",
                     "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
                     "sample_rate": 1.0
-                },
-                {
-                    "name": "support",
-                    "records_path": "tests/fixtures/datasets/chat/train_chat_rag.jsonl",
-                    "num_samples": 1
                 }
             ],
             "prompt_template": {
