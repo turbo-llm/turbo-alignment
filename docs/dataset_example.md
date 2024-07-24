@@ -4,7 +4,7 @@
 
 
 ### Common Attributes
-- `id`: str - A distinct identifier for each data entry, represented as a string.
+- `id`: `str` - A distinct identifier for each data entry, represented as a string.
 
 ### Dataset Types:
 - [Chat Dataset](#-chat-dataset)
