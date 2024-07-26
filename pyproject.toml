@@ -40,8 +40,8 @@ pydantic-settings ="^2.2.1"
 pydantic ="^2.7.0"
 timm ="^0.9.7"
 opencv-python = "^4.10.0.84"
-ragas = "^0.1.10"
 langchain-huggingface = "^0.0.3"
+ragas = "^0.1.10"
 
 [tool.poetry.group.deepspeed.dependencies]
 accelerate = "0.27"
