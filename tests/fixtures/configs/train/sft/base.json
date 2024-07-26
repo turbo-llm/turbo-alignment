@@ -125,13 +125,17 @@
         "learning_rate": 0.0003,
         "num_train_epochs": 2,
         "lr_scheduler_type": "cosine",
-        "warmup_steps": 1,
+        "warmup_steps": 2,
         "fp16": false,
         "bf16": false,
         "optim": "adamw_torch",
         "save_total_limit": 1,
         "no_cuda": true
     },
-    "wandb_settings": null,
+    "wandb_settings": {
+        "project_name": "alignment",
+        "run_name": "sft",
+        "entity": "turbo-alignment"
+      },
     "log_path": "test_sft_chat_llama_train_output"
 }
