@@ -117,7 +117,7 @@
         "learning_rate": 0.0003,
         "num_train_epochs": 2,
         "lr_scheduler_type": "cosine",
-        "warmup_steps": 1,
+        "warmup_steps": 2,
         "fp16": false,
         "bf16": false,
         "optim": "adamw_torch",
@@ -131,6 +131,10 @@
         "use_sft_model": true,
         "no_cuda": true
     },
-    "wandb_settings": null,
+    "wandb_settings": {
+        "project_name": "alignment",
+        "run_name": "dpo",
+        "entity": "turbo-alignment"
+      },
     "log_path": "test_dpo_llama_train_output"
 }

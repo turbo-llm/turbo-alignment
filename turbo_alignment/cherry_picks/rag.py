@@ -54,6 +54,6 @@ class RagCherryPickCallback(ChatCherryPickCallback):
 
         for metric in self._metrics:
             metric_results = metric.compute(dataset=dataset, generations=generations)
-            metric_outputs.append(metric_results)
+            metric_outputs.extend(metric_results)
 
         return metric_outputs

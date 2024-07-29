@@ -1,15 +1,8 @@
-import os
+# pylint: skip-file
+# pylint: disable-all
+# mypy: ignore-errors
 
-import torch
 from datasets import Dataset
-from langchain_community.llms import VLLM
-from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import BaseLanguageModel
-from langchain_huggingface.embeddings import (
-    HuggingFaceEmbeddings,
-    HuggingFaceEndpointEmbeddings,
-)
-from langchain_huggingface.llms import HuggingFacePipeline
 from ragas import RunConfig, evaluate
 from ragas.metrics import (
     answer_relevancy,
@@ -19,24 +12,12 @@ from ragas.metrics import (
     context_recall,
     faithfulness,
 )
-from transformers import (
-    BitsAndBytesConfig,
-    DataCollatorWithPadding,
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
-)
 
 from turbo_alignment.dataset.chat import InferenceChatDataset
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.registry import RagasMetricsSettings
-from turbo_alignment.metrics.utils import calculate_cross_entropy
 from turbo_alignment.settings.generators.outputs.chat import RagInferenceOutput
-from turbo_alignment.settings.metric import (
-    ElementWiseScores,
-    MetricResults,
-    MetricSettings,
-    MetricType,
-)
+from turbo_alignment.settings.metric import MetricResults, MetricType
 
 
 @Metric.register(MetricType.RAGAS_METRICS)
@@ -48,9 +29,9 @@ class RagasMetrics(Metric):
             # use openai endpoints if api key is provided
             from langchain_openai import OpenAI, OpenAIEmbeddings
 
-            self._llm = OpenAI(openai_api_key=self._settings.openai_api_key, model="gpt-3.5-turbo-instruct")
+            self._llm = OpenAI(openai_api_key=self._settings.openai_api_key, model='gpt-3.5-turbo-instruct')
             self._embeddings = OpenAIEmbeddings(
-                openai_api_key=self._settings.openai_api_key, model="text-embedding-3-large"
+                openai_api_key=self._settings.openai_api_key, model='text-embedding-3-large'
             )
 
         elif self._settings.mistralai_api_key is not None:

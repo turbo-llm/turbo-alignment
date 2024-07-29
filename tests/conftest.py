@@ -18,21 +18,21 @@ from turbo_alignment.settings.datasets.pair_preference import (
 )
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def tokenizer_llama2():
     tokenizer_path = 'tests/fixtures/models/llama2_classification/tokenizer'
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     return tokenizer
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def tokenizer_gptj():
     tokenizer_path = 'tests/fixtures/models/gptj_tiny_for_seq_cls'
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     return tokenizer
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def chat_dataset_settings():
     chat_dataset_settings = ChatDatasetSettings(
         prompt_template=ChatPromptTemplate(
@@ -45,19 +45,19 @@ def chat_dataset_settings():
     return chat_dataset_settings
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def classification_dataset_path() -> str:
     return 'tests/fixtures/datasets/classification/train_classification.jsonl'
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def pair_preferences_dataset_path() -> str:
     return 'tests/fixtures/datasets/rm/train_preferences.jsonl'
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def kto_dataset_path() -> str:
-    return "tests/fixtures/datasets/rm/train_kto.jsonl"
+    return 'tests/fixtures/datasets/rm/train_kto.jsonl'
 
 
 def load_dataset_source(dataset_path: str) -> tuple[DatasetSourceSettings, list[dict]]:
@@ -69,22 +69,22 @@ def load_dataset_source(dataset_path: str) -> tuple[DatasetSourceSettings, list[
     return source, data_dicts
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def classification_dataset_source(classification_dataset_path) -> tuple[DatasetSourceSettings, list[dict]]:
     return load_dataset_source(classification_dataset_path)
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def pair_preferences_dataset_source(pair_preferences_dataset_path) -> tuple[DatasetSourceSettings, list[dict]]:
     return load_dataset_source(pair_preferences_dataset_path)
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def kto_dataset_source(kto_dataset_path) -> tuple[DatasetSourceSettings, list[dict]]:
     return load_dataset_source(kto_dataset_path)
 
 
-@fixture(scope="session")
+@fixture(scope='session')
 def dpo_dataset(pair_preferences_dataset_source, tokenizer_llama2, chat_dataset_settings):
     source, _ = pair_preferences_dataset_source
 

@@ -2,12 +2,12 @@ import torch
 from peft import PeftModel
 
 from turbo_alignment.common.tf.loaders import load_model, load_tokenizer
-from turbo_alignment.settings.pipelines.convert_to_base import (
-    ConvertToBaseModelSettings,
+from turbo_alignment.settings.pipelines.common.merge_adapters_to_base import (
+    MergeAdaptersToBaseModelSettings,
 )
 
 
-def peft_to_base_model(settings: ConvertToBaseModelSettings) -> None:
+def peft_to_base_model(settings: MergeAdaptersToBaseModelSettings) -> None:
     tokenizer = load_tokenizer(settings.tokenizer_settings, settings.model_settings)
     base_model = load_model(settings.model_settings, tokenizer)
 

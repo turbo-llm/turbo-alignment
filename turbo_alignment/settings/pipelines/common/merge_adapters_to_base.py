@@ -5,7 +5,7 @@ from turbo_alignment.settings.model import PreTrainedModelSettings
 from turbo_alignment.settings.tf.tokenizer import TokenizerSettings
 
 
-class ConvertToBaseModelSettings(ExtraFieldsNotAllowedBaseModel):
+class MergeAdaptersToBaseModelSettings(ExtraFieldsNotAllowedBaseModel):
     model_settings: PreTrainedModelSettings
     tokenizer_settings: TokenizerSettings
 

@@ -58,7 +58,7 @@ class RewardMetric(Metric):
         ]
 
         chat_settings = dataset.settings
-        chat_settings.only_bot_replica_loss = False
+        chat_settings.only_answer_loss = False
 
         new_dataset = SamplingRMDataset(
             source=DatasetSourceSettings(name='', records_data=rm_input_records, sample_rate=1.0),

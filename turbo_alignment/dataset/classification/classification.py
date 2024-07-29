@@ -29,7 +29,7 @@ class ClassificationDataset(AlignmentDataset[ClassificationDatasetRecord], ABC):
         settings: ClassificationDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
     ):
-        settings.chat_settings.only_bot_replica_loss = False
+        settings.chat_settings.only_answer_loss = False
         self._chat_dataset = TrainChatDataset(
             source=source,
             settings=settings.chat_settings,

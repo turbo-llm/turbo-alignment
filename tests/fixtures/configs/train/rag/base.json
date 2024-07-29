@@ -140,6 +140,10 @@
     "no_cuda": true,
     "save_total_limit": 1
   },
-  "wandb_settings": null,
+  "wandb_settings": {
+    "project_name": "alignment",
+    "run_name": "rag",
+    "entity": "turbo-alignment"
+  },
   "log_path": "test_rag_train_output"
 }

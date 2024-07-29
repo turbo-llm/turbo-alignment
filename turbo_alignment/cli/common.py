@@ -8,7 +8,7 @@ from turbo_alignment.common.tf.convert_to_base_model import peft_to_base_model
 from turbo_alignment.settings.datasets.multimodal import (
     MultimodalDatasetProcessingSettings,
 )
-from turbo_alignment.settings.pipelines import ConvertToBaseModelSettings
+from turbo_alignment.settings.pipelines import MergeAdaptersToBaseModelSettings
 
 
 @app.command(
@@ -23,9 +23,9 @@ def process_multimodal_dataset(
     pipelines.PreprocessMultimodalDatasetStrategy().run(settings)
 
 
-@app.command(name='convert_to_base', help='Convert peft adapters to base model format')
-def convert_to_base_entrypoint(
+@app.command(name='merge_adapters_to_base', help='Merge peft adapters into base model')
+def merge_adapters_to_base_entrypoint(
     settings_path: Path = typer.Option(..., '--settings_path', exists=True, help='Path to script config file')
 ) -> None:
-    settings = ConvertToBaseModelSettings.parse_file(settings_path)
+    settings = MergeAdaptersToBaseModelSettings.parse_file(settings_path)
     peft_to_base_model(settings)

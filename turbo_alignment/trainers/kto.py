@@ -30,7 +30,9 @@ logger = get_project_logger()
 @dataclass
 class KTOTrainingArguments(TrainingArguments):
     beta: float = 0.1
-    sync_ref_settings: SyncRefModelSettings = field(default_factory=SyncRefModelSettings())
+    sync_ref_settings: SyncRefModelSettings = field(
+        default_factory=SyncRefModelSettings()  # type: ignore[call-overload]
+    )
     use_ref_model: bool = True
     average_log_prob: bool = False
     undesirable_weight: float = 1.0

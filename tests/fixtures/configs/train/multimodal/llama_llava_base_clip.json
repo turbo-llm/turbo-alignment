@@ -120,7 +120,11 @@
       "save_total_limit": 1,
       "no_cuda": true
     },
-    "wandb_settings": null,
+    "wandb_settings": {
+      "project_name": "alignment",
+      "run_name": "multimodal",
+      "entity": "turbo-alignment"
+    },
     "modality_encoder_settings_mapping": {
       "image": {
         "modality_encoder_type": "clip",
@@ -185,17 +189,7 @@
         "truncate_top": false,
         "random_cut": true
       },
-      "metric_settings": [
-        {
-          "type": "meteor",
-          "parameters": {
-            "need_average": [
-              true,
-              false
-            ]
-          }
-        }
-      ]
+      "metric_settings": []
     },
-    "log_path": "multimodal_train_output"
+    "log_path": "test_multimodal_train_output"
   }
