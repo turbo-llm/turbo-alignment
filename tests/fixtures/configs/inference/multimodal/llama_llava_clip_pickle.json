@@ -87,5 +87,5 @@
     "truncate_top": false,
     "random_cut": true
   },
-  "save_path": "llama_clip_multimodal_inference"
+  "save_path": "test_llama_clip_multimodal_inference_output"
 }

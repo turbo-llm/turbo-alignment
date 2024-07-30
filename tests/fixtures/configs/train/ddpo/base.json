@@ -150,6 +150,10 @@
         "no_cuda": true,
         "max_grad_norm": 1.0
     },
-    "wandb_settings": null,
+    "wandb_settings": {
+        "project_name": "alignment",
+        "run_name": "ddpo",
+        "entity": "turbo-alignment"
+      },
     "log_path": "train_output"
 }

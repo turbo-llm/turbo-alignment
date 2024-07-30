@@ -37,8 +37,8 @@ from turbo_alignment import pipelines
 from turbo_alignment.dataset.registry import DatasetRegistry
 from turbo_alignment.settings import pipelines as pipeline_settings
 
-ds_qap = load_dataset("rag-datasets/rag-mini-bioasq", "question-answer-passages")
-ds_corpus = load_dataset("rag-datasets/rag-mini-bioasq", "text-corpus")
+ds_qap = load_dataset('rag-datasets/rag-mini-bioasq', 'question-answer-passages')
+ds_corpus = load_dataset('rag-datasets/rag-mini-bioasq', 'text-corpus')
 
 from transformers import AutoModelForCausalLM
 
@@ -74,7 +74,7 @@ def save_index(num_passages=1000):
     passages_with_embeddings.save_faiss_index('embeddings', 'my_index.faiss')
 
     passages_with_embeddings.drop_index('embeddings')
-    passages_with_embeddings = passages_with_embeddings.rename_column("id", "title").rename_column('passage', 'text')
+    passages_with_embeddings = passages_with_embeddings.rename_column('id', 'title').rename_column('passage', 'text')
 
     features = passages_with_embeddings.features.copy()
     features['title'] = Value('string')
@@ -85,35 +85,35 @@ def save_index(num_passages=1000):
 # save_index()
 
 model_settings_json = {
-    "generator_settings": {
-        "model_path": GENERATOR_MODEL,
-        "model_type": "causal",
-        "transformers_settings": {},
-        "embeddings_initialization_strategy": {
-            "<|begin_of_text|>": "<s>",
-            "<|end_of_text|>": "</s>",
-            "<bot>": "bot",
-            "<user>": "user",
-            "<system>": "system",
+    'generator_settings': {
+        'model_path': GENERATOR_MODEL,
+        'model_type': 'causal',
+        'transformers_settings': {},
+        'embeddings_initialization_strategy': {
+            '<|begin_of_text|>': '<s>',
+            '<|end_of_text|>': '</s>',
+            '<bot>': 'bot',
+            '<user>': 'user',
+            '<system>': 'system',
         },
-        "peft_settings": {
-            "r": 4,
-            "lora_alpha": 16,
-            "lora_dropout": 0.05,
-            "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj"],
-            "task_type": "CAUSAL_LM",
-            "modules_to_save": [],
-            "name": "LORA",
+        'peft_settings': {
+            'r': 4,
+            'lora_alpha': 16,
+            'lora_dropout': 0.05,
+            'target_modules': ['q_proj', 'v_proj', 'k_proj', 'o_proj'],
+            'task_type': 'CAUSAL_LM',
+            'modules_to_save': [],
+            'name': 'LORA',
         },
     },
-    "question_encoder_settings": {
-        "model_path": ENCODER_MODEL,
-        "model_type": "encoder",
-        "transformers_settings": {},
-        "embeddings_initialization_strategy": {},
+    'question_encoder_settings': {
+        'model_path': ENCODER_MODEL,
+        'model_type': 'encoder',
+        'transformers_settings': {},
+        'embeddings_initialization_strategy': {},
     },
-    "index_settings": {"index_path": "my_index.faiss", "passages_path": "passages"},
-    "retrieval_settings": {"n_docs": 2, "max_doc_length": 256, "query_encoder_max_length": 128},
+    'index_settings': {'index_path': 'my_index.faiss', 'passages_path': 'passages'},
+    'retrieval_settings': {'n_docs': 2, 'max_doc_length': 256, 'query_encoder_max_length': 128},
 }
 
 from turbo_alignment.modeling.rag.rag_model import RagSequenceForGeneration
@@ -129,7 +129,7 @@ is_train = True
 
 if is_train:
     peft_config = model_settings.generator_settings.peft_settings.dict()
-    peft_config["peft_type"] = peft_config['name']
+    peft_config['peft_type'] = peft_config['name']
     del peft_config['name']
 
     peft_config = get_peft_config(peft_config)
@@ -143,9 +143,9 @@ records = []
 for example in ds_qap['test']:
     messages = [{'role': 'user', 'content': example['question']}, {'role': 'bot', 'content': example['answer']}]
     record = {
-        "messages": messages,
-        "meta": {'relevant_passage_ids': example['relevant_passage_ids']},
-        "id": example['id'],
+        'messages': messages,
+        'meta': {'relevant_passage_ids': example['relevant_passage_ids']},
+        'id': example['id'],
     }
 
     records.append(record)
@@ -161,17 +161,17 @@ val_records = val_records[:10]
 def records_to_dataset(records: list, strategy: str, tokenizer: PreTrainedTokenizerBase):
     dataset_cls = DatasetRegistry.by_name('chat').by_name(strategy)
 
-    source = DatasetSourceSettings(name="rag-mini-bioasq", records_data=records, num_samples=len(records))
+    source = DatasetSourceSettings(name='rag-mini-bioasq', records_data=records, num_samples=len(records))
 
     chat_dataset_settings_dict = {
-        "prompt_template": {
-            "role_tag_mapping": {"bot": "<bot>", "user": "<user>", "system": "<system>"},
-            "prefix_template": "<|im_start|>{role}\n",
-            "suffix_template": "<|im_end|>",
+        'prompt_template': {
+            'role_tag_mapping': {'bot': '<bot>', 'user': '<user>', 'system': '<system>'},
+            'prefix_template': '<|im_start|>{role}\n',
+            'suffix_template': '<|im_end|>',
         },
-        "dataset_type": "chat",
-        "max_tokens_count": None,
-        "only_answer_loss": True,
+        'dataset_type': 'chat',
+        'max_tokens_count': None,
+        'only_answer_loss': True,
     }
     chat_dataset_settings = ChatDatasetSettings(**chat_dataset_settings_dict)
 
@@ -186,31 +186,31 @@ def evaluate(val_records, rag_model):
     inference_chat_dataset = records_to_dataset(val_records, 'inference', tokenizer)
 
     cherry_pick_settings_dict = {
-        "generator_transformers_settings": {
-            "num_beams": 1,
-            "max_new_tokens": 256,
-            "do_sample": False,
+        'generator_transformers_settings': {
+            'num_beams': 1,
+            'max_new_tokens': 256,
+            'do_sample': False,
         },
-        "custom_generation_settings": {"generation_eos_token": "<|im_end|>", "skip_special_tokens": True},
-        "dataset_settings": {
-            "sources": [
+        'custom_generation_settings': {'generation_eos_token': '<|im_end|>', 'skip_special_tokens': True},
+        'dataset_settings': {
+            'sources': [
                 {
-                    "name": "support",
-                    "records_path": "tests/fixtures/datasets/chat/train_chat_rag.jsonl",
-                    "num_samples": 1,
+                    'name': 'support',
+                    'records_path': 'tests/fixtures/datasets/chat/train_chat_rag.jsonl',
+                    'num_samples': 1,
                 }
             ],
-            "prompt_template": {
-                "role_tag_mapping": {"bot": "<bot>", "user": "<user>", "system": "<system>"},
-                "prefix_template": "<|im_start|>{role}",
-                "suffix_template": "<|im_end|>",
+            'prompt_template': {
+                'role_tag_mapping': {'bot': '<bot>', 'user': '<user>', 'system': '<system>'},
+                'prefix_template': '<|im_start|>{role}',
+                'suffix_template': '<|im_end|>',
             },
-            "dataset_type": "chat",
-            "max_tokens_count": 20000,
-            "random_cut": True,
-            "only_answer_loss": False,
+            'dataset_type': 'chat',
+            'max_tokens_count': 20000,
+            'random_cut': True,
+            'only_answer_loss': False,
         },
-        "metric_settings": [],
+        'metric_settings': [],
     }
 
     from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
@@ -220,7 +220,7 @@ def evaluate(val_records, rag_model):
     from turbo_alignment.metrics.metric import Metric
     from turbo_alignment.metrics.registry import RagasMetricsSettings
 
-    ragas_metrics = Metric.by_name("ragas_metrics")(
+    ragas_metrics = Metric.by_name('ragas_metrics')(
         settings=RagasMetricsSettings(
             mistralai_api_key=os.getenv('MISTRALAI_API_KEY'),
             openai_api_key=os.getenv('OPENAI_API_KEY'),

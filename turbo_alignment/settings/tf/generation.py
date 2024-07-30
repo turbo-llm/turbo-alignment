@@ -2,7 +2,6 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
-    # described in https://huggingface.co/docs/transformers/v4.42.0/en/main_classes/text_generation#transformers.GenerationConfig
     num_beams: int = 1
     max_new_tokens: int = 15
     repetition_penalty: float = 1.0

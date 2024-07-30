@@ -2,7 +2,7 @@ from typing import Generator
 
 import torch
 from accelerate import Accelerator
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
 
 from turbo_alignment.common.tf.loaders import load_model, load_tokenizer
 from turbo_alignment.generators.base import BaseGenerator
@@ -36,11 +36,11 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                     tensor_parallel_size=model_inference_settings.tensor_parallel_size,
                 )
             else:
-                model: PreTrainedModel = load_model(model_inference_settings.model_settings, tokenizer)
+                model = load_model(model_inference_settings.model_settings, tokenizer)
                 model = (
                     accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
                     if torch.cuda.is_available()
-                    else model.to('cpu')
+                    else model.to('cpu')  # type: ignore[attr-defined]
                 )
 
             for generation_settings in model_inference_settings.generation_settings:

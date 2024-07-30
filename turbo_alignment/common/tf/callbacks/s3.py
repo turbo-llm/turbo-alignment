@@ -33,7 +33,6 @@ class CheckpointUploaderCallback(TrainerCallback):
         self._s3_handler.upload_local_file(
             target_directory=Path(self._parameters.checkpoints_directory) / last_checkpoint_basename,
             file_path=Path(args.output_dir) / 'experiment_metadata.json',
-            save_optimizer_states=self._parameters.save_optimizer_states,
         )
 
         return control
@@ -68,7 +67,11 @@ class CheckpointUploaderCallback(TrainerCallback):
         last_checkpoint_basename = str(checkpoint_directory).rsplit('/', maxsplit=1)[-1]
         s3_key = f'{self._parameters.checkpoints_directory}/{last_checkpoint_basename}'
         logger.info(f'🥭 Start to upload checkpoint {checkpoint_directory} to s3 with key {s3_key}')
-        self._s3_handler.upload_local_files(path=checkpoint_directory, target_directory=s3_key)
+        self._s3_handler.upload_local_files(
+            path=checkpoint_directory,
+            target_directory=s3_key,
+            save_optimizer_states=self._parameters.save_optimizer_states,
+        )
         logger.info(f'🥝 Successfully uploaded checkpoint {checkpoint_directory} to s3 with key {s3_key}')
 
     @staticmethod
