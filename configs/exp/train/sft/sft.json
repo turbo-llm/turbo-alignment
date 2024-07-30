@@ -2,45 +2,44 @@
   "train_dataset_settings": {
     "sources": [
       {
-        "name": "train",
-        "records_path": "/from_s3/dataset/train.jsonl",
+        "name": "train_chat",
+        "records_path": "/from_s3/dataset/train_chat.jsonl",
         "sample_rate": 1.0
       }
     ],
     "prompt_template": {
       "role_tag_mapping": {
-        "bot": "<bot>",
-        "user": "<user>",
-        "system": "<system>"
+        "bot": "assistant",
+        "user": "user",
+        "system": "system"
       },
-      "prefix_template": "<RS>{role}",
-      "suffix_template": "</RS>"
+      "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+      "suffix_template": "<|eot_id|>"
     },
     "dataset_type": "chat",
     "max_tokens_count": 2000,
-    "only_answer_loss": false
+    "only_answer_loss": true
   },
   "val_dataset_settings": {
     "sources": [
       {
-        "name": "test",
-        "records_path": "/from_s3/dataset/test.jsonl",
-        "num_samples": 5
+        "name": "val_chat",
+        "records_path": "/from_s3/dataset/val_chat.jsonl",
+        "sample_rate": 1.0
       }
     ],
     "prompt_template": {
       "role_tag_mapping": {
-        "bot": "<bot>",
-        "user": "<user>",
-        "system": "<system>"
+        "bot": "assistant",
+        "user": "user",
+        "system": "system"
       },
-      "prefix_template": "<RS>{role}",
-      "suffix_template": "</RS>"
+      "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+      "suffix_template": "<|eot_id|>"
     },
     "dataset_type": "chat",
     "max_tokens_count": 2000,
-    "only_answer_loss": true,
-    "keep_end": true
+    "only_answer_loss": true
   },
   "model_settings": {
     "model_path": "/from_s3/model",
@@ -57,55 +56,51 @@
         "o_proj"
       ],
       "task_type": "CAUSAL_LM",
-      "modules_to_save": [
-        "embed_tokens",
-        "lm_head"
-      ],
       "name": "LORA"
     },
-    "embeddings_initialization_strategy": {
-      "<RS>": "<s>",
-      "</RS>": "</s>",
-      "<bot>": "bot",
-      "<user>": "user",
-      "<system>": "system"
+    "model_kwargs": {
+      "attn_implementation": "flash_attention_2"
     }
   },
   "cherry_pick_settings": {
     "generator_transformers_settings": {
       "num_beams": 3,
-      "max_new_tokens": 500,
-      "repetition_penalty": 1.1
+      "max_new_tokens": 512,
+      "repetition_penalty": 1.02
     },
     "custom_generation_settings": {
-      "generation_eos_token": "</RS>",
+      "generation_eos_token": "<|eot_id|>",
       "skip_special_tokens": false
     },
     "dataset_settings": {
       "sources": [
         {
-          "name": "test",
-          "records_path": "/from_s3/dataset/test.jsonl",
-          "num_samples": 5
+          "name": "cherrypick_chat",
+          "records_path": "/from_s3/dataset/cherrypick_chat.jsonl",
+          "num_samples": 150
         }
       ],
       "prompt_template": {
         "role_tag_mapping": {
-          "bot": "<bot>",
-          "user": "<user>",
-          "system": "<system>"
+          "bot": "assistant",
+          "user": "user",
+          "system": "system"
         },
-        "prefix_template": "<RS>{role}",
-        "suffix_template": "</RS>"
+        "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+        "suffix_template": "<|eot_id|>"
       },
       "dataset_type": "chat",
       "max_tokens_count": 2000,
-      "random_cut": false,
-      "only_answer_loss": true,
-      "keep_end": true
+      "random_cut": true,
+      "only_answer_loss": true
     },
     "metric_settings": [
-      {"type": "length", "parameters": {"need_average": [false, true]}}
+      {
+        "type": "length", 
+        "parameters": {
+          "need_average": [true]
+        }
+      }
     ]
   },
   "tokenizer_settings": {},
@@ -117,15 +112,15 @@
     "per_device_eval_batch_size": 1,
     "gradient_accumulation_steps": 16,
     "logging_steps": 1,
-    "eval_steps": 1,
-    "save_steps": 8,
-    "learning_rate": 0.00004,
-    "num_train_epochs": 5,
+    "eval_steps": 64,
+    "save_steps": 64,
+    "learning_rate": 1e-6,
+    "num_train_epochs": 2,
     "lr_scheduler_type": "linear",
-    "warmup_ratio": 0.3,
+    "warmup_ratio": 0.03,
     "fp16": false,
     "bf16": true,
-    "deepspeed": "configs/exp/deepspeed/ds_config_zero.json",
+    "deepspeed": "configs/exp/deepspeed/stage2.json",
     "optim": "adamw_torch",
     "adam_beta1": 0.9,
     "adam_beta2": 0.98,
@@ -138,5 +133,6 @@
     "run_name": "sft",
     "entity": "turbo-alignment"
   },
+  "seed": 0,
   "log_path": "train_output"
 }

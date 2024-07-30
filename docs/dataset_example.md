@@ -3,24 +3,26 @@
 [All datasets](../tests/fixtures/datasets) are in **JSONL format**, where:
 
 
-
-### Common Attributes:
-- **id** — A unique integer identifier.
-- **source** — A convenient string identifier for users.
+### Common Attributes
+- `id`: `str` - A distinct identifier for each data entry, represented as a string.
 
 ### Dataset Types:
-- chat
-- pair_preferences
-- sampling
-- classification
-- multimodal
+- [Chat Dataset](#-chat-dataset)
+- [Pair Preferences Dataset](#-pair-preferences-dataset)
+- [KTO Dataset](#-kto-dataset)
+- [Sampling Dataset](#-sampling-dataset)
+- [Multimodal Dataset ](#-multimodal-dataset) (⌛️ Work in progress...)
+- [Classification Dataset](#-classification-dataset)
+- [DPPO Dataset](#-ddpo-dataset) (⌛️ Work in progress...)
 
 
-### For Chat:
 
-- **messages** — A list of `chatmessage` where `chatmessage` is structured as:
-  - **role**: The role of the speaker (e.g., user, bot).
-  - **content**: The message content.
+<a name="-chat-dataset"></a>
+### Chat Dataset
+
+- `messages`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history. Each `ChatMessage` includes:
+  - `role` - The participant's role in the conversation (e.g., `user` or `bot`).
+  - `content` -  The textual content of the message.
 
 Example:
 ```json
@@ -34,63 +36,122 @@ Example:
 }
 ```
 
-### For DPO/KTO (paired) — the format is the same everywhere:
 
-- context: list[chatmessage] — chat history
-- answer_winning: chatmessage — the good response
-- answer_losing: chatmessage — the poor response
+
+<a name="-pair-preferences-dataset"></a>
+### Pair Preferences Dataset
+
+- `context`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answer_w`: `ChatMessage` — The more preferable response.
+- `answer_l`: `ChatMessage` — The less preferable response.
+
 Example:
 ```json
-{"id": 0, "source": "example", 
-"context": [{"role": "user", "content": "Can you play chess?"}],
-"answer_winning": {"role": "bot", "content": "Yes, of course"},
-"answer_losing":{"role": "bot", "content": "Get out, I don't want to talk to you!"}
+{
+  "id": 0,
+  "source": "example", 
+  "context": [
+    {"role": "user", "content": "Can you play chess?"}
+  ],
+  "answer_w": {"role": "bot", "content": "Yes, of course"},
+  "answer_l": {"role": "bot", "content": "Get out, I don't want to talk to you!"}
   }
 ```
 
 
 
-### For KTO (unpaired):
--*context: list[chatmessage] — chat history
-- answer: chatmessage — chatmessage
--  is_desirable: bool — whether the response is desirable
+<a name="-kto-dataset"></a>
+### KTO Dataset
+- `context`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answer`: `ChatMessage` — The given response.
+- `is_desirable`: `bool` —  Indicator if the provided response is considered as desirable or no.
 
-    context: list[chatmessage]
-    answer: chatmessage
-    is_desirable: bool — whether the response is desirable
+Example:
 ```json
 {
   "id": 0,
   "source": "example",
-  "context": [{"role": "user", "content": "Can you play chess?"}],
+  "context": [
+    {"role": "user", "content": "Can you play chess?"}
+  ],
   "answer": {"role": "bot", "content": "Yes, of course"},
   "is_desirable": true
 }
 {
   "id": 1,
   "source": "example",
-  "context": [{"role": "user", "content": "Can you play chess?"}],
+  "context": [
+    {"role": "user", "content": "Can you play chess?"}
+  ],
   "answer": {"role": "bot", "content": "Get out, I don't want to talk to you!"},
   "is_desirable": false
 }
-
 ```
 
-## For SAMPLING:
-- **messages** — A list of `chatmessage` where `chatmessage` is structured as:
-  - **role**: The role of the speaker (e.g., user, bot).
-  - **content**: The message content.
-
-- **answers** - A list of `ChatInferenceOutput` where `ChatInferenceOutput` is structured as:
-  - **id** : The number or id of generated completion
-  - **content**: The content of generated completion
 
 
+<a name="-sampling-dataset"></a>
+## Sampling Dataset
+- `messages`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answers`: `list[ChatInferenceOutput]` - A list of generated responses. Each `ChatInferenceOutput` is structured as:
+  - `id`: `str` -  A unique identifier for the generated response.
+  - `content`: `str` - The content of generated completion
+
+Example:
 ```json
-{"id": "0", "messages": [{"role": "user", "content": "hi", "disable_loss": false}, {"role": "bot", "content": "hi", "disable_loss": false}, {"role": "user", "content": "how are you", "disable_loss": false}], "label": null, "dataset_name": "chat_test", "answers": [{"content": "content", "id": "0"}, {"content": "lol", "id": "1"}]}
-{"id": "1", "messages": [{"role": "user", "content": "hi", "disable_loss": false}, {"role": "bot", "content": "hi", "disable_loss": false}, {"role": "user", "content": "how are you", "disable_loss": false}, {"role": "bot", "content": "bad", "disable_loss": false}], "label": null, "dataset_name": "chat_test", "answers": [{"content": "content", "id": "0"}, {"content": "lol", "id": "1"}]}
+{
+  "id": "0", 
+  "dataset_name": "example", 
+  "messages": [
+    {"role": "user", "content": "hi"}, 
+    {"role": "bot", "content": "hi"}, 
+    {"role": "user", "content": "how are you"}
+  ], 
+  "answers": [
+    {"content": "good", "id": "0"}, 
+    {"content": "not bad", "id": "1"}
+  ]
+}
 ```
 
 
-## For MULTIMODAL:
-examples [here](../tests/fixtures/datasets/multimodal)
+
+<a name="-multimodal-dataset"></a>
+## Multimodal Dataset
+⌛️ in progress..
+
+
+
+
+<a name="-classification-dataset"></a>
+### Classification Dataset
+- `messages`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `label`: `int` — Label of provided chat history.
+
+Example: 
+```json
+{
+  "id": 0,
+  "source": "example",
+  "messages": [
+    {"role": "user", "content": "Can you play chess?"},
+    {"role": "bot", "content": "Yes, of course"}
+  ],
+  "label": 1
+}
+{
+  "id": 1,
+  "source": "example",
+  "messages": [
+    {"role": "user", "content": "Can you play chess?"},
+    {"role": "bot", "content": "Get out, I don't want to talk to you!"}
+  ],
+  "label": 0
+}
+```
+
+
+
+<a name="-ddpo-dataset"></a>
+## DDPO Dataset
+⌛️ in progress..

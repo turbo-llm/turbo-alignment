@@ -79,12 +79,7 @@
         "dataset_settings": {
             "sources": [
                 {
-                    "name": "chat_rag",
-                    "records_path": "tests/fixtures/datasets/chat/train_chat_rag.jsonl",
-                    "num_samples": 2
-                },
-                {
-                    "name": "chat_test_2",
+                    "name": "chat_test",
                     "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
                     "num_samples": 2
                 }
