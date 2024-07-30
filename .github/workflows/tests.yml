@@ -2,7 +2,7 @@ name: Push
 on: [push]
 
 jobs:
-  test:
+  tests:
     strategy:
       fail-fast: false
       matrix:
@@ -23,7 +23,7 @@ jobs:
         run: poetry install
       - name: Run tests
         run: poetry run make tests
-  code-quality:
+  linters:
     strategy:
       fail-fast: false
       matrix:
