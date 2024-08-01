@@ -489,7 +489,7 @@ class DPOTrainer(Trainer):
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
-        if self.args.use_ref_model:
+        if self.args.use_ref_model or self.loss_type not in (DPOLossesType.SIMPO, DPOLossesType.ORPO):
             reference_chosen_logps, reference_rejected_logps = self._get_logps(self.ref_model, batch)
 
         losses, chosen_rewards, rejected_rewards = self.dpo_loss(

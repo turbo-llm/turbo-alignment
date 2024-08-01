@@ -12,7 +12,10 @@ runner = CliRunner()
 
 @pytest.mark.parametrize(
     'config_path',
-    [FIXTURES_PATH / 'configs/train/dpo/base.json'],
+    [
+        FIXTURES_PATH / 'configs/train/dpo/base.json',
+        FIXTURES_PATH / 'configs/train/dpo/simpo.json',
+    ],
 )
 def test_dpo_train(config_path: Path):
     result = runner.invoke(
