@@ -60,7 +60,16 @@ def load_model(
             for new_token, old_token in model_settings.embeddings_initialization_strategy.items():
                 new_token_id = tokenizer.get_added_vocab()[new_token]
                 old_token_id = tokenizer.encode(old_token, add_special_tokens=False)[0]
-                model.model.embed_tokens.weight[new_token_id, :] = model.model.embed_tokens.weight[old_token_id, :]
+
+                if model.config.model_type == 'gpt_neox':
+                    model.gpt_neox.embed_in.weight[new_token_id, :] = torch.clone(
+                        model.gpt_neox.embed_in.weight[old_token_id, :]
+                    )
+                    if model_settings.model_type == 'causal':
+                        model.embed_out.weight[new_token_id, :] = torch.clone(model.embed_out.weight[old_token_id, :])
+
+                elif model.config.model_type == 'llama':
+                    model.model.embed_tokens.weight[new_token_id, :] = model.model.embed_tokens.weight[old_token_id, :]
 
     if isinstance(model_settings, PreTrainedAdaptersModelSettings):
         model = _load_pretrained_adapters(model, model_settings)
