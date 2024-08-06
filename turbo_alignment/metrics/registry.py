@@ -1,7 +1,6 @@
 from enum import Enum
 
 from allenai_common import Registrable
-from pydantic import model_validator
 
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.datasets.chat import ChatPromptTemplate
@@ -87,19 +86,3 @@ class ToolMetricsSettings(MetricSettings):
 @MetricSettingsRegistry.register(MetricType.RETRIEVAL_UTILITY)
 class RetrievalUtilitySettings(MetricSettings):
     doc_sep_symbol: str = '<doc_sep>'
-
-
-@MetricSettingsRegistry.register(MetricType.RAGAS_METRICS)
-class RagasMetricsSettings(MetricSettings):
-    openai_api_key: str | None = None
-    mistralai_api_key: str | None = None
-
-    @model_validator(mode='before')
-    def check_only_one_field(cls, values):
-        openai_api_key = values.get('openai_api_key')
-        mistralai_api_key = values.get('mistralai_api_key')
-
-        if not bool(openai_api_key) and not bool(mistralai_api_key):
-            raise ValueError('At least one of openai_api_key or mistralai_api_key must be specified')
-
-        return values

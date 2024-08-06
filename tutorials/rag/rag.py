@@ -218,19 +218,8 @@ def evaluate(val_records, rag_model):
     cherry_pick_settings = ChatCherryPickSettings.model_validate(cherry_pick_settings_dict)
 
     from turbo_alignment.metrics.metric import Metric
-    from turbo_alignment.metrics.registry import RagasMetricsSettings
 
-    ragas_metrics = Metric.by_name('ragas_metrics')(
-        settings=RagasMetricsSettings(
-            mistralai_api_key=os.getenv('MISTRALAI_API_KEY'),
-            openai_api_key=os.getenv('OPENAI_API_KEY'),
-            need_average=[False],
-        )
-    )
-
-    rag_cherry_pick = RagCherryPickCallback(
-        cherry_pick_settings, datasets=[inference_chat_dataset], metrics=[ragas_metrics]
-    )
+    rag_cherry_pick = RagCherryPickCallback(cherry_pick_settings, datasets=[inference_chat_dataset], metrics=[])
 
     output = rag_cherry_pick.on_evaluate(None, None, None, tokenizer=tokenizer, model=rag_model)
 

@@ -24,10 +24,10 @@ class RagGenerator(ChatGenerator):
             generation_config=self._transformers_generator_parameters,
             pad_token_id=self._tokenizer.pad_token_id,
             stopping_criteria=self._stopping_criteria,
-        ).cpu()
+        )
 
-        answers = self._decode(token_indices=answer_indices)
-        documents = self._decode(token_indices=document_indices)
+        answers = self._decode(token_indices=answer_indices.cpu())
+        documents = self._decode(token_indices=document_indices.cpu())
         doc_scores = list(doc_scores[0])
 
         return RagInferenceOutput(

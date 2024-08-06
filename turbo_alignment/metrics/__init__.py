@@ -5,7 +5,6 @@ from turbo_alignment.metrics.length import LengthMetric
 from turbo_alignment.metrics.meteor import MeteorMetric
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.perplexity import PerplexityMetric
-from turbo_alignment.metrics.ragas import RagasMetrics
 from turbo_alignment.metrics.registry import *
 from turbo_alignment.metrics.retrieval_utility import RetrievalUtilityMetric
 from turbo_alignment.metrics.reward import RewardMetric
