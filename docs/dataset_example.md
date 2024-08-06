@@ -11,7 +11,7 @@
 - [Pair Preferences Dataset](#-pair-preferences-dataset)
 - [KTO Dataset](#-kto-dataset)
 - [Sampling Dataset](#-sampling-dataset)
-- [Multimodal Dataset ](#-multimodal-dataset) (⌛️ Work in progress...)
+- [Multimodal Dataset ](#-multimodal-dataset)
 - [Classification Dataset](#-classification-dataset)
 - [DPPO Dataset](#-ddpo-dataset) (⌛️ Work in progress...)
 
@@ -118,9 +118,45 @@ Example:
 
 <a name="-multimodal-dataset"></a>
 ## Multimodal Dataset
-⌛️ in progress..
 
+- `messages`: `list[MultimodalChatMessage]` — This is a sequence of messages that make up the chat history. Each `ChatMessage` includes:
+  - `role` - The participant's role in the conversation (e.g., `user` or `bot`).
+  - `type` – The type of modality (e.g., `text` or `image`)
+  - `content` - If the `type` is `text`, it's the textual content of the message. If it's `image`, it's the file path.
 
+Example:
+```json
+{
+  "id": "0",
+  "messages": [
+    {
+      "role": "system",
+      "type": "text",
+      "content": "You are a Multimodal AI assistant."
+    },
+    {
+      "role": "user",
+      "type": "image",
+      "content": "/path/to/cat.jpg"
+    },
+    {
+      "role": "user",
+      "type": "image",
+      "content": "/path/to/dog.jpg"
+    },
+    {
+      "role": "user",
+      "type": "text",
+      "content": "What's the difference between these two images?"
+    },
+    {
+      "role": "bot",
+      "type": "text",
+      "content": "The two images in question both feature animals, albeit of different species. The first image depicts a dog, which is generally perceived as an animal that elicits positive emotional responses. The second image features a cat, which is also regarded as an animal that evokes a positive emotional response."
+    }
+  ]
+}
+```
 
 
 <a name="-classification-dataset"></a>
