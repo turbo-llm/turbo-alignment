@@ -25,8 +25,6 @@ class BaseTrainExperimentSettings(BaseSettings):
     log_path: Path = Path('train_output')
     seed: int = 42
 
-    # early_stopping: EarlyStoppingSettings | None = None
-
     trainer_settings: TrainerSettings
     tokenizer_settings: TokenizerSettings
 

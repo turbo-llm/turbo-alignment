@@ -5,7 +5,6 @@ from typing import Any, overload
 import numpy as np
 import torch
 from allenai_common import Params
-from safetensors import SafetensorError  # type: ignore[attr-defined]
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
@@ -152,9 +151,7 @@ class TrainMultimodalDataset(MultimodalDataset):
 
         super().__init__(tokenizer=tokenizer, source=source, settings=settings)
 
-        self._chat_dataset = TrainChatDataset(
-            tokenizer=tokenizer, source=source, settings=settings, read=False
-        )  # type: ignore[misc]
+        self._chat_dataset = TrainChatDataset(tokenizer=tokenizer, source=source, settings=settings, read=False)
 
         self._read()
 
@@ -178,7 +175,7 @@ class TrainMultimodalDataset(MultimodalDataset):
 
             try:
                 encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            except (OSError, RuntimeError, SafetensorError):
+            except (OSError, RuntimeError):
                 outputs.append(None)
                 continue
 
@@ -212,8 +209,11 @@ class InferenceMultimodalDataset(MultimodalDataset):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-
-        self._chat_dataset = InferenceChatDataset(*args, random_cut=random_cut, **kwargs, read=False)  # type: ignore
+        settings = kwargs['settings']
+        settings.random_cut = random_cut
+        self._chat_dataset = InferenceChatDataset(
+            tokenizer=kwargs['tokenizer'], source=kwargs['source'], settings=settings, read=False
+        )
         self._read()
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
@@ -233,7 +233,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
 
             try:
                 encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            except (OSError, RuntimeError, SafetensorError):
+            except (OSError, RuntimeError):
                 outputs.append(None)
                 continue
 

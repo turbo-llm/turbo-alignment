@@ -29,7 +29,7 @@ def _load_pretrained_adapters(
 ) -> PeftModel:
     return PeftModel.from_pretrained(
         model,
-        model_settings.adapter_path,  # type: ignore
+        model_settings.adapter_path,
         is_trainable=model_settings.is_trainable,
     )
 

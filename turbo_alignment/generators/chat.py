@@ -115,7 +115,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
                     answer_token_ids=a_t_ids.unsqueeze(0),
                     logits=l.unsqueeze(0),
                 )
-                for i, (a, a_t_ids, l) in enumerate(zip(answers, answer_tokens_ids, logits))
+                for i, (a, a_t_ids, l) in enumerate(zip(answers, answer_tokens_ids, logits))  # type: ignore[arg-type]
             ]
         else:
             answer_messages = [
