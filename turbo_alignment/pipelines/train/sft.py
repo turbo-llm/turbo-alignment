@@ -72,6 +72,8 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
         data_collator: DataCollatorMixin,
         **_kwargs,
     ) -> MultiGPUCherryPicksTrainer:
+        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+
         return MultiGPUCherryPicksTrainer(
             model=model,
             args=training_args,
