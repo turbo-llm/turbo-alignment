@@ -47,7 +47,7 @@ class RewardMetric(Metric):
         messages = [record['messages'] for record in dataset.records for _ in range(answers_per_context)]
 
         answers = [
-            AnswerMessage(id=ans_idx, content=ans)
+            AnswerMessage(id=str(ans_idx), content=ans)
             for ctx_answers in predictions
             for ans_idx, ans in enumerate(ctx_answers)
         ]
