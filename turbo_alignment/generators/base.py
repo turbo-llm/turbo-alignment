@@ -170,8 +170,8 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
     @staticmethod
     def _postprocess(input_indices: torch.Tensor, output_indices: torch.Tensor, remove_prompt: bool) -> torch.Tensor:
         if remove_prompt:
-            return output_indices[:, input_indices.shape[1] :]
-        return output_indices
+            return output_indices[:, input_indices.shape[1] :].cpu()
+        return output_indices.cpu()
 
     def _decode(self, token_indices: torch.Tensor) -> list[str]:
         return self._tokenizer.batch_decode(

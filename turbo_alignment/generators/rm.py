@@ -28,7 +28,7 @@ class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]
         attn_mask = batch['attention_mask'].to(self.device)
 
         with torch.no_grad():
-            rewards = self._model(input_ids=input_ids, attention_mask=attn_mask).logits
+            rewards = self._model(input_ids=input_ids, attention_mask=attn_mask).logits.cpu()
             rewards_w, rewards_l = rewards[: len(records)], rewards[len(records) :]
 
         return [
@@ -74,7 +74,7 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
             for i in range(0, len(input_ids), self._micro_batch):
                 input_ids_batch = input_ids[i : i + self._micro_batch].to(self.device)
                 attn_mask_batch = attn_mask[i : i + self._micro_batch].to(self.device)
-                rewards.extend(self._model(input_ids=input_ids_batch, attention_mask=attn_mask_batch).logits)
+                rewards.extend(self._model(input_ids=input_ids_batch, attention_mask=attn_mask_batch).logits.cpu())
 
         rewards = torch.cat(rewards, dim=0)
 

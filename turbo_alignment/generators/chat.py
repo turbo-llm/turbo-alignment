@@ -102,10 +102,10 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         if self._return_logits:
             with torch.no_grad():
-                logits = self._model(output_indices).logits
+                logits = self._model(output_indices).logits.cpu()
 
             answer_tokens_ids = postprocessed_output_indices
-            input_token_ids = input_ids
+            input_token_ids = input_ids.cpu()
 
         return ChatInferenceOutput(
             id=original_record.id,
