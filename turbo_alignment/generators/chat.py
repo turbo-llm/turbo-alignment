@@ -40,7 +40,6 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             attention_mask=batched_attention_mask,
             generation_config=self._transformers_generator_parameters,
             pad_token_id=self._tokenizer.pad_token_id,
-            stopping_criteria=self._stopping_criteria,
         )
 
         postprocessed_output_indices = self._postprocess(
@@ -85,7 +84,6 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             attention_mask=attention_mask,
             generation_config=self._transformers_generator_parameters,
             pad_token_id=self._tokenizer.pad_token_id,
-            stopping_criteria=self._stopping_criteria,
         )
 
         postprocessed_output_indices = self._postprocess(

@@ -25,9 +25,10 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         model.set_tokenizer(tokenizer)
         super().__init__(model, tokenizer, batch=batch)
 
-        eos_token_id: list[int] = self._tokenizer.encode(
-            custom_generation_settings.generation_eos_token, add_special_tokens=False
-        )
+        if isinstance(transformers_settings.stop_strings, list):
+            raise ValueError('You should use only 1 eos token with VLLM')
+
+        eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
 
         beam_search_params = {'best_of': transformers_settings.num_return_sequences, 'use_beam_search': False}
         if transformers_settings.num_beams > 1:

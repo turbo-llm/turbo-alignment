@@ -23,7 +23,6 @@ class RagGenerator(ChatGenerator):
             inputs=input_ids,
             generation_config=self._transformers_generator_parameters,
             pad_token_id=self._tokenizer.pad_token_id,
-            stopping_criteria=self._stopping_criteria,
         )
 
         answers = self._decode(token_indices=answer_indices.cpu())
