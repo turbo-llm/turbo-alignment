@@ -56,7 +56,6 @@ Turbo-Alignment supports a wide range of methods for model training and alignmen
 - **📏** Length
 - **🌀** Perplexity
 - **🌟** METEOR
-- **📐** RAGAS
 - **🔍** Retrieval Utility
 
 <a name="-how-to-use"></a>
