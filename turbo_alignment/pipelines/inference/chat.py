@@ -40,7 +40,7 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 model = (
                     accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
                     if torch.cuda.is_available()
-                    else model.to('cpu')
+                    else model.to('cpu')  # type: ignore[attr-defined]
                 )
 
             for generation_settings in model_inference_settings.generation_settings:

@@ -28,7 +28,7 @@ class BaseTrainExperimentSettings(BaseSettings):
     trainer_settings: TrainerSettings
     tokenizer_settings: TokenizerSettings
 
-    model_settings: ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings
+    model_settings: (ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings)
 
     train_dataset_settings: MultiDatasetSettings
     val_dataset_settings: MultiDatasetSettings

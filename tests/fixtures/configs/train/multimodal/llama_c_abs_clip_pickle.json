@@ -31,7 +31,7 @@
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
-      "max_tokens_count": 2000,
+      "max_tokens_count": 150,
       "only_answer_loss": true,
       "truncate_top": false
     },
@@ -67,7 +67,7 @@
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
-      "max_tokens_count": 2000,
+      "max_tokens_count": 150,
       "only_answer_loss": true,
       "truncate_top": false
     },
@@ -144,7 +144,7 @@
     "cherry_pick_settings": {
       "generator_transformers_settings": {
         "num_beams": 1,
-        "max_new_tokens": 128,
+        "max_new_tokens": 16,
         "repetition_penalty": 1.1,
         "stop_strings": "</RS>",
         "do_sample": true
@@ -170,7 +170,7 @@
           "suffix_template": "</RS>"
         },
         "dataset_type": "multimodal",
-        "max_tokens_count": 2000,
+        "max_tokens_count": 150,
         "n_modality_embeddings": 225,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",

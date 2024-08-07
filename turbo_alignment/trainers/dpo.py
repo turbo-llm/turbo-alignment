@@ -233,10 +233,14 @@ class SlicHfLoss(DPOLossRegistry):
 
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
-    loss_settings: SigmoidLossSettings | HingeLossSettings | IPOLossSettings | SlicHfLoss | KTOLoss | CPOLoss = field(
+    loss_settings: (
+        SigmoidLossSettings | HingeLossSettings | IPOLossSettings | SlicHfLoss | KTOLoss | CPOLoss
+    ) = field(  # type: ignore[call-overload]
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )
-    sync_ref_settings: SyncRefModelSettings = field(default_factory=SyncRefModelSettings())
+    sync_ref_settings: SyncRefModelSettings = field(  # type: ignore[call-overload]
+        default_factory=SyncRefModelSettings()
+    )
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False
@@ -267,9 +271,9 @@ class DPOTrainer(Trainer):
         self.sync_ref_settings = args.sync_ref_settings
 
         if hasattr(args, 'loss_settings'):
-            self.loss_type = args.loss_settings['loss_type']
+            self.loss_type = args.loss_settings['loss_type']  # type: ignore[index]
             loss_args = args.loss_settings
-            loss_args.pop('loss_type')
+            loss_args.pop('loss_type')  # type: ignore[union-attr]
             self.dpo_loss_registry = DPOLossRegistry.by_name(self.loss_type)(**loss_args)
 
         self._stored_metrics: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
@@ -309,7 +313,7 @@ class DPOTrainer(Trainer):
         self.add_callback(PrinterCallback if self.args.disable_tqdm else ProgressCallback)
         self.control: TrainerControl = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
-        if self.sync_ref_settings['sync_ref_model']:
+        if self.sync_ref_settings['sync_ref_model']:  # type: ignore[index]
             self.add_callback(SyncRefModelCallback(sync_ref_settings=self.sync_ref_settings))
 
     def dpo_loss(
@@ -370,7 +374,7 @@ class DPOTrainer(Trainer):
 
         policy_best_decode_logps: torch.Tensor = all_logps[chosen_idxs + rejected_idx :]
         if len(policy_best_decode_logps) == 0:
-            policy_best_decode_logps = None
+            policy_best_decode_logps = None  # type: ignore[assignment]
 
         chosen_logits = all_logits[:chosen_idxs]
         rejected_logits = all_logits[chosen_idxs:]
@@ -522,7 +526,7 @@ class DPOTrainer(Trainer):
             'logits_test/rejected': metrics['logits_test/rejected'],
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)
+        logits = torch.stack(logits).mean(axis=1)  # type: ignore[call-overload, arg-type]
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels

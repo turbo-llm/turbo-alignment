@@ -30,7 +30,10 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
 
         eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
 
-        beam_search_params = {'best_of': transformers_settings.num_return_sequences, 'use_beam_search': False}
+        beam_search_params: dict[str, Any] = {
+            'best_of': transformers_settings.num_return_sequences,
+            'use_beam_search': False,
+        }
         if transformers_settings.num_beams > 1:
             beam_search_params['use_beam_search'] = True
             beam_search_params['best_of'] = transformers_settings.num_beams

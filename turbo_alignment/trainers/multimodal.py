@@ -269,7 +269,7 @@ class MultimodalTrainer(Trainer):
             'logits_test/rejected': metrics['logits_test/rejected'],
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)
+        logits = torch.stack(logits).mean(axis=1)  # type: ignore[call-overload, arg-type]
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels

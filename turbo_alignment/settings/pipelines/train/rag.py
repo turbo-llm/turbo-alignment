@@ -5,7 +5,7 @@ from turbo_alignment.settings.rag_model import RAGPreTrainedModelSettings
 
 
 class RAGTrainExperimentSettings(BaseTrainExperimentSettings):
-    model_settings: RAGPreTrainedModelSettings
+    model_settings: RAGPreTrainedModelSettings  # type: ignore[assignment]
     train_dataset_settings: ChatMultiDatasetSettings
     val_dataset_settings: ChatMultiDatasetSettings
 

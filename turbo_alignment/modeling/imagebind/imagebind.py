@@ -59,7 +59,7 @@ def load_imagebind(settings: ImageBindSettings) -> ImageBindModel:
     return model
 
 
-class ImageBindSingleton(metaclass=ParametrizedSingleton[ImageBindSettings]):
+class ImageBindSingleton(metaclass=ParametrizedSingleton[ImageBindSettings]):  # type: ignore[misc]
     def __init__(self, settings: ImageBindSettings) -> None:
         self._model = load_imagebind(settings)
 

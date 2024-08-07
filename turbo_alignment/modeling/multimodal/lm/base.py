@@ -35,7 +35,7 @@ class BaseMultiModalModeling(Module, ABC):
         self.language_model_dim = (
             language_model.base_model.model.model.embed_tokens.modules_to_save.default.weight.shape[1]
         )
-        self.encoders = torch.nn.ModuleDict(encoders)
+        self.encoders = torch.nn.ModuleDict(encoders)  # type: ignore[arg-type]
 
         for encoder in self.encoders.values():
             encoder.eval()
