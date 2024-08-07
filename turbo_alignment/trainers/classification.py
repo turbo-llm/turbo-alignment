@@ -59,7 +59,7 @@ def classification_loss(
 
 
 def auto_class_weights(dataset: Dataset) -> list[float]:
-    labels = [dataset[i]['labels'] for i in range(len(dataset))]  # type: ignore[arg-type]
+    labels = [dataset[i]['labels'] for i in range(len(dataset))]
     class_weights = compute_class_weight('balanced', classes=np.unique(labels), y=np.array(labels))
     return class_weights.tolist()
 

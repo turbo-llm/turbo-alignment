@@ -1,4 +1,3 @@
-# mypy: disable-error-code="call-overload"
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
@@ -268,9 +267,9 @@ class DPOTrainer(Trainer):
         self.sync_ref_settings = args.sync_ref_settings
 
         if hasattr(args, 'loss_settings'):
-            self.loss_type = args.loss_settings['loss_type']  # type: ignore[index]
+            self.loss_type = args.loss_settings['loss_type']
             loss_args = args.loss_settings
-            loss_args.pop('loss_type')  # type: ignore[union-attr]
+            loss_args.pop('loss_type')
             self.dpo_loss_registry = DPOLossRegistry.by_name(self.loss_type)(**loss_args)
 
         self._stored_metrics: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
@@ -310,7 +309,7 @@ class DPOTrainer(Trainer):
         self.add_callback(PrinterCallback if self.args.disable_tqdm else ProgressCallback)
         self.control: TrainerControl = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
-        if self.sync_ref_settings['sync_ref_model']:  # type: ignore[index]
+        if self.sync_ref_settings['sync_ref_model']:
             self.add_callback(SyncRefModelCallback(sync_ref_settings=self.sync_ref_settings))
 
     def dpo_loss(
@@ -371,7 +370,7 @@ class DPOTrainer(Trainer):
 
         policy_best_decode_logps: torch.Tensor = all_logps[chosen_idxs + rejected_idx :]
         if len(policy_best_decode_logps) == 0:
-            policy_best_decode_logps = None  # type: ignore[assignment]
+            policy_best_decode_logps = None
 
         chosen_logits = all_logits[:chosen_idxs]
         rejected_logits = all_logits[chosen_idxs:]
@@ -463,7 +462,7 @@ class DPOTrainer(Trainer):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        return losses.mean(), metrics  # type: ignore
+        return losses.mean(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor
@@ -523,7 +522,7 @@ class DPOTrainer(Trainer):
             'logits_test/rejected': metrics['logits_test/rejected'],
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)  # type: ignore[arg-type, call-overload]
+        logits = torch.stack(logits).mean(axis=1)
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels

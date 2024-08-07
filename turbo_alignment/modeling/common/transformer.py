@@ -77,7 +77,16 @@ class MultiheadAttention(torch.nn.MultiheadAttention):
     # pylint: disable=arguments-differ
 
     def forward(self, x: torch.Tensor, attn_mask: torch.Tensor) -> torch.Tensor:  # type: ignore[override]
-        return super().forward(x, x, x, need_weights=False, attn_mask=attn_mask)[0]
+        return super().forward(
+            query=x,
+            key=x,
+            value=x,
+            key_padding_mask=None,
+            need_weights=False,
+            attn_mask=attn_mask,
+            average_attn_weights=True,
+            is_causal=False,
+        )[0]
 
 
 class BlockWithMasking(torch.nn.Module):

@@ -65,7 +65,7 @@ class TrainRAGStrategy(BaseTrainStrategy[RAGTrainExperimentSettings]):
 
     @staticmethod
     def _get_additional_special_tokens(
-        experiment_settings: RAGTrainExperimentSettings,  # type: ignore[override]
+        experiment_settings: RAGTrainExperimentSettings,
     ) -> list[str]:
         gen_settings = experiment_settings.model_settings.generator_settings
         embeddings_initialization_strategy = gen_settings.embeddings_initialization_strategy

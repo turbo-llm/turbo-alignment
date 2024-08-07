@@ -44,7 +44,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
             max_tokens=transformers_settings.max_new_tokens,
-            **beam_search_params,  # type: ignore[arg-type]
+            **beam_search_params,
         )
 
     def _generate_from_batch(

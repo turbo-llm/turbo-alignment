@@ -40,14 +40,13 @@ total number of patches returned by the encoder. \
 Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in config.'
 
             if self.modality_projector_initialization_mapping:
-                if self.modality_projector_initialization_mapping.get(modality):
+                state_dict_path = self.modality_projector_initialization_mapping.get(modality)
+                if state_dict_path is not None:
                     logger.info(f'Loading {modality} connector weights')
 
-                    state_dictionary = torch.load(
-                        self.modality_projector_initialization_mapping[modality]  # type: ignore[arg-type]
-                    )
+                    state_dictionary = torch.load(state_dict_path)
                     modality_adapters[modality].load_state_dict(state_dictionary)
-                    logger.info(f'Sucsessfully loaded from {self.modality_projector_initialization_mapping[modality]}')
+                    logger.info(f'Sucsessfully loaded from {state_dict_path}')
 
         self.modality_adapters = torch.nn.ModuleDict(modality_adapters)
 

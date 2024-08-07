@@ -296,7 +296,7 @@ class RagSequenceForGeneration(Module):
         self,
         inputs: torch.LongTensor,
         generation_config: GenerationConfig | None = None,
-        **kwargs,  # pylint: disable=unused-argument
+        **_kwargs,
     ) -> tuple[torch.LongTensor, torch.LongTensor, torch.Tensor]:
         # TODO remove code duplicate with forward
 

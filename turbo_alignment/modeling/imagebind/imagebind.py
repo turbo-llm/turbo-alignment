@@ -1,4 +1,3 @@
-# pylint: skip-file
 # pylint: disable=unused-import
 import torch
 
@@ -60,7 +59,7 @@ def load_imagebind(settings: ImageBindSettings) -> ImageBindModel:
     return model
 
 
-class ImageBindSingleton(metaclass=ParametrizedSingleton[ImageBindSettings]):  # type: ignore[misc]
+class ImageBindSingleton(metaclass=ParametrizedSingleton[ImageBindSettings]):
     def __init__(self, settings: ImageBindSettings) -> None:
         self._model = load_imagebind(settings)
 
