@@ -85,7 +85,7 @@ Examples of datasets are available [here](docs/dataset_example.md).
   - [RSO](#-RSO-sampling)
 - [Common](#-common)
   - [Preprocess](#-preprocess-common)
-  - [Convert to base](#-convert-to-base-common)
+  - [Merge adapters to base](#-merge-adapters-to-base-common)
 
 <a name="-train"></a>
 # Train
@@ -169,7 +169,9 @@ To launch RAG:
 ## 🚀 Installation
 
 ### 📦 Python Package
-⌛️ in progress..
+```bash
+pip install turbo-alignment
+```
 
 ### 🛠️ From Source
 For the latest features before an official release:

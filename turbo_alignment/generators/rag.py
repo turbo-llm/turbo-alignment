@@ -22,6 +22,7 @@ class RagGenerator(ChatGenerator):
         answer_indices, document_indices, doc_scores = self._model.generate(
             inputs=input_ids,
             generation_config=self._transformers_generator_parameters,
+            tokenizer=self._tokenizer.current_tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
