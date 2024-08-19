@@ -94,7 +94,8 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         data_collator: Callable,
         rm_model: PreTrainedModel = None,
     ) -> DDPOTrainer:
-        model.config.use_cache = False
+        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+
         extra_args = {'rm': rm_model}
 
         return DDPOTrainer(

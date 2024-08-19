@@ -47,7 +47,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         total_number_of_objects = len(list(dataset_path.iterdir()))
 
         logger.info('📖 Reading modality objects...')
-        files_paths = []  # type: ignore
+        files_paths: list[Path] = []
         for extension in available_extensions:
             files_paths.extend(dataset_path.glob(f'*.{extension}'))
 

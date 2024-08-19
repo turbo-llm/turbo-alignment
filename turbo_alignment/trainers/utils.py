@@ -54,10 +54,10 @@ def prepare_model_for_deepspeed(
     config_kwargs = deepcopy(deepspeed_plugin.deepspeed_config)
     if model is not None:
         if hasattr(model, 'config'):
-            hidden_size: int | None = (  # type: ignore
-                max(model.config.hidden_sizes)  # type: ignore
-                if getattr(model.config, 'hidden_sizes', None)  # type: ignore
-                else getattr(model.config, 'hidden_size', None)  # type: ignore
+            hidden_size: int | None = (
+                max(model.config.hidden_sizes)
+                if getattr(model.config, 'hidden_sizes', None)
+                else getattr(model.config, 'hidden_size', None)
             )
 
             if hidden_size is not None and config_kwargs['zero_optimization']['stage'] == 3:

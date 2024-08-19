@@ -25,12 +25,10 @@ class BaseTrainExperimentSettings(BaseSettings):
     log_path: Path = Path('train_output')
     seed: int = 42
 
-    # early_stopping: EarlyStoppingSettings | None = None
-
     trainer_settings: TrainerSettings
     tokenizer_settings: TokenizerSettings
 
-    model_settings: ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings
+    model_settings: (ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings)
 
     train_dataset_settings: MultiDatasetSettings
     val_dataset_settings: MultiDatasetSettings

@@ -1,4 +1,3 @@
-# mypy: disable-error-code="call-overload"
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
@@ -308,8 +307,12 @@ class DPOTrainingArguments(TrainingArguments):
         | CPOLossSettings
         | ORPOLossSettings
         | SimPOLossSettings
-    ) = field(default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID))
-    sync_ref_settings: SyncRefModelSettings = field(default_factory=SyncRefModelSettings())
+    ) = field(
+        default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
+    )  # type: ignore[call-overload]
+    sync_ref_settings: SyncRefModelSettings = field(  # type: ignore[call-overload]
+        default_factory=SyncRefModelSettings()
+    )
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False
@@ -342,8 +345,8 @@ class DPOTrainer(Trainer):
         if hasattr(args, 'loss_settings'):
             self.loss_type = args.loss_settings['loss_type']  # type: ignore[index]
 
-            if self.loss_type == DPOLossesType.SIMPO and not args.average_log_prob:
-                raise ValueError('You should normalize logits by length when using SimPO')
+            if self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO) and not args.average_log_prob:
+                raise ValueError(f'You should normalize logits by length when using {self.loss_type}')
 
             loss_args = args.loss_settings
             loss_args.pop('loss_type')  # type: ignore[union-attr]
@@ -363,8 +366,7 @@ class DPOTrainer(Trainer):
         )
 
         if hasattr(args, 'loss_settings') and self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO):
-            self.args.use_ref_model = False
-            logger.info('You can turn off ref_model when using SimPO or ORPO for memory saving')
+            logger.info(f'You can turn off ref_model when using {self.loss_type} for memory saving')
 
         self.ref_model = ref_model
         self.sft_model = sft_model
@@ -564,7 +566,7 @@ class DPOTrainer(Trainer):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        return losses.mean(), metrics  # type: ignore
+        return losses.mean(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor
@@ -624,7 +626,7 @@ class DPOTrainer(Trainer):
             'logits_test/rejected': metrics['logits_test/rejected'],
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)  # type: ignore[arg-type, call-overload]
+        logits = torch.stack(logits).mean(axis=1)  # type: ignore[call-overload, arg-type]
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels

@@ -19,8 +19,6 @@ class MetricType(str, Enum):
     KL: str = 'kl'
     TOOL_CALL_METRICS: str = 'tool_call_metrics'
     RETRIEVAL_UTILITY: str = 'retrieval_utility'
-    INTENT_CLASSIFIER_ACCURACY: str = 'intent_classifier_accuracy'
-    RAGAS_METRICS: str = 'ragas_metrics'
 
 
 class ElementWiseScores(ExtraFieldsNotAllowedBaseModel):

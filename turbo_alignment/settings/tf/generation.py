@@ -10,3 +10,4 @@ class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     top_p: float = 1.0
     top_k: int = 50
     temperature: float = 1.0
+    stop_strings: str | list[str] = '</s>'

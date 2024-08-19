@@ -69,10 +69,10 @@
     "cherry_pick_settings": {
         "generator_transformers_settings": {
             "num_beams": 3,
+            "stop_strings": ["</RS>", "</s>"],
             "max_new_tokens": 8
         },
         "custom_generation_settings": {
-            "generation_eos_token": "</RS>",
             "skip_special_tokens": false
           },
         "dataset_settings": {

@@ -26,7 +26,7 @@ logger = get_project_logger()
 
 
 class TrainerCustomSave(MultiGPUCherryPicksTrainer):
-    def _save_checkpoint(self, model, trial, metrics=None):  # pylint: disable=unused-argument
+    def _save_checkpoint(self, model, trial, metrics=None):
         logger.info('Running custom _save_checkpoint')
         checkpoint_folder = f'{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}'
         run_dir = self._get_output_dir(trial=trial)
@@ -269,7 +269,7 @@ class MultimodalTrainer(Trainer):
             'logits_test/rejected': metrics['logits_test/rejected'],
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)  # type: ignore[arg-type, call-overload]
+        logits = torch.stack(logits).mean(axis=1)  # type: ignore[call-overload, arg-type]
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels
@@ -285,7 +285,7 @@ class MultimodalTrainer(Trainer):
         del self._stored_metrics[train_eval]
         return super().log(logs)  # pylint: disable=no-member
 
-    def _save_checkpoint(self, model, trial, metrics=None):  # pylint: disable=unused-argument
+    def _save_checkpoint(self, model, trial, metrics=None):
         logger.info('Running custom _save_checkpoint')
         checkpoint_folder = f'{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}'
         run_dir = self._get_output_dir(trial=trial)

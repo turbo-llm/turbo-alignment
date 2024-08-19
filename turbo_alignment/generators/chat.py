@@ -39,8 +39,8 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             inputs=batched_input_ids,
             attention_mask=batched_attention_mask,
             generation_config=self._transformers_generator_parameters,
+            tokenizer=self._tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
-            stopping_criteria=self._stopping_criteria,
         )
 
         postprocessed_output_indices = self._postprocess(
@@ -84,8 +84,8 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             inputs=input_ids,
             attention_mask=attention_mask,
             generation_config=self._transformers_generator_parameters,
+            tokenizer=self._tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
-            stopping_criteria=self._stopping_criteria,
         )
 
         postprocessed_output_indices = self._postprocess(
@@ -102,18 +102,23 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         if self._return_logits:
             with torch.no_grad():
-                logits = self._model(output_indices).logits
+                logits = self._model(output_indices).logits.cpu()
 
             answer_tokens_ids = postprocessed_output_indices
             input_token_ids = input_ids
 
-        return ChatInferenceOutput(
-            id=original_record.id,
-            dataset_name=dataset_name,
-            messages=original_record.messages,
-            label=original_record.label,
-            meta=original_record.meta,
-            answers=[
+            answer_messages = [
+                AnswerMessage(
+                    id=str(i),
+                    content=a,
+                    input_token_ids=input_token_ids,
+                    answer_token_ids=a_t_ids.unsqueeze(0),
+                    logits=l.unsqueeze(0),
+                )
+                for i, (a, a_t_ids, l) in enumerate(zip(answers, answer_tokens_ids, logits))  # type: ignore[arg-type]
+            ]
+        else:
+            answer_messages = [
                 AnswerMessage(
                     id=str(i),
                     content=a,
@@ -122,5 +127,13 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
                     logits=logits,
                 )
                 for i, a in enumerate(answers)
-            ],
+            ]
+
+        return ChatInferenceOutput(
+            id=original_record.id,
+            dataset_name=dataset_name,
+            messages=original_record.messages,
+            label=original_record.label,
+            meta=original_record.meta,
+            answers=answer_messages,
         )
