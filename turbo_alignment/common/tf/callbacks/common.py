@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Any, Callable
 
 import pandas as pd
+import wandb
 from accelerate.utils.operations import gather_object
 from transformers import (
     TrainerCallback,
@@ -11,7 +12,6 @@ from transformers import (
 )
 from transformers.trainer_callback import CallbackHandler
 
-import wandb
 from turbo_alignment.settings.metric import MetricResults
 
 
