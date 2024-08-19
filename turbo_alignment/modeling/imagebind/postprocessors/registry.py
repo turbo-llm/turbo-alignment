@@ -1,3 +1,5 @@
+from abc import ABC
+
 import torch
 
 from turbo_alignment.modeling.common.helpers import LearnableLogitScaling, Normalize
@@ -7,7 +9,7 @@ from turbo_alignment.modeling.imagebind.models import (
 )
 
 
-class Postprocessors(torch.nn.ModuleDict):  # pylint: disable=abstract-method
+class Postprocessors(ABC, torch.nn.ModuleDict):
     def __init__(self, _settings: ImageBindArchitectureSettings):
         super().__init__()
 

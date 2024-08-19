@@ -39,6 +39,9 @@ ifneq ($(CODE),)
 	unify --in-place --recursive $(CODE) tutorials
 endif
 
+bash-dev:
+	docker run -v $(shell pwd):/app --rm -it ${DEV_IMAGE} bash
+
 lock:
 	rm poetry.lock
 	poetry lock

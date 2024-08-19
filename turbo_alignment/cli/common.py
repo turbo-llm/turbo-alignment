@@ -4,7 +4,7 @@ import typer
 
 from turbo_alignment import pipelines
 from turbo_alignment.cli.app import app
-from turbo_alignment.common.tf.convert_to_base_model import peft_to_base_model
+from turbo_alignment.common.tf.merge_adapters_to_base import peft_to_base_model
 from turbo_alignment.settings.datasets.multimodal import (
     MultimodalDatasetProcessingSettings,
 )

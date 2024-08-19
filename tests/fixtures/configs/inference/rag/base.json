@@ -41,10 +41,10 @@
             "num_beams": 1,
             "max_new_tokens": 10,
             "repetition_penalty": 1.2,
+            "stop_strings": "</RS>",
             "do_sample": false
           },
           "custom_settings": {
-            "generation_eos_token": "</RS>",
             "skip_special_tokens": false,
             "remove_prompt": false
           }

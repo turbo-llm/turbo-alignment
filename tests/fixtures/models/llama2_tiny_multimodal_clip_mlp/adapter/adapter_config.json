@@ -22,8 +22,8 @@
   "rank_pattern": {},
   "revision": null,
   "target_modules": [
-    "q_proj",
-    "k_proj"
+    "k_proj",
+    "q_proj"
   ],
   "task_type": "CAUSAL_LM",
   "use_rslora": false

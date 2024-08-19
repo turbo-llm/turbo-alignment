@@ -1,3 +1,4 @@
+from abc import ABC
 from functools import partial
 
 import torch
@@ -13,7 +14,7 @@ from turbo_alignment.modeling.imagebind.models import (
 )
 
 
-class Trunks(torch.nn.ModuleDict):  # pylint: disable=abstract-method
+class Trunks(ABC, torch.nn.ModuleDict):
     @staticmethod
     def __instantiate_trunk(
         embed_dim: int,

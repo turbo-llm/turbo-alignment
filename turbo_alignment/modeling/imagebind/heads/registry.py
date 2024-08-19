@@ -1,3 +1,5 @@
+from abc import ABC
+
 import torch
 
 from turbo_alignment.modeling.common.helpers import SelectElement, SelectEOSAndProject
@@ -7,7 +9,7 @@ from turbo_alignment.modeling.imagebind.models import (
 )
 
 
-class Heads(torch.nn.ModuleDict):  # pylint: disable=abstract-method
+class Heads(ABC, torch.nn.ModuleDict):
     @staticmethod
     def __get_vision_head(
         vision_embed_dim: int,
