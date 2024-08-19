@@ -19,6 +19,8 @@ class DPOLossesType(str, Enum):
     KTO = 'kto'
     SLIC_HF = 'slic_hf'
     CPO = 'cpo'
+    ORPO = 'orpo'
+    SIMPO = 'simpo'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -57,6 +59,17 @@ class SlicHfLossSettings(DPOLossSettings):
     norm: bool = False
 
 
+class SimPOLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.SIMPO]
+    beta: float = 0.1
+    gamma: float = 0.1
+
+
+class ORPOLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.ORPO]
+    beta: float = 0.1
+
+
 class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
     sync_ref_model: bool = False
     alpha: float = 1.0
@@ -64,16 +77,19 @@ class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
 
 
 class DPOTrainerSettings(TrainerSettings):
-    loss_settings: SigmoidLossSettings | HingeLossSettings | IPOLossSettings | KTOLossSettings | CPOLossSettings
+    loss_settings: (
+        SigmoidLossSettings
+        | HingeLossSettings
+        | IPOLossSettings
+        | KTOLossSettings
+        | CPOLossSettings
+        | ORPOLossSettings
+        | SimPOLossSettings
+        | SlicHfLossSettings
+    )
     sync_ref_settings: SyncRefModelSettings
     use_ref_model: bool = True
     use_sft_model: bool = False
-    average_log_prob: bool = Field(default=False, description='Normalize log probability by length or not')
-
-
-class SlicHfTrainerSettings(TrainerSettings):
-    loss_settings: SlicHfLossSettings
-    use_ref_model: bool = True
     average_log_prob: bool = Field(default=False, description='Normalize log probability by length or not')
 
 

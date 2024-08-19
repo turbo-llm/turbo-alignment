@@ -1,0 +1,134 @@
+{
+    "train_dataset_settings": {
+        "sources": [
+            {
+                "name": "rm_preferences_test",
+                "records_path": "tests/fixtures/datasets/rm/train_preferences.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "max_tokens_count": 120
+        },
+        "add_labels": true,
+        "dataset_type": "pair_preferences"
+    },
+    "val_dataset_settings": {
+        "sources": [
+            {
+                "name": "rm_preferences_test",
+                "records_path": "tests/fixtures/datasets/rm/val_preferences.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "max_tokens_count": 120
+        },
+        "add_labels": true,
+        "dataset_type": "pair_preferences"
+    },
+    "model_settings": {
+        "model_path": "tests/fixtures/models/llama2_tiny",
+        "model_type": "causal",
+        "transformers_settings": {},
+        "adapter_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/trainer",
+        "is_trainable": true
+    },
+    "cherry_pick_settings": {
+        "generator_transformers_settings": {
+            "num_beams": 1,
+            "do_sample": false,
+            "stop_strings": "</RS>",
+            "max_new_tokens": 8
+        },
+        "custom_generation_settings": {
+            "skip_special_tokens": false
+          },
+        "dataset_settings": {
+            "sources": [
+                {
+                    "name": "chat_test",
+                    "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+                    "num_samples": 2
+                }
+            ],
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "dataset_type": "chat",
+            "max_tokens_count": 150,
+            "only_answer_loss": true
+        },
+        "metric_settings": [
+            {
+                "type": "length",
+                "parameters": {"need_average": [true]}
+            },
+            {
+                "type": "kl",
+                "parameters": {
+                    "need_average": [true],
+                    "ref_logits_type": "sft"
+                }
+            }
+        ]
+    },
+    "tokenizer_settings": {},
+    "trainer_settings": {
+        "evaluation_strategy": "steps",
+        "per_device_train_batch_size": 2,
+        "per_device_eval_batch_size": 2,
+        "gradient_accumulation_steps": 2,
+        "eval_steps": 4,
+        "save_steps": 4,
+        "logging_steps": 1,
+        "learning_rate": 0.0003,
+        "num_train_epochs": 2,
+        "lr_scheduler_type": "cosine",
+        "warmup_steps": 2,
+        "fp16": false,
+        "bf16": false,
+        "optim": "adamw_torch",
+        "save_total_limit": 1,
+        "average_log_prob": true,
+        "loss_settings": {
+            "loss_type": "simpo"
+        },
+        "sync_ref_settings": {
+            "sync_ref_model": false
+        },
+        "use_ref_model": false,
+        "use_sft_model": true,
+        "no_cuda": true
+    },
+    "wandb_settings": {
+        "project_name": "alignment",
+        "run_name": "dpo",
+        "entity": "turbo-alignment"
+      },
+    "log_path": "test_dpo_llama_train_output"
+}

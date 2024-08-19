@@ -14,6 +14,7 @@ runner = CliRunner()
     'config_path',
     [
         FIXTURES_PATH / 'configs/train/sft/base.json',
+        FIXTURES_PATH / 'configs/train/sft/sft_with_rm_metric.json',
     ],
 )
 def test_sft_train(config_path: Path):
