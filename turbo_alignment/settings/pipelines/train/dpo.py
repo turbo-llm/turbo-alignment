@@ -67,6 +67,7 @@ class SimPOLossSettings(DPOLossSettings):
 
 class ORPOLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.ORPO]
+    beta: float = 0.1
 
 
 class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
@@ -84,6 +85,7 @@ class DPOTrainerSettings(TrainerSettings):
         | CPOLossSettings
         | ORPOLossSettings
         | SimPOLossSettings
+        | SlicHfLossSettings
     )
     sync_ref_settings: SyncRefModelSettings
     use_ref_model: bool = True

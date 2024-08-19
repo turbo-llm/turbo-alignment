@@ -307,6 +307,7 @@ class DPOTrainingArguments(TrainingArguments):
         | CPOLossSettings
         | ORPOLossSettings
         | SimPOLossSettings
+        | SlicHfLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
