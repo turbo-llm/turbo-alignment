@@ -3,7 +3,7 @@
       "sources": [
         {
           "name": "train",
-          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+          "records_path": "train_chat.jsonl",
           "sample_rate": 1
         }
       ],
@@ -39,7 +39,7 @@
       "sources": [
         {
           "name": "test",
-          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+          "records_path": "train_chat.jsonl",
           "sample_rate": 1
         }
       ],
@@ -156,7 +156,7 @@
         "sources": [
           {
             "name": "cherry_picks",
-            "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+            "records_path": "val_chat.jsonl",
             "sample_rate": 1
           }
         ],
