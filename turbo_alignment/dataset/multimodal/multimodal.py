@@ -190,6 +190,7 @@ class TrainMultimodalDataset(MultimodalDataset):
             )
 
             tokenized_record['labels'][modality_tokens_mask] = DISABLE_LOSS_LABEL
+
             outputs.append(
                 {
                     **tokenized_record,

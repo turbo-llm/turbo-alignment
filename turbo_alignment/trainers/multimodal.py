@@ -53,9 +53,15 @@ class TrainerCustomSave(MultiGPUCherryPicksTrainer):
         (output_dir / 'adapter').mkdir(parents=True, exist_ok=True)
         (output_dir / 'tokenizer').mkdir(parents=True, exist_ok=True)
 
-        torch.save(model.modality_adapters.state_dict(), output_dir / 'projections' / 'modality_adapters.pt')
+        if isinstance(model, torch.nn.DataParallel):
+            torch.save(
+                model.module.modality_adapters.state_dict(), output_dir / 'projections' / 'modality_adapters.pt'
+            )
+            model.module.language_model.save_pretrained(output_dir / 'adapter')
+        else:
+            torch.save(model.modality_adapters.state_dict(), output_dir / 'projections' / 'modality_adapters.pt')
+            model.language_model.save_pretrained(output_dir / 'adapter')
 
-        model.language_model.save_pretrained(output_dir / 'adapter')
         self.tokenizer.save_pretrained(output_dir / 'tokenizer')
 
 
