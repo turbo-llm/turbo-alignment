@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-# TMP
+
 def write_jsonl(records: Any, path: Path) -> None:
     with path.open('w', encoding='utf-8') as f:
         for r in records:
