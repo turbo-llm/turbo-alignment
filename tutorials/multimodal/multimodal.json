@@ -4,7 +4,7 @@
         {
           "name": "train",
           "records_path": "train_chat.jsonl",
-          "sample_rate": 1
+          "num_samples": 10
         }
       ],
       "prompt_template": {
@@ -23,11 +23,11 @@
       "modality_reader_settings_mapping": {
         "image": {
           "reader_type": "clip",
-          "reader_path": "../models/clip-vit-base-patch16"
+          "reader_path": "openai/clip-vit-base-patch32"
         },
         "audio": null
       },
-      "n_modality_embeddings": 196,
+      "n_modality_embeddings": 49,
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
@@ -39,8 +39,8 @@
       "sources": [
         {
           "name": "test",
-          "records_path": "train_chat.jsonl",
-          "sample_rate": 1
+          "records_path": "val_chat.jsonl",
+          "num_samples": 10
         }
       ],
       "prompt_template": {
@@ -59,11 +59,11 @@
       "modality_reader_settings_mapping": {
         "image": {
           "reader_type": "clip",
-          "reader_path": "../models/clip-vit-base-patch16"
+          "reader_path": "openai/clip-vit-base-patch32"
         },
         "audio": null
       },
-      "n_modality_embeddings": 196,
+      "n_modality_embeddings": 49,
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
@@ -72,7 +72,7 @@
       "truncate_top": false
     },
     "model_settings": {
-      "model_path": "../models/Qwen1.5-0.5B",
+      "model_path": "Qwen/Qwen1.5-0.5B",
       "model_type": "causal",
       "transformers_settings": {},
       "peft_settings": {
@@ -104,21 +104,22 @@
     },
     "tokenizer_settings": {},
     "trainer_settings": {
-      "evaluation_strategy": "epoch",
-      "save_strategy": "epoch",
+      "evaluation_strategy": "steps",
+      "save_strategy": "steps",
       "per_device_train_batch_size": 1,
       "per_device_eval_batch_size": 1,
       "gradient_accumulation_steps": 1,
       "logging_steps": 1,
-      "learning_rate": 0.00002,
+      "eval_steps": 32,
+      "save_steps": 32,
+      "learning_rate": 1e-6,
       "num_train_epochs": 1,
       "lr_scheduler_type": "cosine",
       "warmup_steps": 0,
       "fp16": false,
       "bf16": false,
       "optim": "adamw_torch",
-      "save_total_limit": 1,
-      "no_cuda": true
+      "save_total_limit": 1
     },
     "wandb_settings": {
       "project_name": "alignment",
@@ -129,7 +130,7 @@
       "image": {
         "modality_encoder_type": "clip",
         "is_pickle": false,
-        "encoder_path": "../models/clip-vit-base-patch16"
+        "encoder_path": "openai/clip-vit-base-patch32"
       },
       "audio": null
     },
@@ -146,10 +147,10 @@
         "num_beams": 1,
         "max_new_tokens": 128,
         "repetition_penalty": 1.1,
-        "do_sample": true
+        "do_sample": true,
+        "stop_strings": "</RS>"
       },
       "custom_generation_settings": {
-        "generation_eos_token": "</RS>",
         "skip_special_tokens": true
       },
       "dataset_settings": {
@@ -157,7 +158,7 @@
           {
             "name": "cherry_picks",
             "records_path": "val_chat.jsonl",
-            "sample_rate": 1
+            "num_samples": 10
           }
         ],
         "prompt_template": {
@@ -171,7 +172,7 @@
         },
         "dataset_type": "multimodal",
         "max_tokens_count": 2000,
-        "n_modality_embeddings": 196,
+        "n_modality_embeddings": 49,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "only_answer_loss": true,
@@ -182,7 +183,7 @@
         "modality_reader_settings_mapping": {
           "image": {
             "reader_type": "clip",
-            "reader_path": "../models/clip-vit-base-patch16"
+            "reader_path": "openai/clip-vit-base-patch32"
           },
           "audio": null
         },
