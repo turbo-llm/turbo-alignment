@@ -3,7 +3,7 @@ name = "turbo-alignment"
 packages = [
     { include = "turbo_alignment" },
 ]
-version = "0.1.0"
+version = "0.0.2"
 description = "turbo-alignment repository"
 authors = ["T Mega Alignment Team <n.surnachev@tcsbank.ru>" ]
 
