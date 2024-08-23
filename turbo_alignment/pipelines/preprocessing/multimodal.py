@@ -121,6 +121,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         experiment_settings.output_file_path.mkdir(parents=True, exist_ok=True)
 
         tensors = self._get_safetensor_dict(encoded_modality_tensors, encoded_file_paths)
+
         del encoded_modality_tensors
 
         save_file(

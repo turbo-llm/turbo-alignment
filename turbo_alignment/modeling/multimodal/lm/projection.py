@@ -122,7 +122,6 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
         labels: torch.LongTensor | None = None,
     ) -> ModelOutput:
         multimodal_lm_input_embeds = self.convert_inputs_to_embeds(input_ids, modality_inputs, modality_tokens_mask)
-
         return self.language_model(
             inputs_embeds=multimodal_lm_input_embeds, labels=labels, attention_mask=attention_mask
         )

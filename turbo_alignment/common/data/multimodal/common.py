@@ -25,5 +25,4 @@ class FileReader(BaseImageReader):
         safetensors_file = self._get_safetensors_file(Path(path).parent)
         if self.processed_tensors is None:
             self.processed_tensors = safe_open(safetensors_file, framework='pt', device='cpu')
-
         return self.processed_tensors.get_tensor(Path(path).name)

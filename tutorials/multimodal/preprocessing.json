@@ -1,0 +1,14 @@
+{
+    "reader_settings": {
+        "reader_type": "clip",
+        "reader_path": "openai/clip-vit-base-patch32"
+    },
+    "encoder_settings": {
+        "modality_encoder_type": "clip",
+        "encoder_path": "openai/clip-vit-base-patch32"
+    },
+    "modality": "image",
+    "dataset_path": "images/00000",
+    "batch_size": 256,
+    "output_file_path": "images/00000"
+}
