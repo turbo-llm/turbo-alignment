@@ -99,7 +99,6 @@ ENV/
 env.bak/
 venv.bak/
 default_tb/
-poetry.lock
 
 # Spyder project settings
 .spyderproject
