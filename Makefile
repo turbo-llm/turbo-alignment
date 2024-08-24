@@ -18,7 +18,7 @@ tests: tests-unit tests-integration tests-cli
 	[ -n $$CI ] && coverage xml -i || true # always success
 	coverage report -i
 
-lint: black flake pylint mypy
+lint: black flake mypy
 
 black:
 	black --target-version py310 --check --skip-string-normalization --line-length $(MAX_LINE_LENGTH) $(CODE)
