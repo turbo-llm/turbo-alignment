@@ -3,7 +3,7 @@ name = "turbo-alignment"
 packages = [
     { include = "turbo_alignment" },
 ]
-version = "0.1.0"
+version = "0.0.2"
 description = "turbo-alignment repository"
 authors = ["T Mega Alignment Team <n.surnachev@tcsbank.ru>" ]
 
@@ -44,7 +44,6 @@ pydantic ="^2.7.0"
 timm ="^0.9.7"
 opencv-python = "^4.10.0.84"
 langchain-huggingface = "^0.0.3"
-ragas = "^0.1.10"
 
 [tool.poetry.group.deepspeed.dependencies]
 accelerate = "0.27"

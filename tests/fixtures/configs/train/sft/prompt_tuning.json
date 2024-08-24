@@ -63,10 +63,10 @@
             "num_beams": 1,
             "max_new_tokens": 35,
             "repetition_penalty": 1.1,
+            "stop_strings": "</RS>",
             "do_sample": true
         },
         "custom_generation_settings": {
-            "generation_eos_token": "</RS>",
             "skip_special_tokens": false
         },
         "dataset_settings": {

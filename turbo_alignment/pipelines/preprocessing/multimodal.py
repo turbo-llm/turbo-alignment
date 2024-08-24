@@ -47,7 +47,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         total_number_of_objects = len(list(dataset_path.iterdir()))
 
         logger.info('📖 Reading modality objects...')
-        files_paths = []  # type: ignore
+        files_paths: list[Path] = []
         for extension in available_extensions:
             files_paths.extend(dataset_path.glob(f'*.{extension}'))
 
@@ -121,6 +121,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         experiment_settings.output_file_path.mkdir(parents=True, exist_ok=True)
 
         tensors = self._get_safetensor_dict(encoded_modality_tensors, encoded_file_paths)
+
         del encoded_modality_tensors
 
         save_file(

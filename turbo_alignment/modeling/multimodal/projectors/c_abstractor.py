@@ -1,3 +1,4 @@
+from abc import ABC
 from functools import partial
 
 import torch
@@ -14,6 +15,7 @@ from turbo_alignment.settings.modality import ModalityProjectorType
 
 class HoneybeeVisualProjectorConfig(BaseModel):
     projector_type: str = 'c-abs'
+    initializer_range: float = 1.0
     depth: int = 3
     mlp_depth: int = 2
     hidden_size: int = 1024
@@ -42,7 +44,7 @@ def build_eos_tokens(config: HoneybeeVisualProjectorConfig, output_hidden_size: 
     num_eos_tokens = config.num_eos_tokens
     if num_eos_tokens:
         eos_tokens = torch.nn.Parameter(torch.randn(1, num_eos_tokens, output_hidden_size))
-        torch.nn.init.trunc_normal_(eos_tokens, mean=0.0, std=config.initializer_range)  # type: ignore
+        torch.nn.init.trunc_normal_(eos_tokens, mean=0.0, std=config.initializer_range)
     else:
         eos_tokens = None
 
@@ -58,9 +60,9 @@ def build_prenorm(config: HoneybeeVisualProjectorConfig):
 
 
 def build_mlp(depth: int, hidden_size: int, output_hidden_size: int):
-    layers = [torch.nn.Linear(hidden_size, output_hidden_size)]
+    layers: list[torch.nn.Module] = [torch.nn.Linear(hidden_size, output_hidden_size)]
     for _ in range(1, depth):
-        layers.append(torch.nn.SiLU())  # type: ignore
+        layers.append(torch.nn.SiLU())
         layers.append(torch.nn.Linear(output_hidden_size, output_hidden_size))
     return torch.nn.Sequential(*layers)
 
@@ -131,8 +133,7 @@ class Projector(torch.nn.Module):
         super()._load_from_state_dict(state_dict, *args, **kwargs)
 
 
-# pylint: disable=abstract-method
-class ConvProjector(Projector):
+class ConvProjector(ABC, Projector):
     def _forward(self, x):
         # x: [B, L, dim]
         hw = int(x.size(1) ** 0.5)

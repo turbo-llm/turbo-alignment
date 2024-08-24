@@ -4,14 +4,8 @@ from typing import Any, Generic, TypeVar
 
 import torch
 from accelerate import Accelerator
-from transformers import (
-    GenerationConfig,
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
-    StoppingCriteriaList,
-)
+from transformers import GenerationConfig, PreTrainedModel, PreTrainedTokenizerBase
 
-from turbo_alignment.common.tf.stopping_criteria import EndTagCriteria
 from turbo_alignment.dataset.base import BaseDataset
 from turbo_alignment.dataset.base.models import DatasetRecord
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
@@ -105,27 +99,8 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
 
         self._return_logits = return_logits
 
-        eos_token_id: list[int] = self._tokenizer.encode(
-            custom_generation_settings.generation_eos_token, add_special_tokens=False
-        )
-
-        self._stopping_criteria: StoppingCriteriaList | None = None
-        if len(eos_token_id) != 1:
-            eos_token_id = []
-            if transformers_settings.num_beams > 1 or transformers_settings.do_sample:
-                raise ValueError('You should use only 1 eos token with num_beams > 1 or do_sample=True')
-            self._stopping_criteria = StoppingCriteriaList(
-                [
-                    EndTagCriteria(
-                        custom_generation_settings.generation_eos_token,
-                        tokenizer=tokenizer,
-                    )
-                ]
-            )
-
         self._transformers_generator_parameters = GenerationConfig(
             bos_token_id=self._tokenizer.bos_token_id,
-            eos_token_id=eos_token_id,
             **transformers_settings.dict(),
         )
 
@@ -170,8 +145,8 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
     @staticmethod
     def _postprocess(input_indices: torch.Tensor, output_indices: torch.Tensor, remove_prompt: bool) -> torch.Tensor:
         if remove_prompt:
-            return output_indices[:, input_indices.shape[1] :]
-        return output_indices
+            return output_indices[:, input_indices.shape[1] :].cpu()
+        return output_indices.cpu()
 
     def _decode(self, token_indices: torch.Tensor) -> list[str]:
         return self._tokenizer.batch_decode(

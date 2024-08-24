@@ -11,7 +11,7 @@ class BasePeftSettings(ExtraFieldsNotAllowedBaseModel):
 
 
 class LoraSettings(BasePeftSettings):
-    name: Literal[PeftType.LORA] = PeftType.LORA  # type: ignore[valid-type]
+    name: Literal[PeftType.LORA] = PeftType.LORA
     r: int = 16
     lora_alpha: int = 16
     lora_dropout: float = 0.05
@@ -21,19 +21,19 @@ class LoraSettings(BasePeftSettings):
 
 
 class PrefixTuningSettings(BasePeftSettings):
-    name: Literal[PeftType.PREFIX_TUNING] = PeftType.PREFIX_TUNING  # type: ignore[valid-type]
+    name: Literal[PeftType.PREFIX_TUNING] = PeftType.PREFIX_TUNING
     encoder_hidden_size: int
     prefix_projection: bool
 
 
 class PromptTuningSettings(BasePeftSettings):
-    name: Literal[PeftType.PROMPT_TUNING] = PeftType.PROMPT_TUNING  # type: ignore[valid-type]
+    name: Literal[PeftType.PROMPT_TUNING] = PeftType.PROMPT_TUNING
     num_virtual_tokens: int = 32
     prompt_tuning_init_text: str | None = None
 
 
 class PTuningSettings(BasePeftSettings):
-    name: Literal[PeftType.P_TUNING] = PeftType.P_TUNING  # type: ignore[valid-type]
+    name: Literal[PeftType.P_TUNING] = PeftType.P_TUNING
     num_virtual_tokens: int = 32
     encoder_reparameterization_type: str = 'MLP'
 

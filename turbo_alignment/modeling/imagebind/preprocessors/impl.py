@@ -177,12 +177,11 @@ class SpatioTemporalPosEmbeddingHelper(VerboseNNModule, ABC):
 
 
 class RGBDTPreprocessor(VerboseNNModule):
-    # pylint: disable=dangerous-default-value
     def __init__(
         self,
         rgbt_stem: PatchEmbedGeneric | None,
         depth_stem: PatchEmbedGeneric | None,
-        img_size: list = [3, 224, 224],
+        img_size: list | None = None,
         num_cls_tokens: int = 1,
         pos_embed_fn: Callable | None = None,
         use_type_embed: bool = False,
@@ -190,6 +189,8 @@ class RGBDTPreprocessor(VerboseNNModule):
     ) -> None:
         super().__init__()
         stem = rgbt_stem if rgbt_stem is not None else depth_stem
+        if img_size is None:
+            img_size = [3, 224, 224]
         assert stem is not None
         (
             self.patches_layout,
@@ -277,11 +278,10 @@ class RGBDTPreprocessor(VerboseNNModule):
 
 
 class AudioPreprocessor(RGBDTPreprocessor):
-    # pylint: disable=arguments-differ
     def __init__(self, audio_stem: PatchEmbedGeneric, **kwargs) -> None:
         super().__init__(rgbt_stem=audio_stem, depth_stem=None, **kwargs)
 
-    def forward(self, audio: torch.Tensor | None = None) -> dict:  # type: ignore [override]
+    def forward(self, *_args, audio: torch.Tensor | None = None, **_kwargs) -> dict:
         # vision here is actually audio
         return super().forward(vision=audio)
 

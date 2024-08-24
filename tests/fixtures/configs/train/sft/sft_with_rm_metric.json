@@ -70,10 +70,10 @@
         "generator_transformers_settings": {
             "num_beams": 1,
             "num_return_sequences": 2,
+            "stop_strings": "</RS>",
             "max_new_tokens": 8
         },
         "custom_generation_settings": {
-            "generation_eos_token": "</RS>",
             "skip_special_tokens": false
           },
         "dataset_settings": {

@@ -50,6 +50,7 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
         output_indices = self._model.language_model.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
+            tokenizer=self._tokenizer,
             generation_config=self._transformers_generator_parameters,
         )
 

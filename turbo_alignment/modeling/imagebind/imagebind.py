@@ -1,4 +1,3 @@
-# pylint: skip-file
 # pylint: disable=unused-import
 import torch
 

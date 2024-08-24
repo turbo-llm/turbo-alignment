@@ -1,3 +1,4 @@
+from abc import ABC
 from functools import partial
 
 import torch
@@ -16,7 +17,7 @@ from turbo_alignment.modeling.imagebind.preprocessors.impl import (
 )
 
 
-class Preprocessors(torch.nn.ModuleDict):  # pylint: disable=abstract-method
+class Preprocessors(ABC, torch.nn.ModuleDict):
     @staticmethod
     def __get_rgbt_preprocessor(
         video_frames: int,

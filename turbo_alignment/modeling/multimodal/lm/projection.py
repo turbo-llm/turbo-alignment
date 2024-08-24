@@ -1,4 +1,5 @@
 from collections import defaultdict
+from pathlib import Path
 
 import torch
 from scipy.ndimage.measurements import find_objects, label
@@ -40,14 +41,13 @@ total number of patches returned by the encoder. \
 Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in config.'
 
             if self.modality_projector_initialization_mapping:
-                if self.modality_projector_initialization_mapping.get(modality):
+                state_dict_path: Path | None = self.modality_projector_initialization_mapping.get(modality, None)
+                if state_dict_path is not None:
                     logger.info(f'Loading {modality} connector weights')
 
-                    state_dictionary = torch.load(
-                        self.modality_projector_initialization_mapping[modality]  # type: ignore[arg-type]
-                    )
+                    state_dictionary = torch.load(state_dict_path)
                     modality_adapters[modality].load_state_dict(state_dictionary)
-                    logger.info(f'Sucsessfully loaded from {self.modality_projector_initialization_mapping[modality]}')
+                    logger.info(f'Sucsessfully loaded from {state_dict_path}')
 
         self.modality_adapters = torch.nn.ModuleDict(modality_adapters)
 
@@ -122,7 +122,6 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
         labels: torch.LongTensor | None = None,
     ) -> ModelOutput:
         multimodal_lm_input_embeds = self.convert_inputs_to_embeds(input_ids, modality_inputs, modality_tokens_mask)
-
         return self.language_model(
             inputs_embeds=multimodal_lm_input_embeds, labels=labels, attention_mask=attention_mask
         )

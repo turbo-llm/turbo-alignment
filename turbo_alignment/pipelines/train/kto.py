@@ -72,6 +72,8 @@ class TrainKTOStrategy(BaseTrainStrategy[KTOTrainExperimentSettings]):
         val_dataset: Dataset,
         data_collator: Callable,
     ):
+        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+
         extra_args = {}
         if experiment_settings.trainer_settings.use_ref_model:
             ref_model = load_model(experiment_settings.model_settings, tokenizer)

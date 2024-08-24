@@ -3,8 +3,8 @@
       "sources": [
         {
           "name": "train",
-          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
-          "sample_rate": 1
+          "records_path": "train_chat.jsonl",
+          "num_samples": 10
         }
       ],
       "prompt_template": {
@@ -22,16 +22,16 @@
       },
       "modality_reader_settings_mapping": {
         "image": {
-          "reader_type": "pickle",
-          "reader_path": null
+          "reader_type": "clip",
+          "reader_path": "openai/clip-vit-base-patch32"
         },
         "audio": null
       },
-      "n_modality_embeddings": 225,
+      "n_modality_embeddings": 49,
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
-      "max_tokens_count": 300,
+      "max_tokens_count": 2000,
       "only_answer_loss": true,
       "truncate_top": false
     },
@@ -39,8 +39,8 @@
       "sources": [
         {
           "name": "test",
-          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
-          "sample_rate": 1
+          "records_path": "val_chat.jsonl",
+          "num_samples": 10
         }
       ],
       "prompt_template": {
@@ -58,21 +58,21 @@
       },
       "modality_reader_settings_mapping": {
         "image": {
-          "reader_type": "pickle",
-          "reader_path": null
+          "reader_type": "clip",
+          "reader_path": "openai/clip-vit-base-patch32"
         },
         "audio": null
       },
-      "n_modality_embeddings": 225,
+      "n_modality_embeddings": 49,
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
-      "max_tokens_count": 300,
+      "max_tokens_count": 2000,
       "only_answer_loss": true,
       "truncate_top": false
     },
     "model_settings": {
-      "model_path": "tests/fixtures/models/llama2_tiny",
+      "model_path": "Qwen/Qwen1.5-0.5B",
       "model_type": "causal",
       "transformers_settings": {},
       "peft_settings": {
@@ -104,21 +104,22 @@
     },
     "tokenizer_settings": {},
     "trainer_settings": {
-      "evaluation_strategy": "epoch",
-      "save_strategy": "epoch",
+      "evaluation_strategy": "steps",
+      "save_strategy": "steps",
       "per_device_train_batch_size": 1,
       "per_device_eval_batch_size": 1,
       "gradient_accumulation_steps": 1,
       "logging_steps": 1,
-      "learning_rate": 0.00002,
+      "eval_steps": 32,
+      "save_steps": 32,
+      "learning_rate": 1e-6,
       "num_train_epochs": 1,
       "lr_scheduler_type": "cosine",
       "warmup_steps": 0,
       "fp16": false,
       "bf16": false,
       "optim": "adamw_torch",
-      "save_total_limit": 1,
-      "no_cuda": true
+      "save_total_limit": 1
     },
     "wandb_settings": {
       "project_name": "alignment",
@@ -128,13 +129,13 @@
     "modality_encoder_settings_mapping": {
       "image": {
         "modality_encoder_type": "clip",
-        "is_pickle": true,
-        "encoder_path": "tests/fixtures/models/clip_tiny"
+        "is_pickle": false,
+        "encoder_path": "openai/clip-vit-base-patch32"
       },
       "audio": null
     },
     "modality_projector_mapping": {
-      "image": "c_abstractor",
+      "image": "llava",
       "audio": null
     },
     "modality_projector_initialization_mapping": {
@@ -144,10 +145,10 @@
     "cherry_pick_settings": {
       "generator_transformers_settings": {
         "num_beams": 1,
-        "max_new_tokens": 16,
+        "max_new_tokens": 128,
         "repetition_penalty": 1.1,
-        "stop_strings": "</RS>",
-        "do_sample": true
+        "do_sample": true,
+        "stop_strings": "</RS>"
       },
       "custom_generation_settings": {
         "skip_special_tokens": true
@@ -156,8 +157,8 @@
         "sources": [
           {
             "name": "cherry_picks",
-            "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
-            "sample_rate": 1
+            "records_path": "val_chat.jsonl",
+            "num_samples": 10
           }
         ],
         "prompt_template": {
@@ -170,8 +171,8 @@
           "suffix_template": "</RS>"
         },
         "dataset_type": "multimodal",
-        "max_tokens_count": 300,
-        "n_modality_embeddings": 225,
+        "max_tokens_count": 2000,
+        "n_modality_embeddings": 49,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "only_answer_loss": true,
@@ -181,8 +182,8 @@
         },
         "modality_reader_settings_mapping": {
           "image": {
-            "reader_type": "pickle",
-            "reader_path": null
+            "reader_type": "clip",
+            "reader_path": "openai/clip-vit-base-patch32"
           },
           "audio": null
         },
@@ -191,5 +192,5 @@
       },
       "metric_settings": []
     },
-    "log_path": "test_multimodal_train_output"
+    "log_path": "tutorial_multimodal_output"
   }

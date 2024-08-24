@@ -1,4 +1,3 @@
-# mypy: disable-error-code="call-overload"
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
@@ -25,10 +24,15 @@ from turbo_alignment.common.tf.callbacks.common import WandbMetricsCallbackHandl
 from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelCallback
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.settings.pipelines.train.dpo import (
+    CPOLossSettings,
     DPOLossesType,
     HingeLossSettings,
     IPOLossSettings,
+    KTOLossSettings,
+    ORPOLossSettings,
     SigmoidLossSettings,
+    SimPOLossSettings,
+    SlicHfLossSettings,
     SyncRefModelSettings,
 )
 from turbo_alignment.trainers.utils import (
@@ -198,6 +202,7 @@ class HingeLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.SLIC_HF)
 class SlicHfLoss(DPOLossRegistry):
     def __init__(self, delta: float = 1, beta: float = 1.0, lam: float = 1.0, norm: bool = False) -> None:
         self.delta = delta
@@ -232,12 +237,83 @@ class SlicHfLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.SIMPO)
+class SimPOLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, gamma: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        self.gamma = gamma
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor | None,
+        reference_rejected_logps: torch.FloatTensor | None,
+        policy_best_decode_logps: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pi_logratios = policy_chosen_logps - policy_rejected_logps
+
+        logits = pi_logratios - self.gamma
+
+        chosen_rewards = self.beta * (policy_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps).detach()
+
+        loss = -F.logsigmoid(self.beta * logits)
+
+        return (
+            loss,
+            chosen_rewards,
+            rejected_rewards,
+        )
+
+
+@DPOLossRegistry.register(DPOLossesType.ORPO)
+class ORPOLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor | None,
+        reference_rejected_logps: torch.FloatTensor | None,
+        policy_best_decode_logps: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        log_odds = (policy_chosen_logps - policy_rejected_logps) - (
+            torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
+            - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+        )
+
+        ratio = -F.logsigmoid(log_odds)
+        losses = self.beta * ratio
+
+        chosen_rewards = self.beta * policy_chosen_logps.detach()
+        rejected_rewards = self.beta * policy_rejected_logps.detach()
+
+        return losses, chosen_rewards, rejected_rewards
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
-    loss_settings: SigmoidLossSettings | HingeLossSettings | IPOLossSettings | SlicHfLoss | KTOLoss | CPOLoss = field(
+    loss_settings: (
+        SigmoidLossSettings
+        | HingeLossSettings
+        | IPOLossSettings
+        | SlicHfLossSettings
+        | KTOLossSettings
+        | CPOLossSettings
+        | ORPOLossSettings
+        | SimPOLossSettings
+        | SlicHfLossSettings
+    ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
+    )  # type: ignore[call-overload]
+    sync_ref_settings: SyncRefModelSettings = field(  # type: ignore[call-overload]
+        default_factory=SyncRefModelSettings()
     )
-    sync_ref_settings: SyncRefModelSettings = field(default_factory=SyncRefModelSettings())
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False
@@ -269,6 +345,10 @@ class DPOTrainer(Trainer):
 
         if hasattr(args, 'loss_settings'):
             self.loss_type = args.loss_settings['loss_type']  # type: ignore[index]
+
+            if self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO) and not args.average_log_prob:
+                raise ValueError(f'You should normalize logits by length when using {self.loss_type}')
+
             loss_args = args.loss_settings
             loss_args.pop('loss_type')  # type: ignore[union-attr]
             self.dpo_loss_registry = DPOLossRegistry.by_name(self.loss_type)(**loss_args)
@@ -285,6 +365,9 @@ class DPOTrainer(Trainer):
             callbacks=callbacks,
             **kwargs,
         )
+
+        if hasattr(args, 'loss_settings') and self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO):
+            logger.info(f'You can turn off ref_model when using {self.loss_type} for memory saving')
 
         self.ref_model = ref_model
         self.sft_model = sft_model
@@ -407,7 +490,10 @@ class DPOTrainer(Trainer):
             policy_best_decode_logps,
         ) = self.concatenated_forward(model, batch)
 
-        reference_chosen_logps, reference_rejected_logps = self._get_logps(self.ref_model, batch)
+        reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
+
+        if self.args.use_ref_model or self.loss_type not in (DPOLossesType.SIMPO, DPOLossesType.ORPO):
+            reference_chosen_logps, reference_rejected_logps = self._get_logps(self.ref_model, batch)
 
         losses, chosen_rewards, rejected_rewards = self.dpo_loss(
             policy_chosen_logps=policy_chosen_logps,
@@ -423,13 +509,15 @@ class DPOTrainer(Trainer):
 
         metrics = self._compute_metrics(metrics, dpo_prefix_name, chosen_rewards, rejected_rewards)
 
-        metrics[f'{prefix}logps/ref_rejected'] = (reference_rejected_logps).detach().cpu().mean().item()
-        metrics[f'{prefix}logps/ref_chosen'] = (reference_chosen_logps).detach().cpu().mean().item()
         metrics[f'{prefix}logps/rejected'] = (policy_rejected_logps).detach().cpu().mean().item()
         metrics[f'{prefix}logps/chosen'] = (policy_chosen_logps).detach().cpu().mean().item()
 
         metrics[f'{prefix}logits/rejected'] = (policy_rejected_logits).detach().cpu().mean().item()
         metrics[f'{prefix}logits/chosen'] = (policy_chosen_logits).detach().cpu().mean().item()
+
+        if self.args.use_ref_model:
+            metrics[f'{prefix}logps/ref_rejected'] = (reference_rejected_logps).detach().cpu().mean().item()
+            metrics[f'{prefix}logps/ref_chosen'] = (reference_chosen_logps).detach().cpu().mean().item()
 
         if self.loss_type == DPOLossesType.KTO:
             kto_chosen_KL = (
@@ -448,6 +536,22 @@ class DPOTrainer(Trainer):
             metrics[f'{prefix}rewards/kto_grad_term_chosen'] = kto_grad_term_chosen.item()
             metrics[f'{prefix}rewards/kto_grad_term_rejected'] = kto_grad_term_rejected.item()
 
+        elif self.loss_type == DPOLossesType.ORPO:
+            labels_w = batch['inputs_w']['labels'][:, 1:].clone()
+            loss_mask_w = labels_w != DISABLE_LOSS_LABEL
+            length_norm_policy_chosen_logps = policy_chosen_logps / loss_mask_w.sum(-1)
+
+            log_odds = (policy_chosen_logps - policy_rejected_logps) - (
+                torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
+                - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+            )
+            ratio = -F.logsigmoid(log_odds)
+            nll_loss = -length_norm_policy_chosen_logps
+
+            metrics[f'{prefix}orpo/nll_loss'] = nll_loss.clone().detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/ratio'] = (ratio).detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/log_odds'] = (log_odds).detach().cpu().mean().item()
+
         if self.sft_model is not None:
             sft_chosen_logps, sft_rejected_logps = self._get_logps(self.sft_model, batch)
 
@@ -463,7 +567,7 @@ class DPOTrainer(Trainer):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        return losses.mean(), metrics  # type: ignore
+        return losses.mean(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor
@@ -523,7 +627,7 @@ class DPOTrainer(Trainer):
             'logits_test/rejected': metrics['logits_test/rejected'],
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)  # type: ignore[arg-type, call-overload]
+        logits = torch.stack(logits).mean(axis=1)  # type: ignore[call-overload, arg-type]
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels
