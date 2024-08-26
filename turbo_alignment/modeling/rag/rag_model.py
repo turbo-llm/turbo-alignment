@@ -343,7 +343,7 @@ class RagSequenceForGeneration(Module):
             input_ids=joined_input_ids,
             generation_config=generation_config,
             pad_token_id=self.tokenizer.pad_token_id,
-            tokenizer=kwargs.get('tokenizer', None),
+            # tokenizer=kwargs.get('tokenizer', None),
         )
         # TODO chose max-prob sequence with accounting for doc probs
         only_answer_output = output_sequences[:, joined_input_ids.shape[-1] :]
