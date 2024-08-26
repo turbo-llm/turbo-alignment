@@ -27,7 +27,7 @@ flake:
 	flake8 --max-line-length 119 --jobs $(JOBS) --statistics $${CI:+--format=gl-codeclimate --output=codeclimate-flake8.json} $(CODE)
 
 pylint:
-	pylint  $(CODE)
+	pylint --jobs $(JOBS) --rcfile=setup.cfg $(CODE)
 
 mypy:
 	mypy --config-file mypy.ini $(CODE) --show-traceback
