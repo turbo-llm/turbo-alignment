@@ -20,7 +20,7 @@ jobs:
         with:
           poetry-version: ${{ matrix.poetry-version }}
       - name: Install dependencies
-        run: poetry install --without deepspeed
+        run: poetry install
       - name: Run tests
         run: poetry run make tests
   linters:
@@ -41,6 +41,6 @@ jobs:
         with:
           poetry-version: ${{ matrix.poetry-version }}
       - name: Install dependencies
-        run: poetry install --without deepspeed
+        run: poetry install
       - name: Run linters
         run: poetry run make lint
