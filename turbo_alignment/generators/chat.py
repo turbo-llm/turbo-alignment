@@ -39,7 +39,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             inputs=batched_input_ids,
             attention_mask=batched_attention_mask,
             generation_config=self._transformers_generator_parameters,
-            # tokenizer=self._tokenizer,
+            tokenizer=self._tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
@@ -84,7 +84,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             inputs=input_ids,
             attention_mask=attention_mask,
             generation_config=self._transformers_generator_parameters,
-            # tokenizer=self._tokenizer,
+            tokenizer=self._tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
