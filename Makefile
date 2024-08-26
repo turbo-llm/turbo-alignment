@@ -18,7 +18,7 @@ tests: tests-unit tests-integration tests-cli
 	[ -n $$CI ] && coverage xml -i || true # always success
 	coverage report -i
 
-lint: black flake mypy
+lint: black flake pylint mypy
 
 black:
 	black --target-version py310 --check --skip-string-normalization --line-length $(MAX_LINE_LENGTH) $(CODE)
@@ -27,7 +27,7 @@ flake:
 	flake8 --max-line-length 119 --jobs $(JOBS) --statistics $${CI:+--format=gl-codeclimate --output=codeclimate-flake8.json} $(CODE)
 
 pylint:
-	pylint --jobs $(JOBS) --rcfile=setup.cfg $${CI:+--output-format=json --output=codeclimate-pylint.json} $(CODE)
+	pylint --rcfile=setup.cfg $${CI:+--output-format=json --output=codeclimate-pylint.json} $(CODE)
 
 mypy:
 	mypy --config-file mypy.ini $(CODE) --show-traceback
