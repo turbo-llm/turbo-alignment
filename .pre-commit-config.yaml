@@ -1,7 +1,8 @@
 repos:
 -   repo: local
     hooks:
-    -   id: lint
+    -   id:  poetry-make-pretty
+        name: make pretty
         entry: poetry run make pretty
         language: system
         types: [python]
