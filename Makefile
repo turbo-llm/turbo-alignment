@@ -27,7 +27,7 @@ flake:
 	flake8 --max-line-length 119 --jobs $(JOBS) --statistics $${CI:+--format=gl-codeclimate --output=codeclimate-flake8.json} $(CODE)
 
 pylint:
-	pylint --jobs $(JOBS) --rcfile=setup.cfg $${CI:+--output-format=pylint_gitlab.GitlabCodeClimateReporter --output=codeclimate-pylint.json} $(CODE)
+	pylint --jobs $(JOBS) --rcfile=setup.cfg $(CODE)
 
 mypy:
 	mypy --config-file mypy.ini $(CODE) --show-traceback
@@ -38,9 +38,6 @@ ifneq ($(CODE),)
 	isort $(CODE) tutorials
 	unify --in-place --recursive $(CODE) tutorials
 endif
-
-bash-dev:
-	docker run -v $(shell pwd):/app --rm -it ${DEV_IMAGE} bash
 
 lock:
 	rm poetry.lock

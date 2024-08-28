@@ -53,6 +53,7 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+!tests/fixtures/models/llama2_tiny_multimodal_clip_mlp/projections/modality_adapters.pt
 
 # Translations
 *.mo
@@ -99,7 +100,6 @@ ENV/
 env.bak/
 venv.bak/
 default_tb/
-poetry.lock
 
 # Spyder project settings
 .spyderproject
