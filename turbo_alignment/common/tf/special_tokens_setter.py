@@ -13,11 +13,7 @@ class SpecialTokensSetter:
         self._special_tokens_settings = special_tokens_settings
         self._special_tokens_already_set: bool = False
 
-    def setBOS(self, bos_token: str | None) -> None:
-        if self._tokenizer.bos_token_id is None and bos_token is None:
-            logger.info('Skip adding bos_token_id')
-            return None
-
+    def setBOS(self, bos_token: str) -> None:
         if self._tokenizer.bos_token_id is None:
             logger.info('Model does not have bos_token_id')
             self._tokenizer.add_special_tokens(special_tokens_dict={'bos_token': bos_token})
@@ -26,13 +22,7 @@ class SpecialTokensSetter:
         else:
             logger.info(f'Model has bos_token_id = {self._tokenizer.bos_token_id}')
 
-        return None
-
-    def setEOS(self, eos_token: str | None) -> None:
-        if self._tokenizer.eos_token_id is None and eos_token is None:
-            logger.info('Skip adding eos_token_id')
-            return None
-
+    def setEOS(self, eos_token: str) -> None:
         if self._tokenizer.eos_token_id is None:
             logger.info('Model does not have eos_token_id')
             self._tokenizer.add_special_tokens(special_tokens_dict={'eos_token': eos_token})
@@ -40,8 +30,6 @@ class SpecialTokensSetter:
             logger.info(f'Created eos_token_id = {self._tokenizer.eos_token_id}')
         else:
             logger.info(f'Model has eos_token_id = {self._tokenizer.eos_token_id}')
-
-        return None
 
     def setPAD(self, pad_token: str | None) -> None:
         if self._tokenizer.pad_token_id is None and pad_token is None:
@@ -105,12 +93,11 @@ class SpecialTokensSetter:
         added_tokens = self._tokenizer.add_special_tokens({'additional_special_tokens': tokens})
         assert added_tokens == len(tokens)
 
-    def setup_model_config(self, model: PreTrainedModel):
-        if self._tokenizer.bos_token_id is None:
-            model.config.bos_token_id = self._tokenizer.bos_token_id
-        if self._tokenizer.eos_token_id is None:
-            model.config.eos_token_id = self._tokenizer.eos_token_id
-        if self._tokenizer.pad_token_id is None:
+    def setup_model_config(self, model: PreTrainedModel) -> None:
+        model.config.bos_token_id = self._tokenizer.bos_token_id
+        model.config.eos_token_id = self._tokenizer.eos_token_id
+
+        if self._tokenizer.pad_token_id is not None:
             model.config.pad_token_id = self._tokenizer.pad_token_id
-        if self._tokenizer.sep_token_id is None:
+        if self._tokenizer.sep_token_id is not None:
             model.config.sep_token_id = self._tokenizer.sep_token_id
