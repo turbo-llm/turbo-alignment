@@ -19,14 +19,23 @@ def concatenated_inputs(
     """
 
     grouped_batch: dict[str, list[torch.Tensor]] = defaultdict(list)
+    no_grouped_batch_items: dict[str, Any] = {}
     for outcome_key, outcome_inputs in batch.items():
         if outcome_key.startswith(prefix):
-            for k, v in outcome_inputs.items():
-                grouped_batch[k].append(v)
+            if isinstance(outcome_inputs, dict):
+                for k, v in outcome_inputs.items():
+                    grouped_batch[k].append(v)
+            else:
+                no_grouped_batch_items[outcome_key] = outcome_inputs
 
     concatenated_batch: dict[str, torch.Tensor] = {}
     for k, v in grouped_batch.items():
         concatenated_batch[k] = torch.cat(v, dim=0).to(device)
+
+    for k, v in no_grouped_batch_items.items():
+        if isinstance(v, torch.Tensor):
+            v = v.to(device)
+        concatenated_batch[k] = v
 
     return concatenated_batch
 
@@ -86,6 +95,6 @@ class DPOLossRegistry(Registrable):
         policy_rejected_logps: torch.FloatTensor,
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
-        policy_best_decode_logps: torch.FloatTensor | None,
+        precomputed_margins: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         ...

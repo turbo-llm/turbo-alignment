@@ -14,6 +14,7 @@ from turbo_alignment.settings.tf.trainer import TrainerSettings
 
 class DPOLossesType(str, Enum):
     SIGMOID = 'sigmoid'
+    SIGMOD_WITH_MARGIN = 'sigmoid_with_margin'
     HINGE = 'hinge'
     IPO = 'ipo'
     KTO = 'kto'
@@ -36,6 +37,8 @@ class SigmoidLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.SIGMOID]
     label_smoothing: float = 0
 
+class SigmoidLossWithMarginSettings(SigmoidLossSettings):
+    loss_type: Literal[DPOLossesType.SIGMOD_WITH_MARGIN]
 
 class HingeLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.HINGE]
@@ -86,6 +89,7 @@ class DPOTrainerSettings(TrainerSettings):
         | ORPOLossSettings
         | SimPOLossSettings
         | SlicHfLossSettings
+        | SigmoidLossWithMarginSettings
     )
     sync_ref_settings: SyncRefModelSettings
     use_ref_model: bool = True

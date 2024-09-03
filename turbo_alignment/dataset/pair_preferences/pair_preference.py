@@ -82,23 +82,19 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
             if not (chosen_record and rejected_record):
                 continue
 
-            ignore_keys = []
+            ignore_keys = ['precomputed_margin']
             if not self._add_labels:
                 ignore_keys.append('labels')
 
             chosen_tokens = {k: v.squeeze(0) for k, v in chosen_record.items() if k not in ignore_keys}
             rejected_tokens = {k: v.squeeze(0) for k, v in rejected_record.items() if k not in ignore_keys}
-            best_decode_tokens = {}
-
-            if best_decode_record is not None:
-                best_decode_tokens = {k: v.squeeze(0) for k, v in best_decode_record.items() if k not in ignore_keys}
 
             output.append(
                 {
                     'id': record.id,
                     'inputs_w': chosen_tokens,
                     'inputs_l': rejected_tokens,
-                    'best_decode': best_decode_tokens,
+                    'precomputed_margin': record.precomputed_margin,
                 }
             )
 

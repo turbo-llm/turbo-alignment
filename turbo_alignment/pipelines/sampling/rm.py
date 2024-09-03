@@ -3,6 +3,8 @@ from typing import Generic, TypeVar
 
 from accelerate import Accelerator
 from accelerate.utils import set_seed
+from accelerate.utils.operations import gather_object
+
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from turbo_alignment.common.tf.loaders.model.model import load_model
@@ -36,7 +38,9 @@ class BaseSamplingStrategyWithRM(BaseSamplingStrategy[SamplingSettingsWithRMT], 
             batch=experiment_settings.rm_batch_size,
             micro_batch=experiment_settings.rm_batch_size,
         )
-        outputs: list[RMSamplingInferenceOutput] = generator.generate_from_dataset(dataset)
+        outputs: list[RMSamplingInferenceOutput] = gather_object(generator.generate_from_dataset(dataset))[
+            : len(dataset)
+        ]
         return {out.id: out.rewards for out in outputs}
 
     @staticmethod
@@ -59,7 +63,9 @@ class BaseSamplingStrategyWithRM(BaseSamplingStrategy[SamplingSettingsWithRMT], 
 
         model = load_model(experiment_settings.rm, tokenizer)
         if accelerator is not None:
-            model.to(accelerator.device)
+            model = accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
+            
+        model.eval()
 
         dataset = SamplingRMDataset(
             source=experiment_settings.dataset_settings.sources[0],
