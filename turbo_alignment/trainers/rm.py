@@ -9,12 +9,10 @@ from transformers.utils import logging
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.trainers.utils import concatenated_inputs
 
-
 logger = logging.get_logger(__name__)
 
 
 class RMTrainer(MultiGPUCherryPicksTrainer):
-
     def concatenated_forward(self, model: nn.Module, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
         concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
         all_rewards = model(

@@ -31,6 +31,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     KTOLossSettings,
     ORPOLossSettings,
     SigmoidLossSettings,
+    SigmoidLossWithMarginSettings,
     SimPOLossSettings,
     SlicHfLossSettings,
     SyncRefModelSettings,
@@ -294,14 +295,13 @@ class ORPOLoss(DPOLossRegistry):
         rejected_rewards = self.beta * policy_rejected_logps.detach()
 
         return losses, chosen_rewards, rejected_rewards
-    
+
 
 @DPOLossRegistry.register(DPOLossesType.SIGMOID_WITH_MARGIN)
 class SigmoidLossWithMargin(DPOLossRegistry):
     def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
         self.beta = beta
-        super().__ini__(*args, **kwargs)
-
+        super().__init__(*args, **kwargs)
 
     def compute_loss(
         self,
@@ -309,7 +309,6 @@ class SigmoidLossWithMargin(DPOLossRegistry):
         policy_rejected_logps: torch.FloatTensor,
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
-        policy_best_decode_logps: torch.FloatTensor | None,
         precomputed_margins: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
