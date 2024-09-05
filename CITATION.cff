@@ -1,0 +1,19 @@
+cff-version: 0.0.1
+title: 'turbo-alignment'
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Surnachev
+    family-names: Nikita
+repository-code: 'https://github.com/turbo-llm/turbo-alignment'
+abstract: "Turbo-Alignment is a library designed to streamline the fine-tuning and alignment of large language models, leveraging advanced techniques to enhance efficiency and scalability."
+keywords:
+  - alignment
+  - llm
+  - dpo
+  - ppo
+  - rlhf
+license: Apache-2.0
+version: 0.0.3

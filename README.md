@@ -218,3 +218,17 @@ Tutorials are available [here](tutorials/tutorial.md).
 
 ## 📝 License
 This project is licensed, see the [LICENSE](https://github.com/turbo-llm/turbo-alignment/-/blob/main/LICENSE) file for details.
+
+
+## Citation
+
+```bibtex
+@misc{surnachev2024turbo-alignment,
+  author = {Nikita Surnachev},
+  title = {turbo-alignment},
+  year = {2024},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/turbo-llm/turbo-alignment}}
+}
+```
