@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 import torch
 import transformers
@@ -19,7 +19,9 @@ class PairPreferenceDataCollator:
     ) -> transformers.BatchEncoding:
         features = [ex[key] for ex in examples]
         labels = [v.tolist() for feature in features for k, v in feature.items() if k == 'labels']
-        no_labels_features = [{k: v for k, v in feature.items() if k != 'labels'} for feature in features]
+        no_labels_features = [
+            {k: v for k, v in feature.items() if k not in ['labels', 'precomputed_margin']} for feature in features
+        ]
 
         batch = tokenizer.pad(
             no_labels_features,
@@ -38,13 +40,16 @@ class PairPreferenceDataCollator:
         max_length = 0
         for ex in examples:
             for t in ex:
-                if 'input_ids' in ex[t]:
-                    max_length = max(max_length, len(ex[t]['input_ids']))
+                if isinstance(ex[t], Iterable):
+                    if 'input_ids' in ex[t]:
+                        max_length = max(max_length, len(ex[t]['input_ids']))
 
-        batch = {
+        batch: dict[str, Any] = {
             'inputs_w': dict(self._get_batch(examples, self.tokenizer, 'inputs_w', max_length)),
             'inputs_l': dict(self._get_batch(examples, self.tokenizer, 'inputs_l', max_length)),
         }
-        if 'best_decode' in examples[0] and len(examples[0]['best_decode']) != 0:
-            batch['best_decode'] = dict(self._get_batch(examples, self.tokenizer, 'best_decode', max_length))
+
+        if 'precomputed_margin' in examples[0] and examples[0]['precomputed_margin'] is not None:
+            batch['precomputed_margin'] = torch.tensor([ex['precomputed_margin'] for ex in examples])
+
         return batch

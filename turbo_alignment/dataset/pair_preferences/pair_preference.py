@@ -49,7 +49,6 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
     def convert_records(self, records: list[PairPreferenceRecord]) -> list[dict[str, Any] | None]:
         chosen_chat_records: list[ChatDatasetRecord] = []
         rejected_chat_records: list[ChatDatasetRecord] = []
-        best_decode_records: list[ChatDatasetRecord] = []
 
         for record in records:
             context = [
@@ -60,45 +59,32 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
             chosen = ChatMessage(role=record.answer_w.role, content=record.answer_w.content)
             rejected = ChatMessage(role=record.answer_l.role, content=record.answer_l.content)
 
-            if record.best_decode is not None:
-                best_decode = ChatMessage(role=record.best_decode.role, content=record.best_decode.content)
-                best_decode_records.append(ChatDatasetRecord(id=record.id, messages=context + [best_decode]))
-
             chosen_chat_records.append(ChatDatasetRecord(id=record.id, messages=context + [chosen]))
             rejected_chat_records.append(ChatDatasetRecord(id=record.id, messages=context + [rejected]))
 
         tokenized_chosen_records = self._chat_dataset.convert_records(chosen_chat_records)
         tokenized_rejected_records = self._chat_dataset.convert_records(rejected_chat_records)
 
-        if len(best_decode_records) != 0:
-            tokenized_best_decode_records = self._chat_dataset.convert_records(best_decode_records)
-        else:
-            tokenized_best_decode_records = [None] * len(tokenized_chosen_records)
-
         output: list[dict[str, Any] | None] = []
-        for record, chosen_record, rejected_record, best_decode_record in zip(
-            records, tokenized_chosen_records, tokenized_rejected_records, tokenized_best_decode_records
+        for record, chosen_record, rejected_record in zip(
+            records, tokenized_chosen_records, tokenized_rejected_records
         ):
             if not (chosen_record and rejected_record):
                 continue
 
-            ignore_keys = []
+            ignore_keys = ['precomputed_margin']
             if not self._add_labels:
                 ignore_keys.append('labels')
 
             chosen_tokens = {k: v.squeeze(0) for k, v in chosen_record.items() if k not in ignore_keys}
             rejected_tokens = {k: v.squeeze(0) for k, v in rejected_record.items() if k not in ignore_keys}
-            best_decode_tokens = {}
-
-            if best_decode_record is not None:
-                best_decode_tokens = {k: v.squeeze(0) for k, v in best_decode_record.items() if k not in ignore_keys}
 
             output.append(
                 {
                     'id': record.id,
                     'inputs_w': chosen_tokens,
                     'inputs_l': rejected_tokens,
-                    'best_decode': best_decode_tokens,
+                    'precomputed_margin': record.precomputed_margin,
                 }
             )
 
