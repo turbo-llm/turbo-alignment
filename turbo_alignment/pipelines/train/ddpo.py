@@ -129,14 +129,14 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         additional_special_tokens = self._get_additional_special_tokens(experiment_settings)
 
         logger.info(f'Special tokens: {additional_special_tokens}')
-        special_tokens_setter = SpecialTokensSetter(self.rm_tokenizer)
+        special_tokens_setter = SpecialTokensSetter(self.rm_tokenizer, experiment_settings.special_tokens_settings)
         special_tokens_setter.set_all()
         special_tokens_setter.set_custom_tokens(additional_special_tokens)
 
         logger.info('RM Special tokens added!')
 
         logger.info(f'Special tokens: {additional_special_tokens}')
-        special_tokens_setter = SpecialTokensSetter(self.tokenizer)
+        special_tokens_setter = SpecialTokensSetter(self.tokenizer, experiment_settings.special_tokens_settings)
         special_tokens_setter.set_all()
         special_tokens_setter.set_custom_tokens(additional_special_tokens)
 
