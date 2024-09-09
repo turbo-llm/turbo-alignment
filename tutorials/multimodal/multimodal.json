@@ -103,6 +103,10 @@
       }
     },
     "tokenizer_settings": {},
+    "special_tokens_settings": {
+      "bos_token": "<s>",
+      "eos_token": "</s>"
+      },
     "trainer_settings": {
       "evaluation_strategy": "steps",
       "save_strategy": "steps",

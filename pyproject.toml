@@ -3,7 +3,7 @@ name = "turbo-alignment"
 packages = [
     { include = "turbo_alignment" },
 ]
-version = "0.0.2"
+version = "0.0.3"
 description = "turbo-alignment repository"
 authors = ["T Mega Alignment Team <n.surnachev@tcsbank.ru>" ]
 
@@ -15,7 +15,7 @@ peft = "0.8.2"
 typer ="^0.9.0"
 wandb ="^0.15.3"
 scipy = "^1.1.0"
-torch = "^2.0.0"
+torch = "2.1.2"
 numpy = "^1.21"
 tomlkit ="^0.11.8"
 platformdirs ="^3.5.3"
@@ -45,14 +45,12 @@ timm ="^0.9.7"
 opencv-python = "^4.10.0.84"
 langchain-huggingface = "^0.0.3"
 
-[tool.poetry.group.deepspeed.dependencies]
-accelerate = "0.27"
-deepspeed = "0.12"
+faiss-gpu = { version = "^1.7.2", optional = true }
+xformers = { version = "^0.0.23.post1", optional = true }
+vllm = { version = "^0.4.0.post1", optional = true }
+deepspeed = { version = "0.12", optional = true }
+accelerate = { version = "0.27", optional = true }
 
-[tool.poetry.group.gpu.dependencies]
-faiss-gpu ="^1.7.2"
-xformers = "^0.0.23.post1"
-vllm = "^0.4.0.post1"
 
 [tool.poetry.dev-dependencies]
 coverage = "^7.2.7"
@@ -67,6 +65,9 @@ pylint-gitlab = "^1.2.0"
 pydantic-core = "^2.18.2"
 annotated-types = "^0.6.0"
 
+[tool.poetry.extras]
+deepspeed = ["deepspeed", "accelerate"]
+gpu = ["faiss-gpu", "xformers", "vllm"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

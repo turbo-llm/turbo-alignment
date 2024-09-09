@@ -11,6 +11,7 @@ from turbo_alignment.settings.model import (
     PreTrainedModelSettings,
 )
 from turbo_alignment.settings.s3 import CheckpointUploaderCallbackParameters
+from turbo_alignment.settings.tf.special_tokens_setter import SpecialTokensSettings
 from turbo_alignment.settings.tf.tokenizer import TokenizerSettings
 from turbo_alignment.settings.tf.trainer import TrainerSettings
 from turbo_alignment.settings.weights_and_biases import WandbSettings
@@ -26,7 +27,9 @@ class BaseTrainExperimentSettings(BaseSettings):
     seed: int = 42
 
     trainer_settings: TrainerSettings
+
     tokenizer_settings: TokenizerSettings
+    special_tokens_settings: SpecialTokensSettings
 
     model_settings: (ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings)
 

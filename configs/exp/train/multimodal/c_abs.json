@@ -105,6 +105,10 @@
     "tokenizer_settings": {
         "tokenizer_path": "/from_s3/model"
     },
+    "special_tokens_settings": {
+        "bos_token": "<s>",
+        "eos_token": "</s>"
+    },
     "trainer_settings": {
         "evaluation_strategy": "epoch",
         "save_strategy": "epoch",
