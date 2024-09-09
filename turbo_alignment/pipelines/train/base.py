@@ -31,7 +31,7 @@ import loguru
 
 logger = get_project_logger()
 
-ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
+ExperimentSettingsT = TypeVar("ExperimentSettingsT", bound=BaseTrainExperimentSettings)
 
 
 class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentSettingsT]):
@@ -46,18 +46,19 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
     @staticmethod
     @abstractmethod
     def _get_cherry_pick_callback(
-            experiment_settings: ExperimentSettingsT,
-            tokenizer: PreTrainedTokenizerBase,
-            **kwargs,
-    ) -> CherryPickCallbackBase | None:
-        ...
+        experiment_settings: ExperimentSettingsT,
+        tokenizer: PreTrainedTokenizerBase,
+        **kwargs,
+    ) -> CherryPickCallbackBase | None: ...
 
     @staticmethod
     def _save_experiment_config(
-            experiment_settings: ExperimentSettingsT, model: PreTrainedModel, output_path: Path
+        experiment_settings: ExperimentSettingsT,
+        model: PreTrainedModel,
+        output_path: Path,
     ) -> None:
         model_config = model.config.to_dict()
-        model_config['experiment_config'] = experiment_settings
+        model_config["experiment_config"] = experiment_settings
         write_json(model_config, output_path)
 
     @staticmethod
@@ -67,45 +68,47 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
     @staticmethod
     @abstractmethod
     def _get_data_collator(
-            experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase, **kwargs
-    ) -> Callable:
-        ...
+        experiment_settings: ExperimentSettingsT,
+        tokenizer: PreTrainedTokenizerBase,
+        **kwargs,
+    ) -> Callable: ...
 
     @staticmethod
     @abstractmethod
     def _get_trainer(
-            training_args: TrainingArguments,
-            experiment_settings: ExperimentSettingsT,
-            model: PreTrainedModel,
-            tokenizer: PreTrainedTokenizerBase,
-            train_dataset: Dataset,
-            val_dataset: Dataset,
-            data_collator: Callable,
-    ) -> Trainer:
-        ...
+        training_args: TrainingArguments,
+        experiment_settings: ExperimentSettingsT,
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizerBase,
+        train_dataset: Dataset,
+        val_dataset: Dataset,
+        data_collator: Callable,
+    ) -> Trainer: ...
 
     @staticmethod
     def _load_model(
-            experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase
+        experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase
     ) -> torch.nn.Module | PreTrainedModel:
         return load_model(experiment_settings.model_settings, tokenizer)
 
     @staticmethod
     @abstractmethod
-    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArguments:
-        ...
+    def _get_training_args(
+        experiment_settings: ExperimentSettingsT,
+    ) -> TrainingArguments: ...
 
     @staticmethod
-    def _load_tokenizer(experiment_settings: ExperimentSettingsT) -> PreTrainedTokenizerBase:
+    def _load_tokenizer(
+        experiment_settings: ExperimentSettingsT,
+    ) -> PreTrainedTokenizerBase:
         return load_tokenizer(experiment_settings.tokenizer_settings, experiment_settings.model_settings)
 
     @abstractmethod
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: Callable) -> None:
-        ...
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: Callable) -> None: ...
 
     @staticmethod
     def _get_additional_special_tokens(
-            experiment_settings: BaseTrainExperimentSettings,
+        experiment_settings: BaseTrainExperimentSettings,
     ) -> list[str]:
         embeddings_initialization_strategy = experiment_settings.model_settings.embeddings_initialization_strategy
         return list(embeddings_initialization_strategy.keys()) if embeddings_initialization_strategy else []
@@ -123,7 +126,7 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
         if experiment_settings.checkpoint_uploader_callback_parameters is not None:
             if self.trainer.is_deepspeed_enabled and self.trainer.args.deepspeed_plugin.zero_stage == 3:
                 raise NotImplementedError(
-                    'You should not use checkpoint uploader callback when DeepSpeed ZeRO stage 3 enabled'
+                    "You should not use checkpoint uploader callback when DeepSpeed ZeRO stage 3 enabled"
                 )
             s3_handler = self._get_s3_handler(S3HandlerParameters())
 
@@ -141,21 +144,21 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
 
         self.tokenizer = self._load_tokenizer(experiment_settings)
 
-        logger.info('Tokenizer is loaded!')
+        logger.info("Tokenizer is loaded!")
 
         additional_special_tokens = self._get_additional_special_tokens(experiment_settings)
-        logger.info(f'Special tokens: {additional_special_tokens}')
+        logger.info(f"Special tokens: {additional_special_tokens}")
         special_tokens_setter = SpecialTokensSetter(self.tokenizer)
         special_tokens_setter.set_all()
         special_tokens_setter.set_custom_tokens(additional_special_tokens)
 
-        logger.info('Special tokens added!')
+        logger.info("Special tokens added!")
 
         self.model = self._load_model(experiment_settings, self.tokenizer)
 
         special_tokens_setter.setup_model_config(self.model)
 
-        logger.info('Model is loaded!')
+        logger.info("Model is loaded!")
 
         train_dataset: ConcatDataset = ConcatDataset(
             datasets=DatasetLoader().load_datasets(
@@ -192,12 +195,15 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
 
         os.makedirs(self.trainer.args.output_dir, exist_ok=True)
         self._save_experiment_config(
-            experiment_settings, self.trainer.model, Path(self.trainer.args.output_dir) / 'experiment.config'
+            experiment_settings,
+            self.trainer.model,
+            Path(self.trainer.args.output_dir) / "experiment.config",
         )
 
         experiment_metadata = ExperimentMetadata()
         self._save_experiment_metadata(
-            experiment_metadata, Path(self.trainer.args.output_dir) / 'experiment_metadata.json'
+            experiment_metadata,
+            Path(self.trainer.args.output_dir) / "experiment_metadata.json",
         )
 
         self.trainer.train()
