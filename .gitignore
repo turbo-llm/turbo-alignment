@@ -119,3 +119,7 @@ poetry.lock
 .checkpoints/.history
 .history
 .vscode
+
+data/
+bin/
+presets/

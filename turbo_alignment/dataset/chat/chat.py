@@ -1,302 +1,245 @@
 import random
 from abc import ABC
-from itertools import accumulate
+from enum import Enum
 from pathlib import Path
 from typing import Any, overload
 
+import loguru
 import numpy as np
 import numpy.typing as npt
 import torch
-from transformers import PreTrainedTokenizerBase
+from jinja2 import Environment
+from jinja2.nodes import Assign, Name, Const, List
+from transformers import PreTrainedTokenizerBase, BatchEncoding
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.dataset.base import AlignmentDataset
-from turbo_alignment.dataset.chat.models import (
-    ChatDatasetRecord,
-    ChatMessage,
-    ChatMessageRole,
-)
+from turbo_alignment.dataset.chat.models import ChatDatasetRecord, ChatMessageRole
 from turbo_alignment.dataset.registry import ChatDatasetTypeRegistry
-from turbo_alignment.settings.datasets.base import (
-    DatasetSourceSettings,
-    DatasetStrategy,
-)
+from turbo_alignment.settings.datasets.base import DatasetSourceSettings, DatasetStrategy
 from turbo_alignment.settings.datasets.chat import ChatDatasetSettings
-
 from .conversation import Conversation
+from turbo_alignment.common.jinja.trackers import AssistantTracker
 
 logger = get_project_logger()
 
 
+def _get_variable_values(template: str, variable: str) -> list[str]:
+    env = Environment(extensions=[AssistantTracker])
+    parsed_content = env.parse(template)
+
+    replica_start = None
+    for assign_node in parsed_content.find_all(Assign):
+        if isinstance(assign_node.target, Name) and assign_node.target.name == variable:
+            value_node = assign_node.node
+            if isinstance(value_node, Const):
+                replica_start = [value_node.value]
+            if isinstance(value_node, List):
+                replica_start = [item.value for item in value_node.items if isinstance(item, Const)]
+    return replica_start
+
+
+class Tokens:
+    def __init__(self, input_ids: npt.NDArray = None, labels: npt.NDArray = None):
+        self._input_ids = input_ids if input_ids is not None else np.array([])
+        self._labels = labels if labels is not None else np.array([])
+
+    @property
+    def input_ids(self):
+        return self._input_ids
+
+    @input_ids.setter
+    def input_ids(self, input_ids):
+        self._input_ids = input_ids
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @labels.setter
+    def labels(self, labels):
+        self._labels = labels
+
+    def __len__(self):
+        return len(self._input_ids)
+
+    def get_suffix(self, from_ind: int) -> "Tokens":
+        return Tokens(self._input_ids[from_ind:], self.labels[from_ind:])
+
+    def get_prefix(self, to_ind: int) -> "Tokens":
+        return Tokens(self._input_ids[:to_ind], self.labels[:to_ind])
+
+    def append(self, tokens: "Tokens"):
+        self._input_ids = np.concatenate((self._input_ids, tokens.input_ids))
+        self._labels = np.concatenate((self.labels, tokens.labels))
+
+    def slice(self, from_ind: int, to_ind: int) -> "Tokens":
+        return Tokens(self._input_ids[from_ind:to_ind], self._labels[from_ind:to_ind])
+
+
+def concatenate_tokens(seqs: tuple[Tokens, ...]) -> Tokens:
+    result = seqs[0]
+    for i in range(1, len(seqs)):
+        result.append(seqs[i])
+    return result
+
+
+def get_target_value_indices(input_ids: npt.NDArray[int], target_values: list[int]) -> npt.NDArray[int]:
+    return np.where(np.isin(input_ids, target_values))[0]
+
+
+def enum_to_string_in_dict(conv: list[dict[str, Any]]):
+    result = []
+    for dictionary in conv:
+        for key in dictionary:
+            if isinstance(dictionary[key], Enum):
+                dictionary[key] = dictionary[key].value
+        result.append(dictionary)
+    return result
+
+
 class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
     def __init__(
-        self,
-        source: DatasetSourceSettings,
-        settings: ChatDatasetSettings,
-        tokenizer: PreTrainedTokenizerBase,
-        read: bool = True,
+            self,
+            source: DatasetSourceSettings,
+            settings: ChatDatasetSettings,
+            tokenizer: PreTrainedTokenizerBase,
+            read: bool = True,
     ) -> None:
         super().__init__(source=source, settings=settings, tokenizer=tokenizer)
         self.settings: ChatDatasetSettings = settings
+        self.prompt_template = settings.prompt_template.read_text()
+
+        replica_start_tokens = _get_variable_values(self.prompt_template, "replica_start")
+        replica_end_tokens = _get_variable_values(self.prompt_template, "replica_end")
+        if not replica_start_tokens:
+            loguru.logger.warning(
+                "You should specify tokens that a replica can start with so that the dialogue is splitted correctly."
+            )
+        self.replica_start_ids = tokenizer.convert_tokens_to_ids(replica_start_tokens)
+        self.replica_end_ids = tokenizer.convert_tokens_to_ids(replica_end_tokens)
 
         if read:
             self._read()
 
-    @overload
-    def __tokenize(self, inputs: str) -> npt.NDArray[np.int64]:
-        ...
-
-    @overload
-    def __tokenize(self, inputs: list[str]) -> np.ndarray:
-        ...
-
-    def __tokenize(self, inputs):
-        return self.tokenizer(
-            inputs,
-            add_special_tokens=False,
-            padding=False,
-            truncation=False,
-            return_tensors='np',
-        )['input_ids']
-
-    def __keep_end(
-        self,
-        conversation: Conversation,
-        replicas_cum_len: list[int],
-        inference: bool,
-        max_tokens: int | None,
-    ) -> tuple[int, int]:
-        if max_tokens is None:
-            return 0, len(replicas_cum_len)
-
-        _, right_bound = self.__keep_start(
-            conversation=conversation,
-            replicas_cum_len=replicas_cum_len,
-            inference=inference,
-        )
-
-        left_bound = 0
-        last_index = replicas_cum_len[-1]
-        for i, replica_end_index in enumerate(replicas_cum_len):
-            if last_index - replica_end_index <= max_tokens:
-                return left_bound, right_bound
-
-            left_bound = i
-
-        raise ValueError('Can\'t trim dialogue to fit all requirements')
-
-    def __keep_start(
-        self,
-        conversation: Conversation,
-        replicas_cum_len: list[int],
-        inference: bool,
-        max_tokens: int | None = None,
-    ) -> tuple[int, int]:
-        for i, (message, end_index) in enumerate(zip(conversation.messages[::-1], replicas_cum_len[::-1])):
-            if self.settings.only_answer_loss:
-                if inference and message.role == ChatMessageRole.BOT:
-                    continue
-                if not inference and message.role != ChatMessageRole.BOT:
-                    continue
-
-            if max_tokens is None or end_index < max_tokens:
-                return 0, len(replicas_cum_len) - i
-
-        raise ValueError('Can\'t trim dialogue to fit all requirements')
-
-    def __truncate(
-        self,
-        conversation: Conversation,
-        replicas_cum_len: list[int],
-        inference: bool,
-        max_tokens: int | None,
-    ) -> tuple[int, int]:
-        '''
-        truncate dialogue to fit all requirements:
-        - cumulative tokens num is less than max_tokens
-        - keep dialogue end or start according to settings
-        - remove bot's messages from dialog end at inference
-        - remove user's messages from dialog end at non inference (training)
-
-        returns [first_message_index, last_message_index]
-        '''
-        if self.settings.keep_end:
-            return self.__keep_end(
-                conversation=conversation,
-                replicas_cum_len=replicas_cum_len,
-                max_tokens=max_tokens,
-                inference=inference,
-            )
-
-        return self.__keep_start(
-            conversation=conversation,
-            replicas_cum_len=replicas_cum_len,
-            max_tokens=max_tokens,
-            inference=inference,
-        )
-
-    @staticmethod
-    def _all_loss_disabled(leftover_messages: list[ChatMessage]) -> bool:
-        loss_flags = [message.disable_loss for message in leftover_messages]
-        return sum(loss_flags) == len(leftover_messages)
-
-    def _truncate_and_merge(
-        self,
-        conversation: Conversation,
-        tokenized_replicas: list[np.ndarray],
-        role_prefix_tokens: dict[ChatMessageRole, np.ndarray],
-        suffix_tokens: np.ndarray,
-        inference: bool,
-        random_cut: bool,
-    ) -> tuple[np.ndarray, np.ndarray, str]:
-        # random_cut используется только когда inference=true
-        assert inference or not random_cut
-
-        bot_prefix_tokens = role_prefix_tokens[ChatMessageRole.BOT]
-        max_tokens = (
-            self.settings.max_tokens_count - (len(bot_prefix_tokens) if inference else 1)
-            if self.settings.max_tokens_count is not None
-            else None
-        )
-
-        replicas_len = [
-            len(r) + len(role_prefix_tokens[m.role]) + len(suffix_tokens)
-            for r, m in zip(tokenized_replicas, conversation.messages)
-        ]
-
-        left_bound, right_bound = self.__truncate(
-            conversation=conversation,
-            replicas_cum_len=list(accumulate(replicas_len)),
-            max_tokens=max_tokens,
-            inference=inference,
-        )
-
-        if not inference and right_bound - left_bound < 2:
-            raise ValueError('Less than two messages left after truncation')
-        if (
-            inference
-            and left_bound == 0
-            and right_bound == 1  # если при инференсе остался только системный промпт
-            and conversation.messages[0].role == ChatMessageRole.SYSTEM
-        ):
-            raise ValueError('Less than two messages left after truncation')
-        if not inference and self._all_loss_disabled(conversation.messages[left_bound:right_bound]):
-            raise ValueError('No messages with enabled loss were left after truncations')
-
-        if random_cut:
-            bot_indices = [
-                i
-                for i, m in enumerate(conversation.messages)
-                if m.role == ChatMessageRole.BOT and left_bound <= i < right_bound
-            ]
-            right_bound = random.choice(bot_indices) if bot_indices else right_bound
-
-        input_ids = np.array([self.tokenizer.bos_token_id])
-        labels = np.array([DISABLE_LOSS_LABEL])
-
-        truncated_conversation_messages = conversation.messages[left_bound:right_bound]
-        truncated_tokenized_replicas = tokenized_replicas[left_bound:right_bound]
-
-        if self.source.system_prompt is not None and self.settings.keep_end and left_bound != 0:
-            truncated_conversation_messages = [conversation.messages[0]] + truncated_conversation_messages
-            truncated_tokenized_replicas = [truncated_tokenized_replicas[0]] + truncated_tokenized_replicas
-
-        for ind, (message, tokenized_replica) in enumerate(
-            zip(
-                truncated_conversation_messages[left_bound:right_bound],
-                truncated_tokenized_replicas[left_bound:right_bound],
-            )
-        ):
-            prefix_tokens = role_prefix_tokens[message.role]
-            merged_replica = np.concatenate((prefix_tokens, tokenized_replica, suffix_tokens))
-            input_ids = np.concatenate((input_ids, merged_replica))
-
-            if (
-                (self.settings.only_last_replica_loss and ind != right_bound - left_bound - 1)
-                or (self.settings.only_answer_loss and message.role != ChatMessageRole.BOT)
-                or message.disable_loss
-            ):
-                replica_labels = np.full(merged_replica.shape, DISABLE_LOSS_LABEL)
-            else:
-                replica_labels = np.concatenate(
-                    (
-                        np.full(prefix_tokens.shape, DISABLE_LOSS_LABEL),
-                        tokenized_replica,
-                        suffix_tokens,
-                    )
-                )
-            labels = np.concatenate((labels, replica_labels))
-
-        if inference:
-            input_ids = np.concatenate((input_ids, bot_prefix_tokens))
-            labels = np.concatenate((labels, np.full(bot_prefix_tokens.shape, DISABLE_LOSS_LABEL)))
-        else:
-            input_ids = np.append(input_ids, self.tokenizer.eos_token_id)
-            labels = np.append(labels, DISABLE_LOSS_LABEL)
-
-        return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
+    def _print(self, tokens: Tokens, prefix: str | None = None):
+        prefix = prefix + " " if prefix is not None else ""
+        loguru.logger.info("{}{}", prefix, [self.tokenizer.batch_decode([id])[0] for id in tokens.input_ids])
 
     def _encode(
-        self,
-        records: list[ChatDatasetRecord],
-        inference: bool,
-        random_cut: bool,
+            self,
+            records: list[ChatDatasetRecord],
+            inference: bool,
+            random_cut: bool,
     ) -> list[dict[str, Any] | None]:
-        conversations = [Conversation(system_prompt=self.source.system_prompt, messages=r.messages) for r in records]
+        output = []
+        for record in records:
+            conversation = Conversation(system_prompt=self.source.system_prompt, messages=record.messages)
+            unpacked_conversation = [message.dict() for message in conversation.messages]
+            unpacked_conversation = enum_to_string_in_dict(unpacked_conversation)
 
-        logger.info(f'Tokenizing dataset {self.source.name}')
-        tokenized_replicas = self.__tokenize([m.content for c in conversations for m in c.messages])
+            tokenized_conversation: BatchEncoding = self.tokenizer.apply_chat_template(
+                conversation=unpacked_conversation,
+                chat_template=self.prompt_template,
+                tokenize=True,
+                return_assistant_tokens_mask=True,
+                return_dict=True,
+                add_generation_prompt=inference,
+                add_special_tokens=False,
+                padding=False,
+                truncation=False,
+                return_tensors="np",
+                meta=record.meta
+            )
+            input_ids = tokenized_conversation["input_ids"][0]
 
-        tokenized_conversations = []
-        offset = 0
-        for c in conversations:
-            tokenized_conversations.append([tokenized_replicas[offset + i] for i in range(len(c.messages))])
-            offset += len(c.messages)
+            assistant_masks = tokenized_conversation["assistant_masks"]
 
-        role_prefix_tokens = {
-            role: self.__tokenize(
-                self.settings.prompt_template.prefix_template.format(
-                    role=self.settings.prompt_template.role_tag_mapping[role]
-                )
-            )[0]
-            for role in ChatMessageRole
-        }
-        # TODO: what if suffix is empty?
-        suffix_tokens = self.__tokenize(self.settings.prompt_template.suffix_template)[0]
+            if self.settings.only_last_replica_loss:
+                binary_seq_str = ''.join('1' if i else '0' for i in assistant_masks)
+                last_replica_start_ind = binary_seq_str.rfind('01')
 
-        logger.info(f'Postprocessing tokenized data in {self.source.name}')
-        output: list[dict[str, Any] | None] = []
-        for record, conversation, tokenized_replicas in zip(records, conversations, tokenized_conversations):
-            try:
-                input_ids, labels, prompt = self._truncate_and_merge(
-                    conversation=conversation,
-                    tokenized_replicas=tokenized_replicas,
-                    role_prefix_tokens=role_prefix_tokens,
-                    suffix_tokens=suffix_tokens,
-                    inference=inference,
-                    random_cut=random_cut,
-                )
+                result_str = binary_seq_str[:last_replica_start_ind + 1].replace('1', '0') + binary_seq_str[
+                                                                                             last_replica_start_ind + 1:]
+                assistant_masks = [i == '1' for i in result_str]
 
-            except ValueError as ex:
-                output.append(None)
-                logger.warning(f'Sample dropped: {ex}')
-                continue
+            tokens = Tokens(
+                input_ids, np.where(assistant_masks, input_ids, DISABLE_LOSS_LABEL)
+            )
+            replica_start_indices = get_target_value_indices(input_ids, self.replica_start_ids)
+            replica_end_indices = get_target_value_indices(input_ids, self.replica_end_ids)
+
+            left_replica_ind_inclusive = 0
+            right_replica_ind_exclusive = len(replica_start_indices)
+            replica_start_indices = np.append(replica_start_indices, replica_end_indices[-1] + 1)
+
+            max_length = self.settings.max_tokens_count
+
+            prefix = Tokens() if replica_start_indices[0] == 0 else tokens.get_prefix(replica_start_indices[0])
+            suffix = (
+                Tokens()
+                if replica_end_indices[-1] == len(input_ids) - 1
+                else tokens.get_suffix(replica_end_indices[-1] + 1)
+            )
+
+            if conversation.messages[0].role == ChatMessageRole.SYSTEM:
+                prefix.append(tokens.slice(replica_start_indices[0], replica_start_indices[1]))
+                left_replica_ind_inclusive += 1
+
+            if inference:
+                suffix_left_token_ind = replica_start_indices[right_replica_ind_exclusive - 1]
+                suffix = concatenate_tokens((tokens.slice(suffix_left_token_ind, replica_end_indices[-1] + 1), suffix))
+                right_replica_ind_exclusive -= 1
+
+            max_length = max_length - (len(prefix) + len(suffix))
+
+            while (
+                    replica_start_indices[right_replica_ind_exclusive]
+                    - replica_start_indices[left_replica_ind_inclusive]
+                    > max_length
+            ):
+                if self.settings.keep_end:
+                    left_replica_ind_inclusive += 1
+                else:
+                    right_replica_ind_exclusive -= 1
+
+            if random_cut:
+                right_replica_ind_exclusive = random.randint(left_replica_ind_inclusive, right_replica_ind_exclusive)
+
+            while right_replica_ind_exclusive > 0 and (
+                    (inference and conversation.messages[right_replica_ind_exclusive - 1].role == ChatMessageRole.BOT)
+                    or (
+                            not inference
+                            and conversation.messages[right_replica_ind_exclusive - 1].role == ChatMessageRole.USER
+                    )
+            ):
+                right_replica_ind_exclusive -= 1
+
+            left_token_ind_inclusive = replica_start_indices[left_replica_ind_inclusive]
+            right_token_ind_exclusive = replica_start_indices[right_replica_ind_exclusive]
+            tokens = concatenate_tokens(
+                (prefix, tokens.slice(left_token_ind_inclusive, right_token_ind_exclusive), suffix)
+            )
 
             encoded_record: dict[str, Any] = {
-                # 'id': record.id, FIXME: dont work with collators
-                'input_ids': torch.LongTensor(input_ids),
-                'labels': torch.LongTensor(labels),
-                'attention_mask': torch.ones(input_ids.shape, dtype=torch.int64),
+                'input_ids': torch.LongTensor(tokens.input_ids),
+                'labels': torch.LongTensor(tokens.labels),
+                'attention_mask': torch.ones(tokens.input_ids.shape, dtype=torch.int64),
             }
             if inference:
                 encoded_record.update(
-                    {'prompt': prompt, 'id': record.id, 'messages': record.messages, 'meta': record.meta}
+                    {
+                        'prompt': conversation.get_prompt_repr(
+                            left_replica_ind_inclusive, right_replica_ind_exclusive
+                        ),
+                        'id': record.id,
+                        'messages': record.messages,
+                        'meta': record.meta,
+                    }
                 )
-
             output.append(encoded_record)
-
         return output
 
     @staticmethod
@@ -327,12 +270,12 @@ class TrainChatDataset(ChatDataset):
 @ChatDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
 class InferenceChatDataset(ChatDataset):
     def __init__(
-        self,
-        source: DatasetSourceSettings,
-        settings: ChatDatasetSettings,
-        tokenizer: PreTrainedTokenizerBase,
-        read: bool = True,
-        random_cut: bool = False,
+            self,
+            source: DatasetSourceSettings,
+            settings: ChatDatasetSettings,
+            tokenizer: PreTrainedTokenizerBase,
+            read: bool = True,
+            random_cut: bool = False,
     ) -> None:
         self._random_cut = random_cut
 

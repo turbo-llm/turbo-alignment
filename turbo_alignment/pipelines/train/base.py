@@ -27,9 +27,9 @@ from turbo_alignment.pipelines.mixin import LoggingMixin, S3Mixin
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.s3 import ExperimentMetadata, S3HandlerParameters
+import loguru
 
 logger = get_project_logger()
-
 
 ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
 
@@ -46,15 +46,15 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
     @staticmethod
     @abstractmethod
     def _get_cherry_pick_callback(
-        experiment_settings: ExperimentSettingsT,
-        tokenizer: PreTrainedTokenizerBase,
-        **kwargs,
+            experiment_settings: ExperimentSettingsT,
+            tokenizer: PreTrainedTokenizerBase,
+            **kwargs,
     ) -> CherryPickCallbackBase | None:
         ...
 
     @staticmethod
     def _save_experiment_config(
-        experiment_settings: ExperimentSettingsT, model: PreTrainedModel, output_path: Path
+            experiment_settings: ExperimentSettingsT, model: PreTrainedModel, output_path: Path
     ) -> None:
         model_config = model.config.to_dict()
         model_config['experiment_config'] = experiment_settings
@@ -67,26 +67,26 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
     @staticmethod
     @abstractmethod
     def _get_data_collator(
-        experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase, **kwargs
+            experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase, **kwargs
     ) -> Callable:
         ...
 
     @staticmethod
     @abstractmethod
     def _get_trainer(
-        training_args: TrainingArguments,
-        experiment_settings: ExperimentSettingsT,
-        model: PreTrainedModel,
-        tokenizer: PreTrainedTokenizerBase,
-        train_dataset: Dataset,
-        val_dataset: Dataset,
-        data_collator: Callable,
+            training_args: TrainingArguments,
+            experiment_settings: ExperimentSettingsT,
+            model: PreTrainedModel,
+            tokenizer: PreTrainedTokenizerBase,
+            train_dataset: Dataset,
+            val_dataset: Dataset,
+            data_collator: Callable,
     ) -> Trainer:
         ...
 
     @staticmethod
     def _load_model(
-        experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase
+            experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase
     ) -> torch.nn.Module | PreTrainedModel:
         return load_model(experiment_settings.model_settings, tokenizer)
 
@@ -105,7 +105,7 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
 
     @staticmethod
     def _get_additional_special_tokens(
-        experiment_settings: BaseTrainExperimentSettings,
+            experiment_settings: BaseTrainExperimentSettings,
     ) -> list[str]:
         embeddings_initialization_strategy = experiment_settings.model_settings.embeddings_initialization_strategy
         return list(embeddings_initialization_strategy.keys()) if embeddings_initialization_strategy else []
