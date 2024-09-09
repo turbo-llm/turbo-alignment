@@ -1,8 +1,5 @@
-"""
-`allennlp.common.registrable.Registrable` is a "mixin" for endowing
-any base class with a named registry for its subclasses and a decorator
-for registering them.
-"""
+# mypy: ignore-errors
+# pylint: skip-file
 import importlib
 import inspect
 import logging
@@ -21,27 +18,6 @@ _SubclassRegistry = dict[str, tuple[type, str | None]]
 
 
 class Registrable(FromParams):
-    """
-    Any class that inherits from `Registrable` gains access to a named registry for its
-    subclasses. To register them, just decorate them with the classmethod
-    `@BaseClass.register(name)`.
-
-    After which you can call `BaseClass.list_available()` to get the keys for the
-    registered subclasses, and `BaseClass.by_name(name)` to get the corresponding subclass.
-    Note that the registry stores the subclasses themselves; not class instances.
-    In most cases you would then call `from_params(params)` on the returned subclass.
-
-    You can specify a default by setting `BaseClass.default_implementation`.
-    If it is set, it will be the first element of `list_available()`.
-
-    Note that if you use this class to implement a new `Registrable` abstract class,
-    you must ensure that all subclasses of the abstract class are loaded when the module is
-    loaded, because the subclasses register themselves in their respective files. You can
-    achieve this by having the abstract class and all subclasses in the __init__.py of the
-    module in which they reside (as this causes any import of either the abstract class or
-    a subclass to load all other subclasses and the abstract class).
-    """
-
     _registry: ClassVar[DefaultDict[type, _SubclassRegistry]] = defaultdict(dict)
 
     default_implementation: str | None = None
@@ -50,71 +26,9 @@ class Registrable(FromParams):
     def register(
         cls, name: str, constructor: str | None = None, exist_ok: bool = False
     ) -> Callable[[Type[_T]], Type[_T]]:
-        """
-        Register a class under a particular name.
-
-        # Parameters
-
-        name : `str`
-            The name to register the class under.
-        constructor : `str`, optional (default=`None`)
-            The name of the method to use on the class to construct the object.  If this is given,
-            we will use this method (which must be a `@classmethod`) instead of the default
-            constructor.
-        exist_ok : `bool`, optional (default=`False`)
-            If True, overwrites any existing models registered under `name`. Else,
-            throws an error if a model is already registered under `name`.
-
-        # Examples
-
-        To use this class, you would typically have a base class that inherits from `Registrable`:
-
-        ```python
-        class Vocabulary(Registrable):
-            ...
-        ```
-
-        Then, if you want to register a subclass, you decorate it like this:
-
-        ```python
-        @Vocabulary.register("my-vocabulary")
-        class MyVocabulary(Vocabulary):
-            def __init__(self, param1: int, param2: str):
-                ...
-        ```
-
-        Registering a class like this will let you instantiate a class from a config file, where you
-        give `"type": "my-vocabulary"`, and keys corresponding to the parameters of the `__init__`
-        method (note that for this to work, those parameters must have type annotations).
-
-        If you want to have the instantiation from a config file call a method other than the
-        constructor, either because you have several different construction paths that could be
-        taken for the same object (as we do in `Vocabulary`) or because you have logic you want to
-        happen before you get to the constructor (as we do in `Embedding`), you can register a
-        specific `@classmethod` as the constructor to use, like this:
-
-        ```python
-        @Vocabulary.register("my-vocabulary-from-instances", constructor="from_instances")
-        @Vocabulary.register("my-vocabulary-from-files", constructor="from_files")
-        class MyVocabulary(Vocabulary):
-            def __init__(self, some_params):
-                ...
-
-            @classmethod
-            def from_instances(cls, some_other_params) -> MyVocabulary:
-                ...  # construct some_params from instances
-                return cls(some_params)
-
-            @classmethod
-            def from_files(cls, still_other_params) -> MyVocabulary:
-                ...  # construct some_params from files
-                return cls(some_params)
-        ```
-        """
         registry = Registrable._registry[cls]
 
         def add_subclass_to_registry(subclass: Type[_T]) -> Type[_T]:
-            # Add to registry, raise an error if key has already been used.
             if name in registry:
                 if exist_ok:
                     message = (
@@ -135,11 +49,6 @@ class Registrable(FromParams):
 
     @classmethod
     def by_name(cls: Type[_RegistrableT], name: str) -> Callable[..., _RegistrableT]:
-        """
-        Returns a callable function that constructs an argument of the registered class.  Because
-        you can register particular functions as constructors for specific names, this isn't
-        necessarily the `__init__` method of some class.
-        """
         logger.debug(f'instantiating registered subclass {name} of {cls}')
         subclass, constructor = cls.resolve_class_name(name)
         if not constructor:
@@ -148,15 +57,6 @@ class Registrable(FromParams):
 
     @classmethod
     def resolve_class_name(cls: Type[_RegistrableT], name: str) -> tuple[Type[_RegistrableT], str | None]:
-        """
-        Returns the subclass that corresponds to the given `name`, along with the name of the
-        method that was registered as a constructor for that `name`, if any.
-
-        This method also allows `name` to be a fully-specified module name, instead of a name that
-        was already added to the `Registry`.  In that case, you cannot use a separate function as
-        a constructor (as you need to call `cls.register()` in order to tell us what separate
-        function to use).
-        """
         if name in Registrable._registry[cls]:
             subclass, constructor = Registrable._registry[cls][name]
             return subclass, constructor
@@ -203,7 +103,6 @@ class Registrable(FromParams):
 
     @classmethod
     def list_available(cls) -> list[str]:
-        """list default first if it exists"""
         keys = list(Registrable._registry[cls].keys())
         default = cls.default_implementation
 
@@ -214,46 +113,25 @@ class Registrable(FromParams):
         return [default] + [k for k in keys if k != default]
 
     def _to_params(self) -> dict[str, Any]:
-        """
-        Default behavior to get a params dictionary from a registrable class
-        that does NOT have a _to_params implementation. It is NOT recommended to
-         use this method. Rather this method is a minial implementation that
-         exists so that calling `_to_params` does not break.
-
-        # Returns
-
-        parameter_dict: `Dict[str, Any]`
-            A minimal parameter dictionary for a given registrable class. Will
-            get the registered name and return that as well as any positional
-            arguments it can find the value of.
-
-        """
         logger.warning(
             f"'{self.__class__.__name__}' does not implement '_to_params`. Will" f" use Registrable's `_to_params`."
         )
 
-        # Get the list of parent classes in the MRO in order to check where to
-        # look for the registered name. Skip the first because that is the
-        # current class.
         mro = inspect.getmro(self.__class__)[1:]
 
         registered_name = None
         for parent in mro:
-            # Check if Parent has any registered classes
             try:
                 registered_classes = self._registry[parent]
             except KeyError:
                 continue
 
-            # Found a dict of (name,(class,constructor)) pairs. Check if the
-            # current class is in it.
             for name, registered_value in registered_classes.items():
                 registered_class, _ = registered_value
                 if registered_class == self.__class__:
                     registered_name = name
                     break
 
-            # Extra break to end the top loop.
             if registered_name is not None:
                 break
 
@@ -262,18 +140,11 @@ class Registrable(FromParams):
 
         parameter_dict = {'type': registered_name}
 
-        # Get the parameters from the init function.
         for parameter in inspect.signature(self.__class__).parameters.values():
-            # Skip non-positional arguments. For simplicity, these are arguments
-            # without a default value as those will be required for the
-            # `from_params` method.
             if parameter.default != inspect.Parameter.empty:
                 logger.debug(f'Skipping parameter {parameter.name}')
                 continue
 
-            # Try to get the value of the parameter from the class. Will only
-            # try 'name' and '_name'. If it is not there, the parameter is not
-            # added to the returned dict.
             if hasattr(self, parameter.name):
                 parameter_dict[parameter.name] = getattr(self, parameter.name)
             elif hasattr(self, f'_{parameter.name}'):
@@ -286,13 +157,10 @@ class Registrable(FromParams):
 
 
 def _get_suggestion(name: str, available: list[str]) -> str | None:
-    # First check for simple mistakes like using '-' instead of '_', or vice-versa.
     for ch, repl_ch in (('_', '-'), ('-', '_')):
         suggestion = name.replace(ch, repl_ch)
         if suggestion in available:
             return suggestion
-    # If we still haven't found a reasonable suggestion, we return the first suggestion
-    # with an edit distance (with transpositions allowed) of 1 to `name`.
     from nltk.metrics.distance import edit_distance
 
     for suggestion in available:

@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+# pylint: skip-file
 import collections.abc
 import inspect
 import logging
@@ -27,18 +29,10 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar('T', bound='FromParams')
 
-# If a function parameter has no default value specified,
-# this is what the inspect module returns.
 _NO_DEFAULT = inspect.Parameter.empty
 
 
 def takes_arg(obj, arg: str) -> bool:
-    """
-    Checks whether the provided obj takes a certain arg.
-    If it's a class, we're really checking whether its constructor does.
-    If it's a function or method, we're checking the object itself.
-    Otherwise, we raise an error.
-    """
     if inspect.isclass(obj):
         signature = inspect.signature(obj.__init__)
     elif inspect.ismethod(obj) or inspect.isfunction(obj):
@@ -49,12 +43,6 @@ def takes_arg(obj, arg: str) -> bool:
 
 
 def takes_kwargs(obj) -> bool:
-    """
-    Checks whether a provided object takes in any positional arguments.
-    Similar to takes_arg, we do this for both the __init__ function of
-    the class or a function / method
-    Otherwise, we raise an error
-    """
     if inspect.isclass(obj):
         signature = inspect.signature(obj.__init__)
     elif inspect.ismethod(obj) or inspect.isfunction(obj):
@@ -80,10 +68,6 @@ def can_construct_from_params(type_: Type) -> bool:
 
 
 def is_base_registrable(cls) -> bool:
-    """
-    Checks whether this is a class that directly inherits from Registrable, or is a subclass of such
-    a class.
-    """
     from turbo_alignment.common.registry.registrable import (
         Registrable,  # import here to avoid circular imports
     )
@@ -98,11 +82,6 @@ def is_base_registrable(cls) -> bool:
 
 
 def remove_optional(annotation: type):
-    """
-    Optional[X] annotations are actually represented as Union[X, NoneType].
-    For our purposes, the "Optional" part is not interesting, so here we
-    throw it away.
-    """
     origin = getattr(annotation, '__origin__', None)
     args = getattr(annotation, '__args__', ())
 
@@ -140,9 +119,6 @@ def infer_method_params(cls: Type[T], method: Callable) -> Dict[str, inspect.Par
     if not has_kwargs:
         return parameters
 
-    # "mro" is "method resolution order". The first one is the current class, the next is the
-    # first superclass, and so on. We take the first superclass we find that inherits from
-    # FromParams.
     super_class = None
     for super_class_candidate in cls.mro()[1:]:
         if issubclass(super_class_candidate, FromParams):
@@ -153,60 +129,29 @@ def infer_method_params(cls: Type[T], method: Callable) -> Dict[str, inspect.Par
     else:
         super_parameters = {}
 
-    return {**super_parameters, **parameters}  # Subclass parameters overwrite superclass ones
+    return {**super_parameters, **parameters}
 
 
 def create_kwargs(constructor: Callable[..., T], cls: Type[T], params: Params, **extras) -> Dict[str, Any]:
-    """
-    Given some class, a `Params` object, and potentially other keyword arguments,
-    create a dict of keyword args suitable for passing to the class's constructor.
-
-    The function does this by finding the class's constructor, matching the constructor
-    arguments to entries in the `params` object, and instantiating values for the parameters
-    using the type annotation and possibly a from_params method.
-
-    Any values that are provided in the `extras` will just be used as is.
-    For instance, you might provide an existing `Vocabulary` this way.
-    """
-    # Get the signature of the constructor.
-
     kwargs: Dict[str, Any] = {}
 
     parameters = infer_params(cls, constructor)
     accepts_kwargs = False
 
-    # Iterate over all the constructor parameters and their annotations.
     for param_name, param in parameters.items():
-        # Skip "self". You're not *required* to call the first parameter "self",
-        # so in theory this logic is fragile, but if you don't call the self parameter
-        # "self" you kind of deserve what happens.
         if param_name == 'self':
             continue
 
         if param.kind == param.VAR_KEYWORD:
-            # When a class takes **kwargs, we do two things: first, we assume that the **kwargs are
-            # getting passed to the super class, so we inspect super class constructors to get
-            # allowed arguments (that happens in `infer_params` above).  Second, we store the fact
-            # that the method allows extra keys; if we get extra parameters, instead of crashing,
-            # we'll just pass them as-is to the constructor, and hope that you know what you're
-            # doing.
             accepts_kwargs = True
             continue
 
-        # If the annotation is a compound type like typing.Dict[str, int],
-        # it will have an __origin__ field indicating `typing.Dict`
-        # and an __args__ field indicating `(str, int)`. We capture both.
         annotation = remove_optional(param.annotation)
 
         explicitly_set = param_name in params
+        # FIXME
         constructed_arg = pop_and_construct_arg(cls.__name__, param_name, annotation, param.default, params, **extras)
 
-        # If the param wasn't explicitly set in `params` and we just ended up constructing
-        # the default value for the parameter, we can just omit it.
-        # Leaving it in can cause issues with **kwargs in some corner cases, where you might end up
-        # with multiple values for a single parameter (e.g., the default value gives you lazy=False
-        # for a dataset reader inside **kwargs, but a particular dataset reader actually hard-codes
-        # lazy=True - the superclass sees both lazy=True and lazy=False in its constructor).
         if explicitly_set or constructed_arg is not param.default:
             kwargs[param_name] = constructed_arg
 
@@ -218,29 +163,14 @@ def create_kwargs(constructor: Callable[..., T], cls: Type[T], params: Params, *
 
 
 def create_extras(cls: Type[T], extras: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Given a dictionary of extra arguments, returns a dictionary of
-    kwargs that actually are a part of the signature of the cls.from_params
-    (or cls) method.
-    """
     subextras: Dict[str, Any] = {}
     if hasattr(cls, 'from_params'):
-        from_params_method = cls.from_params  # type: ignore
+        from_params_method = cls.from_params
     else:
-        # In some rare cases, we get a registered subclass that does _not_ have a
-        # from_params method (this happens with Activations, for instance, where we
-        # register pytorch modules directly).  This is a bit of a hack to make those work,
-        # instead of adding a `from_params` method for them somehow. Then the extras
-        # in the class constructor are what we are looking for, to pass on.
         from_params_method = cls
     if takes_kwargs(from_params_method):
-        # If annotation.params accepts **kwargs, we need to pass them all along.
-        # For example, `BasicTextFieldEmbedder.from_params` requires a Vocabulary
-        # object, but `TextFieldEmbedder.from_params` does not.
         subextras = extras
     else:
-        # Otherwise, only supply the ones that are actual args; any additional ones
-        # will cause a TypeError.
         subextras = {k: v for k, v in extras.items() if takes_arg(from_params_method, k)}
     return subextras
 
@@ -253,25 +183,17 @@ def construct_arg(
     default: Any,
     **extras,
 ) -> Any:
-    """
-    The first two parameters here are only used for logging if we encounter an error.
-    """
     origin = getattr(annotation, '__origin__', None)
     args = getattr(annotation, '__args__', [])
 
-    # The parameter is optional if its default value is not the "no default" sentinel.
     optional = default != _NO_DEFAULT
 
     if hasattr(annotation, 'from_params'):
         if popped_params is default:
             return default
         if popped_params is not None:
-            # Our params have an entry for this, so we use that.
-
             subextras = create_extras(annotation, extras)
 
-            # In some cases we allow a string instead of a param dict, so
-            # we need to handle that case separately.
             if isinstance(popped_params, str):
                 popped_params = Params({'type': popped_params})
             elif isinstance(popped_params, dict):
@@ -280,31 +202,22 @@ def construct_arg(
 
             return result
         if not optional:
-            # Not optional and not supplied, that's an error!
             raise ConfigurationError(f'expected key {argument_name} for {class_name}')
         return default
 
-    # If the parameter type is a Python primitive, just pop it off
-    # using the correct casting pop_xyz operation.
     if annotation in {int, bool}:
         if type(popped_params) in {int, bool}:
             return annotation(popped_params)
         raise TypeError(f'Expected {argument_name} to be a {annotation.__name__}.')
     if annotation == str:
-        # Strings are special because we allow casting from Path to str.
         if isinstance(popped_params, str) or isinstance(popped_params, Path):
             return str(popped_params)  # type: ignore
         raise TypeError(f'Expected {argument_name} to be a string.')
     if annotation == float:
-        # Floats are special because in Python, you can put an int wherever you can put a float.
-        # https://mypy.readthedocs.io/en/stable/duck_type_compatibility.html
         if type(popped_params) in {int, float}:
             return popped_params
         raise TypeError(f'Expected {argument_name} to be numeric.')
 
-    # This is special logic for handling types like Dict[str, TokenIndexer],
-    # List[TokenIndexer], Tuple[TokenIndexer, Tokenizer], and Set[TokenIndexer],
-    # which it creates by instantiating each value from_params and returning the resulting structure.
     if (
         origin in {collections.abc.Mapping, Mapping, Dict, dict}
         and len(args) == 2
@@ -362,11 +275,8 @@ def construct_arg(
         return value_set
 
     if origin == Union:
-        # Storing this so we can recover it later if we need to.
         backup_params = deepcopy(popped_params)
 
-        # We'll try each of the given types in the union sequentially, returning the first one that
-        # succeeds.
         error_chain: Optional[Exception] = None
         for arg_annotation in args:
             try:
@@ -379,14 +289,11 @@ def construct_arg(
                     **extras,
                 )
             except (ValueError, TypeError, ConfigurationError, AttributeError) as e:
-                # Our attempt to construct the argument may have modified popped_params, so we
-                # restore it here.
                 popped_params = deepcopy(backup_params)
                 e.args = (f'While constructing an argument of type {arg_annotation}',) + e.args
                 e.__cause__ = error_chain
                 error_chain = e
 
-        # If none of them succeeded, we crash.
         config_error = ConfigurationError(f'Failed to construct argument {argument_name} with type {annotation}.')
         config_error.__cause__ = error_chain
         raise config_error
@@ -398,9 +305,6 @@ def construct_arg(
         subextras = create_extras(value_cls, extras)
         return Lazy(value_cls, params=deepcopy(popped_params), constructor_extras=subextras)  # type: ignore
 
-    # For any other kind of iterable, we will just assume that a list is good enough, and treat
-    # it the same as List. This condition needs to be at the end, so we don't catch other kinds
-    # of Iterables with this branch.
     if (
         origin in {collections.abc.Iterable, Iterable, List, list}
         and len(args) == 1
@@ -423,18 +327,12 @@ def construct_arg(
 
         return value_list
 
-    # Pass it on as is and hope for the best.   ¯\_(ツ)_/¯
     if isinstance(popped_params, Params):
         return popped_params.as_dict()
     return popped_params
 
 
 class FromParams:
-    """
-    Mixin to give a from_params method to classes. We create a distinct base class for this
-    because sometimes we want non-Registrable classes to be instantiatable from_params.
-    """
-
     @classmethod
     def from_params(
         cls: Type[T],
@@ -443,28 +341,6 @@ class FromParams:
         constructor_to_inspect: Union[Callable[..., T], Callable[[T], None]] = None,
         **extras,
     ) -> T:
-        """
-        This is the automatic implementation of `from_params`. Any class that subclasses
-        `FromParams` (or `Registrable`, which itself subclasses `FromParams`) gets this
-        implementation for free.  If you want your class to be instantiated from params in the
-        "obvious" way -- pop off parameters and hand them to your constructor with the same names --
-        this provides that functionality.
-
-        If you need more complex logic in your from `from_params` method, you'll have to implement
-        your own method that overrides this one.
-
-        The `constructor_to_call` and `constructor_to_inspect` arguments deal with a bit of
-        redirection that we do.  We allow you to register particular `@classmethods` on a class as
-        the constructor to use for a registered name.  This lets you, e.g., have a single
-        `Vocabulary` class that can be constructed in two different ways, with different names
-        registered to each constructor.  In order to handle this, we need to know not just the class
-        we're trying to construct (`cls`), but also what method we should inspect to find its
-        arguments (`constructor_to_inspect`), and what method to call when we're done constructing
-        arguments (`constructor_to_call`).  These two methods are the same when you've used a
-        `@classmethod` as your constructor, but they are `different` when you use the default
-        constructor (because you inspect `__init__`, but call `cls()`).
-        """
-
         from turbo_alignment.common.registry.registrable import (
             Registrable,  # import here to avoid circular imports
         )
@@ -491,10 +367,6 @@ class FromParams:
         registered_subclasses = Registrable._registry.get(cls)
 
         if is_base_registrable(cls) and registered_subclasses is None:
-            # NOTE(mattg): There are some potential corner cases in this logic if you have nested
-            # Registrable types.  We don't currently have any of those, but if we ever get them,
-            # adding some logic to check `constructor_to_call` should solve the issue.  Not
-            # bothering to add that unnecessary complexity for now.
             raise ConfigurationError(
                 'Tried to construct an abstract Registrable base class that has no registered '
                 'concrete types. This might mean that you need to use --include-package to get '
@@ -502,17 +374,16 @@ class FromParams:
             )
 
         if registered_subclasses is not None and not constructor_to_call:
-            # We know `cls` inherits from Registrable, so we'll use a cast to make mypy happy.
-
+            # FIXME
             as_registrable = cast(Type[Registrable], cls)
             default_to_first_choice = as_registrable.default_implementation is not None
+            # FIXME
             choice = params.pop_choice(
                 'type',
                 choices=as_registrable.list_available(),
                 default_to_first_choice=default_to_first_choice,
             )
             subclass, constructor_name = as_registrable.resolve_class_name(choice)
-            # See the docstring for an explanation of what's going on here.
             if not constructor_name:
                 constructor_to_inspect = subclass.__init__
                 constructor_to_call = subclass  # type: ignore
@@ -521,9 +392,7 @@ class FromParams:
                 constructor_to_call = constructor_to_inspect
 
             if hasattr(subclass, 'from_params'):
-                # We want to call subclass.from_params.
                 extras = create_extras(subclass, extras)
-                # mypy can't follow the typing redirection that we do, so we explicitly cast here.
                 retyped_subclass = cast(Type[T], subclass)
                 return retyped_subclass.from_params(
                     params=params,
@@ -531,29 +400,16 @@ class FromParams:
                     constructor_to_inspect=constructor_to_inspect,
                     **extras,
                 )
-                # In some rare cases, we get a registered subclass that does _not_ have a
-                # from_params method (this happens with Activations, for instance, where we
-                # register pytorch modules directly).  This is a bit of a hack to make those work,
-                # instead of adding a `from_params` method for them somehow.  We just trust that
-                # you've done the right thing in passing your parameters, and nothing else needs to
-                # be recursively constructed.
             return subclass(**params)  # type: ignore
-        # This is not a base class, so convert our params and extras into a dict of kwargs.
-
-        # See the docstring for an explanation of what's going on here.
         if not constructor_to_inspect:
             constructor_to_inspect = cls.__init__
         if not constructor_to_call:
             constructor_to_call = cls
 
         if constructor_to_inspect == object.__init__:
-            # This class does not have an explicit constructor, so don't give it any kwargs.
-            # Without this logic, create_kwargs will look at object.__init__ and see that
-            # it takes *args and **kwargs and look for those.
             kwargs: Dict[str, Any] = {}
             params.assert_empty(cls.__name__)
         else:
-            # This class has a constructor, so create kwargs for it.
             constructor_to_inspect = cast(Callable[..., T], constructor_to_inspect)
             kwargs = create_kwargs(constructor_to_inspect, cls, params, **extras)
 
