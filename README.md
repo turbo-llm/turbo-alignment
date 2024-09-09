@@ -153,16 +153,88 @@ To launch RAG:
 
 <a name="-inference"></a>
 # Inference
-⌛️ in progress..
+<a name="-chat-inference"></a>
+## Chat Inference
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [sft.json](configs/exp/train/sft/sft.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_chat --inference_settings_path configs/exp/train/sft/sft.json
+```
 
+<a name="-classification-inference"></a>
+## Classification Inference
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [classification_inference.json](configs/exp/inference/classification/classification_inference.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_classification --inference_settings_path configs/exp/train/sft/sft.json
+```
+
+<a name="-multimodal-inference"></a>
+## Multimodal Inference
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [mlp.json](configs/exp/inference/multimodal/mlp.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_multimodal --inference_settings_path configs/exp/train/sft/sft.json
+```
+
+<a name="-rag-inference"></a>
+## RAG Inference
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [rag_inference.json](configs/exp/inference/rag/rag_inference.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_rag --inference_settings_path configs/exp/train/sft/sft.json
+```
 
 <a name="-sampling"></a>
 # Sampling
-⌛️ in progress..
+<a name="-random-sampling"></a>
+## Random Sampling
+- **📚 Dataset type** prepare your dataset  in the `SamplingRMDataset`, examples available [here](docs/dataset_example.md#-sampling-dataset) format.
+- **📝 Configs Example**: [random.json](tests/fixtures/configs/sampling/base.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment random_sample --experiment_settings_path tests/fixtures/configs/sampling/base.json
+```
+
+<a name="-rso-sampling"></a>
+## RSO Sampling
+- **📚 Dataset type** prepare your dataset  in the `SamplingRMDataset`, examples available [here](docs/dataset_example.md#-sampling-dataset) format.
+- **📝 Configs Example**: [rso.json](tests/fixtures/configs/sampling/rso.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment rso_sample --experiment_settings_path tests/fixtures/configs/sampling/rso.json
+```
+
+<a name="-rm-sampling"></a>
+## Reward Model Sampling
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-sampling-dataset) format.
+- **📝 Configs Example**: [rm.json](tests/fixtures/configs/sampling/rm.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment rm_sample --experiment_settings_path tests/fixtures/configs/sampling/rm.json
+```
 
 <a name="-common"></a>
 # Common
-⌛️ in progress..
+<a name="-merge_adapters_to_base"></a>
+## Merge Adapters to base model
+- **📝 Configs Example**: [llama.json](configs/utils/merge_adapters_to_base/llama.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment merge_adapters_to_base --settings_path configs/utils/merge_adapters_to_base/llama.json
+```
+
+<a name="-preprocess_multimodal_dataset"></a>
+## Preprocess Multimodal Dataset
+- **📝 Configs Example**: [coco2014_clip.json](configs/utils/preprocess/coco2014_clip.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment preprocess_multimodal_dataset --settings_path configs/utils/preprocess/coco2014_clip.json
+```
 
 
 <a name="-installation"></a>
