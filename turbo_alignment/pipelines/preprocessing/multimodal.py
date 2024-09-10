@@ -52,8 +52,6 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
             files_paths.extend(dataset_path.glob(f'*.{extension}'))
 
         modality_tensors = self._async_process_files(reader, files_paths, total_number_of_objects)
-
-        modality_tensors = torch.cat(modality_tensors)
         return modality_tensors, files_paths
 
     @staticmethod
@@ -63,11 +61,11 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         encoded_modality_tensors = []
 
         logger.info('👩‍💻 Encoding objects...')
-        batched_modality_tensors = modality_tensors.split(batch_size)
-        for i, batch in enumerate(batched_modality_tensors):
-            logger.info(f'👩‍💻 Encoded {i} / {len(batched_modality_tensors)} batches')
+        for i in range(0, len(modality_tensors), batch_size):
+            batch = torch.cat(modality_tensors[i:i + batch_size], dim=0)
             encoded_modality_tensor_batch = encoder.encode(batch.to(encoder.device)).detach().cpu()
             encoded_modality_tensors.append(encoded_modality_tensor_batch)
+            logger.info(f'👩‍💻 Encoded {i} / {len(modality_tensors)} tensors')
 
         encoded_modality_tensors = torch.cat(encoded_modality_tensors)
 
