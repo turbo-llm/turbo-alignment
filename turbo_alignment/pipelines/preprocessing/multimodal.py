@@ -7,6 +7,7 @@ import torch
 from accelerate import Accelerator
 from turbo_alignment.common.registry import Params
 from safetensors.torch import save_file
+from tqdm import tqdm
 
 from turbo_alignment.common.data.io import write_json
 from turbo_alignment.common.data.multimodal.base import BaseModalityReader
@@ -55,7 +56,9 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         for extension in available_extensions:
             files_paths.extend(experiment_settings.dataset_path.glob(f'*.{extension}'))
 
-        safetensors_full_dict = self._async_process_files(reader, encoder, files_paths, experiment_settings, accelerator)
+        safetensors_full_dict = self._async_process_files(
+            reader, encoder, files_paths, experiment_settings, accelerator
+        )
         return safetensors_full_dict
 
     @staticmethod
@@ -70,26 +73,22 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         modality_objects = torch.cat(modality_objects)
         encoded_modality_objects = encoder.encode(modality_objects.to(accelerator.device)).detach().cpu()
         safetensors_dict_batch = self._get_safetensor_dict(encoded_modality_objects, batch_file_paths)
-        logger.info(f'📖 Finish with batch {batch_idx}')
 
         return safetensors_dict_batch
 
     def _async_process_files(self, reader, encoder, files_paths, experiment_settings, accelerator):
         modality_tensors = [None] * len(files_paths)
 
+        print(experiment_settings.batch_size, len(files_paths))
         batches = np.array_split(files_paths, len(files_paths) // experiment_settings.batch_size)
-        safetensors_full_dict = {}
 
-        with ThreadPoolExecutor() as executor:
-            futures = {
-                executor.submit(self._process_function, reader, encoder, batch, experiment_settings, i, accelerator): i
-                for i, batch in enumerate(batches)
-            }
-            for i, future in enumerate(as_completed(futures)):
-                try:
-                    safetensors_full_dict.update(future.result())
-                except Exception as exc:
-                    logger.error(f'Error reading file: {exc}')
+        safetensors_full_dict = {}
+        for i, batch in enumerate(tqdm(batches)):
+            try:
+                batch_output = self._process_function(reader, encoder, batch, experiment_settings, i, accelerator)
+                safetensors_full_dict.update(batch_output)
+            except Exception as exc:
+                logger.error(f'Error reading file: {exc}')
         return safetensors_full_dict
 
     @staticmethod
