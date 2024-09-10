@@ -14,9 +14,6 @@ from turbo_alignment.settings.modality import ModalityReader
 @AudioModalityReaderRegistry.register(ModalityReader.PICKLE)
 @ImageModalityReaderRegistry.register(ModalityReader.PICKLE)
 class FileReader(BaseImageReader):
-    def __init__(self, **_kwargs):
-        self.processed_tensors = None
-
     @staticmethod
     def _get_h5_file(path: Path) -> Path:
         return list(path.glob('*.h5'))[0]  # FIXME: What if there is more than one h5 file?
