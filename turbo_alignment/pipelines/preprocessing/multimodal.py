@@ -21,6 +21,7 @@ from turbo_alignment.settings.modality import (
     ModalityEncoderSettings,
     ModalityReaderSettings,
 )
+from accelerate import Accelerator
 
 logger = get_project_logger()
 
@@ -28,9 +29,9 @@ logger = get_project_logger()
 class PreprocessMultimodalDatasetStrategy(BaseStrategy):
     @staticmethod
     def _load_modality_reader_encoder(
-        reader_settings: ModalityReaderSettings, encoder_settings: ModalityEncoderSettings, modality: Modality
+        reader_settings: ModalityReaderSettings, encoder_settings: ModalityEncoderSettings, modality: Modality, accelerator
     ) -> Tuple[BaseModalityReader, BaseModalityEncoder]:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device = accelerator.device
         reader = ModalityReaderRegistry.by_name(modality).from_params(
             Params({'type': reader_settings.reader_type, 'reader_path': reader_settings.reader_path})
         )
@@ -106,8 +107,10 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 
     def run(self, experiment_settings: MultimodalDatasetProcessingSettings) -> None:
         logger.info(f'👩 Start dataset processing with the following settings:\n{experiment_settings}')
+        accelerator = Accelerator()
+
         reader, encoder = self._load_modality_reader_encoder(
-            experiment_settings.reader_settings, experiment_settings.encoder_settings, experiment_settings.modality
+            experiment_settings.reader_settings, experiment_settings.encoder_settings, experiment_settings.modality, accelerator
         )
         modality_tensors, encoded_file_paths = self._read_modality_objects(reader, experiment_settings.dataset_path)
         encoded_modality_tensors = self._encode_modality_objects(
