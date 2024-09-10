@@ -76,9 +76,8 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 
     def _async_process_files(self, reader, encoder, files_paths, experiment_settings):
         modality_tensors = [None] * len(files_paths)
-        BATCH_SIZE = 256
 
-        batches = np.array_split(files_paths, len(files_paths) // BATCH_SIZE)
+        batches = np.array_split(files_paths, len(files_paths) // experiment_settings.batch_size)
         safetensors_full_dict = {}
 
         with ThreadPoolExecutor() as executor:
