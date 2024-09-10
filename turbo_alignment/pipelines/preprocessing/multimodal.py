@@ -30,31 +30,32 @@ logger = get_project_logger()
 
 
 class PreprocessMultimodalDatasetStrategy(BaseStrategy):
+    def __init__(self, *args, **kwargs):
+        self.accelerator = Accelerator()
+
     def run(self, experiment_settings: MultimodalDatasetProcessingSettings) -> None:
         logger.info(f'👩 Start dataset processing with the following settings:\n{experiment_settings}')
-        accelerator = Accelerator()
 
         reader, encoder = self._load_modality_reader_encoder(
             experiment_settings.reader_settings,
             experiment_settings.encoder_settings,
             experiment_settings.modality,
-            accelerator,
         )
-        self._read_modality_objects(reader, encoder, experiment_settings, accelerator)
+        self._read_modality_objects(reader, encoder, experiment_settings)
 
         logger.info(f'👩 Saved!')
 
-    def _process_function(self, reader, encoder, batch_file_paths, experiment_settings, batch_idx, accelerator):
+    def _process_function(self, reader, encoder, batch_file_paths, experiment_settings, batch_idx):
         modality_objects = []
         for file_path in batch_file_paths:
             modality_objects.append(reader.read(str(file_path)))
         modality_objects = torch.cat(modality_objects)
-        encoded_modality_objects = encoder.encode(modality_objects.to(accelerator.device)).detach().cpu()
+        encoded_modality_objects = encoder.encode(modality_objects.to(self.accelerator.device)).detach().cpu()
         safetensors_dict_batch = self._get_safetensor_dict(encoded_modality_objects, batch_file_paths)
 
         return safetensors_dict_batch
 
-    def _async_process_files(self, reader, encoder, files_paths, experiment_settings, accelerator):
+    def _async_process_files(self, reader, encoder, files_paths, experiment_settings):
         output_file_name = experiment_settings.output_file_path / (
             experiment_settings.modality.value
             + '.'
@@ -62,27 +63,28 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
             + '.h5'
         )
 
-        batches = np.array_split(files_paths, len(files_paths) // experiment_settings.batch_size)
+        batches_all = np.array_split(files_paths, len(files_paths) // experiment_settings.batch_size)
 
-        for i, batch in enumerate(tqdm(batches)):
-            try:
-                logger.info(f'📖 Processing batch {i} / {len(batches)}')
-                batch_output = self._process_function(reader, encoder, batch, experiment_settings, i, accelerator)
-                with h5py.File(output_file_name, 'a') as f:
-                    for path, encoded_output in batch_output.items():
-                        print(path)
-                        # f.create_dataset(path, data=encoded_output.numpy())
-            except Exception as exc:
-                logger.error(f'Error reading file: {exc}')
+        self.accelerator.wait_for_everyone()
 
-    @staticmethod
+        with self.accelerator.split_between_processes(batches_all) as batches:
+            for i, batch in enumerate(tqdm(batches)):
+                try:
+                    logger.info(f'📖 Processing batch {i} / {len(batches)}')
+                    batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
+                    with h5py.File(output_file_name, 'a') as f:
+                        for path, encoded_output in batch_output.items():
+                            f.create_dataset(path, data=encoded_output.numpy())
+                except Exception as exc:
+                    logger.error(f'Error reading file: {exc}')
+
     def _load_modality_reader_encoder(
+        self,
         reader_settings: ModalityReaderSettings,
         encoder_settings: ModalityEncoderSettings,
         modality: Modality,
-        accelerator,
     ) -> Tuple[BaseModalityReader, BaseModalityEncoder]:
-        device = accelerator.device
+        device = self.accelerator.device
         reader = ModalityReaderRegistry.by_name(modality).from_params(
             Params({'type': reader_settings.reader_type, 'reader_path': reader_settings.reader_path})
         )
@@ -91,7 +93,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         ).to(device)
         return (reader, encoder)
 
-    def _read_modality_objects(self, reader, encoder, experiment_settings, accelerator):
+    def _read_modality_objects(self, reader, encoder, experiment_settings):
         modality_tensors = []
 
         available_extensions = ('jpg', 'jpeg', 'png', 'svg')
@@ -101,11 +103,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         for extension in available_extensions:
             files_paths.extend(experiment_settings.dataset_path.glob(f'*.{extension}'))
 
-        self._async_process_files(reader, encoder, files_paths, experiment_settings, accelerator)
-
-    @staticmethod
-    def _build_encoder_config(encoder) -> dict:
-        return {'emb_dim': encoder.emb_dim}
+        self._async_process_files(reader, encoder, files_paths, experiment_settings)
 
     @staticmethod
     def _get_safetensor_dict(encoded_modality_tensors, encoded_file_paths):
