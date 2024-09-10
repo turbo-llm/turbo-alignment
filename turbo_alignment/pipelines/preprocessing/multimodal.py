@@ -71,7 +71,8 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
                 batch_output = self._process_function(reader, encoder, batch, experiment_settings, i, accelerator)
                 with h5py.File(output_file_name, 'a') as f:
                     for path, encoded_output in batch_output.items():
-                        f.create_dataset(path, data=encoded_output.numpy())
+                        print(path)
+                        # f.create_dataset(path, data=encoded_output.numpy())
             except Exception as exc:
                 logger.error(f'Error reading file: {exc}')
 
