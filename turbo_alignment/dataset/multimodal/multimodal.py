@@ -5,7 +5,6 @@ from typing import Any, overload
 import numpy as np
 import torch
 from allenai_common import Params
-from safetensors._safetensors_rust import SafetensorError
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
@@ -176,7 +175,7 @@ class TrainMultimodalDataset(MultimodalDataset):
 
             try:
                 encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            except (OSError, RuntimeError, SafetensorError):
+            except (OSError, RuntimeError, KeyError):
                 outputs.append(None)
                 continue
 
@@ -235,7 +234,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
 
             try:
                 encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            except (OSError, RuntimeError, SafetensorError):
+            except (OSError, RuntimeError, KeyError):
                 outputs.append(None)
                 continue
 
