@@ -23,14 +23,15 @@ class CLIPImageModeling(BaseImageEncoder):
 
     @staticmethod
     def _get_clip_hidden_states(model_clip: CLIPModel, inputs: torch.Tensor, is_pickle: bool = False) -> torch.Tensor:
-        if is_pickle:
-            return inputs
-        # https://github.com/huggingface/transformers/blob/main/src/transformers/models/llava/modeling_llava.py#L213
-        # -2 is default value of vision_feature_layer in llava config
-        # [1:] is everything after vit [cls] token
-        return model_clip.vision_model(inputs.squeeze(1), output_hidden_states=True).hidden_states[-2][
-            :, 1:
-        ]  # FIXME: squeeze dimension?
+        with torch.no_grad():
+            if is_pickle:
+                return inputs
+            # https://github.com/huggingface/transformers/blob/main/src/transformers/models/llava/modeling_llava.py#L213
+            # -2 is default value of vision_feature_layer in llava config
+            # [1:] is everything after vit [cls] token
+            return model_clip.vision_model(inputs.squeeze(1), output_hidden_states=True).hidden_states[-2][
+                :, 1:
+            ]  # FIXME: squeeze dimension?
 
     def encode(self, inputs: torch.Tensor) -> torch.Tensor:
         return self._get_clip_hidden_states(self.model_clip, inputs, self.is_pickle)
