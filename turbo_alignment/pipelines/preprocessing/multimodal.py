@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Tuple
 
@@ -55,13 +56,13 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 			modality_objects.append(reader.read(str(file_path)))
 		modality_objects = torch.cat(modality_objects)
 		encoded_modality_objects = encoder.encode(modality_objects.to(self.accelerator.device)).detach().cpu()
-		logger.info(f'encoded a batch: {encoded_modality_objects.shape}')
 		safetensors_dict_batch = self._get_safetensor_dict(encoded_modality_objects, batch_file_paths)
 
 		return safetensors_dict_batch
 
 	@staticmethod
-	def _save_tensor(tensor, filename, experiment_settings)
+	def _save_tensor(tensor, filename, experiment_settings):
+		logger.info(f'saving {filepath}', tensor.shape)
 		filepath = experiment_settings.output_file_path / (
 				filename
 				+ '.'
@@ -70,25 +71,24 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 				+ experiment_settings.encoder_settings.modality_encoder_type
 				+ '.pt'
 			)
-
+		torch.save(tensor, filepath)
+	
 	def _process_files(self, reader, encoder, files_paths, experiment_settings):
-		logger.info(f'👩 Processing without accelerate!')
 		batches_all = np.array_split(files_paths, len(files_paths) // experiment_settings.batch_size)
 
-		for i, batches in enumerate(tqdm(batches_all)):
-			logger.info(f'📖 Processing batch {i} / {len(batches_all)}')
+		for i, batch in enumerate(tqdm(batches_all)):
 			try:
-				batch_output = self._process_function(reader, encoder, batches, experiment_settings, i)
-
-				with ThreadPoolExecutor() as executor:
-					futures = [executor.submit(self._save_tensor, tensor, path, experiment_settings)
-							for path, tensor in batch_output.items()]
-					for future in futures:
-						future.result()
-
+				logger.info(f'📖 Processing batch {i} / {len(batches_all)}')
+				batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
+				torch.save(batch_output, experiment_settings.output_file_path / (
+						'batch_' + str(i) + '.' + experiment_settings.modality.value
+						+ '.'
+						+ experiment_settings.encoder_settings.modality_encoder_type
+						+ '.pt'
+					)
+				)
 			except Exception as exc:
 				logger.error(f'Error reading file: {exc}')
-
 
 	def _async_process_files(self, reader, encoder, files_paths, experiment_settings):
 		logger.info(f'👩 Processing with accelerate!')
@@ -99,14 +99,15 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 		with self.accelerator.split_between_processes(batches_all) as batches:
 			for i, batch in enumerate(tqdm(batches)):
 				try:
-					logger.info(f'📖 Processing batch {i} / {len(batches)}')
+					logger.info(f'📖 Encoding batch {i} / {len(batches)}')
 					batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
+					logger.info(f'📖 Saving batch {i}...')
 					with ThreadPoolExecutor() as executor:
 						futures = [executor.submit(self._save_tensor, tensor, path, experiment_settings)
 								for path, tensor in batch_output.items()]
 						for future in futures:
 							future.result()
-					
+
 				except Exception as exc:
 					logger.error(f'Error reading file: {exc}')
 
