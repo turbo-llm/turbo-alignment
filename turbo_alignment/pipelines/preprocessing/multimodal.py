@@ -68,13 +68,16 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
                 for filename, encoded_output in batch_output.items():
                     torch.save(
                         encoded_output,
-                        experiment_settings.output_file_path / (filename
-                        + '.'
-                        + experiment_settings.modality.value
-                        + '.'
-                        + experiment_settings.encoder_settings.modality_encoder_type
-                        + '.pt'
-                    ))
+                        experiment_settings.output_file_path
+                        / (
+                            filename
+                            + '.'
+                            + experiment_settings.modality.value
+                            + '.'
+                            + experiment_settings.encoder_settings.modality_encoder_type
+                            + '.pt'
+                        ),
+                    )
             except Exception as exc:
                 logger.error(f'Error reading file: {exc}')
 
