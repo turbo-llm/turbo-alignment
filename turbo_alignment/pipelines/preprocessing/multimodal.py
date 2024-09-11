@@ -56,27 +56,27 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         return safetensors_dict_batch
 
     def _async_process_files(self, reader, encoder, files_paths, experiment_settings):
-        output_file_name = experiment_settings.output_file_path / (
-            experiment_settings.modality.value
-            + '.'
-            + experiment_settings.encoder_settings.modality_encoder_type
-            + '.h5'
-        )
-
         batches_all = np.array_split(files_paths, len(files_paths) // experiment_settings.batch_size)
 
-        self.accelerator.wait_for_everyone()
+        # self.accelerator.wait_for_everyone()
 
-        with self.accelerator.split_between_processes(batches_all) as batches:
-            for i, batch in enumerate(tqdm(batches)):
-                try:
-                    logger.info(f'📖 Processing batch {i} / {len(batches)}')
-                    batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
-                    with h5py.File(output_file_name, 'a') as f:
-                        for path, encoded_output in batch_output.items():
-                            f.create_dataset(path, data=encoded_output.numpy())
-                except Exception as exc:
-                    logger.error(f'Error reading file: {exc}')
+        # with self.accelerator.split_between_processes(batches_all) as batches:
+        for i, batch in enumerate(tqdm(batches_all)):
+            try:
+                logger.info(f'📖 Processing batch {i} / {len(batches_all)}')
+                batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
+                for filename, encoded_output in batch_output.items():
+                    torch.save(
+                        encoded_output,
+                        experiment_settings.output_file_path / (filename
+                        + '.'
+                        + experiment_settings.modality.value
+                        + '.'
+                        + experiment_settings.encoder_settings.modality_encoder_type
+                        + '.pt'
+                    ))
+            except Exception as exc:
+                logger.error(f'Error reading file: {exc}')
 
     def _load_modality_reader_encoder(
         self,
