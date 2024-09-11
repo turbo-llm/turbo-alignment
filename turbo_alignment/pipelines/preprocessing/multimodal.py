@@ -102,7 +102,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 					logger.info(f'📖 Encoding batch {i} / {len(batches)}')
 					batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
 					torch.save(batch_output, experiment_settings.output_file_path / (
-							'process_' + str(self.accelerator.process_index) + 'batch_' + str(i) + '.' + experiment_settings.modality.value
+							'process_' + str(self.accelerator.process_index) + '_batch_' + str(i) + '.' + experiment_settings.modality.value
 							+ '.'
 							+ experiment_settings.encoder_settings.modality_encoder_type
 							+ '.pt'
