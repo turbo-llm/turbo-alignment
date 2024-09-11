@@ -64,23 +64,18 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
             for i, batch in enumerate(tqdm(batches)):
                 try:
                     logger.info(f'📖 Processing batch {i} / {len(batches)}')
-                    self.accelerator.wait_for_everyone()
                     batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
-                    self.accelerator.wait_for_everyone()
                     for filename, encoded_output in batch_output.items():
-                        torch.save(
-                            encoded_output,
-                            experiment_settings.output_file_path
-                            / (
-                                filename
-                                + '.'
-                                + experiment_settings.modality.value
-                                + '.'
-                                + experiment_settings.encoder_settings.modality_encoder_type
-                                + '.pt'
-                            ),
+                        filepath = experiment_settings.output_file_path / (
+                            filename
+                            + '.'
+                            + experiment_settings.modality.value
+                            + '.'
+                            + experiment_settings.encoder_settings.modality_encoder_type
+                            + '.pt'
                         )
-                    self.accelerator.wait_for_everyone()
+                        with open(filepath, 'wb') as f:
+                            torch.save(encoded_output, f)
                 except Exception as exc:
                     logger.error(f'Error reading file: {exc}')
 
