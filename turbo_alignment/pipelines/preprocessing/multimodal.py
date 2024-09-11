@@ -58,7 +58,17 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 		safetensors_dict_batch = self._get_safetensor_dict(encoded_modality_objects, batch_file_paths)
 
 		return safetensors_dict_batch
-	
+
+	@staticmethod
+	def _save_tensor(tensor, filename, experiment_settings)
+		filepath = experiment_settings.output_file_path / (
+				filename
+				+ '.'
+				+ experiment_settings.modality.value
+				+ '.'
+				+ experiment_settings.encoder_settings.modality_encoder_type
+				+ '.pt'
+			)
 
 	def _process_files(self, reader, encoder, files_paths, experiment_settings):
 		logger.info(f'👩 Processing without accelerate!')
@@ -68,18 +78,13 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 			logger.info(f'📖 Processing batch {i} / {len(batches_all)}')
 			try:
 				batch_output = self._process_function(reader, encoder, batches, experiment_settings, i)
-				for filename, encoded_output in batch_output.items():
-					filepath = experiment_settings.output_file_path / (
-						filename
-						+ '.'
-						+ experiment_settings.modality.value
-						+ '.'
-						+ experiment_settings.encoder_settings.modality_encoder_type
-						+ '.pt'
-					)
-					logger.info(f'📖 Processing file {filepath}, {encoded_output.shape}')
-					torch.save(encoded_output, filepath)
-					logger.info(f'📖 Saved')
+
+				with ThreadPoolExecutor() as executor:
+					futures = [executor.submit(self._save_tensor, tensor, path, experiment_settings)
+							for path, tensor in batch_output.items()]
+					for future in futures:
+						future.result()
+
 			except Exception as exc:
 				logger.error(f'Error reading file: {exc}')
 
@@ -95,19 +100,12 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 				try:
 					logger.info(f'📖 Processing batch {i} / {len(batches)}')
 					batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
-					for filename, encoded_output in batch_output.items():
-						torch.save(
-							encoded_output,
-							experiment_settings.output_file_path
-							/ (
-								filename
-								+ '.'
-								+ experiment_settings.modality.value
-								+ '.'
-								+ experiment_settings.encoder_settings.modality_encoder_type
-								+ '.pt'
-							),
-						)
+					with ThreadPoolExecutor() as executor:
+						futures = [executor.submit(self._save_tensor, tensor, path, experiment_settings)
+								for path, tensor in batch_output.items()]
+						for future in futures:
+							future.result()
+					
 				except Exception as exc:
 					logger.error(f'Error reading file: {exc}')
 
