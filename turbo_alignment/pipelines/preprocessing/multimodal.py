@@ -100,12 +100,13 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
 				try:
 					logger.info(f'📖 Encoding batch {i} / {len(batches)}')
 					batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
-					logger.info(f'📖 Saving batch {i}...')
-					with ThreadPoolExecutor() as executor:
-						futures = [executor.submit(self._save_tensor, tensor, path, experiment_settings)
-								for path, tensor in batch_output.items()]
-						for future in futures:
-							future.result()
+					torch.save(batch_output, experiment_settings.output_file_path / (
+							'process_' + str(self.accelerator.process_index) + 'batch_' + str(i) + '.' + experiment_settings.modality.value
+							+ '.'
+							+ experiment_settings.encoder_settings.modality_encoder_type
+							+ '.pt'
+						)
+					)
 
 				except Exception as exc:
 					logger.error(f'Error reading file: {exc}')
