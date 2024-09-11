@@ -14,7 +14,17 @@ from turbo_alignment.settings.modality import ModalityReader
 @ImageModalityReaderRegistry.register(ModalityReader.PICKLE)
 class FileReader(BaseImageReader):
     def __init__(self, **_kwargs):
-        ...
+        self.processed_batches = None
+
+    @staticmethod
+    def _get_pt_files(path: Path) -> Path:
+        return list(path.glob('*.pt'))
 
     def read(self, path: str) -> torch.Tensor:
-        return torch.load(path + '.image.clip.pt')
+        if self.processed_batches is None:
+            self.processed_batches = {}
+            pt_files = self._get_pt_files(Path(path).parent)
+            for pt_file in pt_files:
+                file_tensor_dict = torch.load(pt_file)
+                self.processed_batches.update(file_tensor_dict)
+        return self.processed_batches[Path(path).name]
