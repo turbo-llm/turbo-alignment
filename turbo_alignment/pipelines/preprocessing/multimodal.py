@@ -2,7 +2,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Tuple
 
-import h5py
 import numpy as np
 import torch
 from accelerate import Accelerator
@@ -64,7 +63,8 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
         self.accelerator.wait_for_everyone()
 
         for i, batches in enumerate(tqdm(batches_all)):
-            logger.info(f'📖 Processing batch {i} / {len(batches_all)}')
+            if self.accelerator.is_main_process:
+                logger.info(f'📖 Processing batch {i} / {len(batches_all)}')
             with self.accelerator.split_between_processes(batches) as batch:
                 try:
                     batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
