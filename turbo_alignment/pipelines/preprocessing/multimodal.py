@@ -65,7 +65,9 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
             for i, batch in enumerate(tqdm(batches)):
                 try:
                     logger.info(f'📖 Processing batch {i} / {len(batches)}')
+                    self.accelerator.wait_for_everyone()
                     batch_output = self._process_function(reader, encoder, batch, experiment_settings, i)
+                    self.accelerator.wait_for_everyone()
                     for filename, encoded_output in batch_output.items():
                         torch.save(
                             encoded_output,
@@ -79,6 +81,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
                                 + '.pt'
                             ),
                         )
+                    self.accelerator.wait_for_everyone()
                 except Exception as exc:
                     logger.error(f'Error reading file: {exc}')
 
