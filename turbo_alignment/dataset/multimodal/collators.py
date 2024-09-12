@@ -8,9 +8,20 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
         label_name = 'label' if 'label' in features[0].keys() else 'labels'
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
 
-        modality_inputs = [feature['modality_inputs'] for feature in features]
-
-        modality_input_names = (label_name, 'modality_inputs', 'modality_tokens_mask')
+        if 'modality_inputs' in features[0].keys():
+            modality_inputs = [feature['modality_inputs'] for feature in features]
+        else:
+            modality_inputs = [None for feature in features]
+        
+        if 'messages' in features[0].keys():
+            message_inputs = [feature['messages'] for feature in features]
+        else:
+            message_inputs = [None] * len(features)
+        
+        if 'messages' in features[0].keys():
+            modality_input_names = (label_name, 'modality_inputs', 'modality_tokens_mask', 'messages')
+        else:
+            modality_input_names = (label_name, 'modality_inputs', 'modality_tokens_mask')
         tokenizer_features = [
             {k: v for k, v in feature.items() if k not in modality_input_names} for feature in features
         ]
@@ -29,6 +40,9 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
         assert padding_side == 'right'
 
         batch['modality_inputs'] = modality_inputs
+        
+        if 'messages' in features[0].keys():        
+            batch['messages'] = message_inputs
 
         batch['modality_tokens_mask'] = torch.stack(
             [

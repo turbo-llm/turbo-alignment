@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Tuple
 
 import numpy as np
+
 import torch
 from accelerate import Accelerator
 from turbo_alignment.common.registry import Params

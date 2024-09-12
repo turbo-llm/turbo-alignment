@@ -21,6 +21,7 @@ class FileReader(BaseImageReader):
         return list(path.glob('*.pt'))
 
     def read(self, path: str) -> torch.Tensor:
+        print('Calling a read!')
         if self.processed_batches is None:
             self.processed_batches = {}
             pt_files = self._get_pt_files(Path(path).parent)
