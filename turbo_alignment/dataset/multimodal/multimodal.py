@@ -1,5 +1,5 @@
-from abc import ABC
 import math
+from abc import ABC
 from pathlib import Path
 from typing import Any, overload
 
@@ -93,6 +93,29 @@ class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
         modality_message_span = ''.join(modality_token for _ in range(self._n_modality_embeddings))
         return f'{self._start_modality_token}{modality_message_span}{self._end_modality_token}'
 
+    def _read_modalities(self, record):
+        modality_messages_after_truncation = int(
+            (self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
+        )
+
+        modality_messages: list[MultimodalFileMessage] = [
+            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
+        ]
+
+        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+
+        if self._truncate_top:
+            modality_messages = modality_messages[messages_to_delete:]
+        else:
+            modality_messages = modality_messages[:modality_messages_after_truncation]
+
+        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        for msg in modality_messages:
+            reader = self._modality_readers[msg.type]
+            modality_encodings.append((msg.type, reader.read(msg.content)))
+        record['modality_inputs'] = modality_encodings
+        return record
+
     def _convert_to_chat(self, record: MultimodalDatasetRecord) -> ChatDatasetRecord:
         """
         Обычные текстовые сообщения оставляем без изменений, а мультимодальные сообщения
@@ -150,16 +173,6 @@ class TrainMultimodalDataset(MultimodalDataset):
                 outputs.append(None)
                 continue
 
-            # try:
-            #     encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            # except (OSError, RuntimeError, KeyError):
-            #     outputs.append(None)
-            #     continue
-
-            # if len(encoded_modalities) != modality_messages_after_truncation:
-            #     outputs.append(None)
-            #     continue
-
             modality_tokens_mask = torch.isin(
                 tokenized_record['input_ids'],
                 torch.tensor([self._get_token_id(token) for token in self._modality_token_mapping.values()]),
@@ -178,30 +191,19 @@ class TrainMultimodalDataset(MultimodalDataset):
 
         return outputs
 
-    def _read_modalities(self, record):
-        modality_messages_after_truncation = int((self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum())
-
-        modality_messages: list[MultimodalFileMessage] = [
-            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
-        ]
-
-        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
-
-        if self._truncate_top:
-            modality_messages = modality_messages[messages_to_delete:]
-        else:
-            modality_messages = modality_messages[:modality_messages_after_truncation]
-
-        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
-        for msg in modality_messages:
-            reader = self._modality_readers[msg.type]
-            modality_encodings.append((msg.type, reader.read(msg.content)))
-        record['modality_inputs'] = modality_encodings
-        return record
-
     def __iter__(self):
+        # try:
+        #     encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
+        # except (OSError, RuntimeError, KeyError):
+        #     outputs.append(None)
+        #     continue
+
+        # if len(encoded_modalities) != modality_messages_after_truncation:
+        #     outputs.append(None)
+        #     continue
+
         worker_info = torch.utils.data.get_worker_info()
-        
+
         start = 0
         end = len(self.records) - 1
         if worker_info:
@@ -209,7 +211,6 @@ class TrainMultimodalDataset(MultimodalDataset):
             worker_id = worker_info.id
             start = start + worker_id * per_worker
             end = min(start + per_worker, end)
-        print("🩻"*10, f"{float(worker_info.num_workers)=}, {per_worker=}, {worker_info.id=}, {start=}, {end=}")
 
         return map(self._read_modalities, iter(self.records[start:end]))
 
@@ -229,27 +230,6 @@ class InferenceMultimodalDataset(MultimodalDataset):
             tokenizer=kwargs['tokenizer'], source=kwargs['source'], settings=settings, read=False
         )
         self._read()
-        
-    def _read_modalities(self, record):
-        modality_messages_after_truncation = int((self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum())
-
-        modality_messages: list[MultimodalFileMessage] = [
-            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
-        ]
-
-        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
-
-        if self._truncate_top:
-            modality_messages = modality_messages[messages_to_delete:]
-        else:
-            modality_messages = modality_messages[:modality_messages_after_truncation]
-
-        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
-        for msg in modality_messages:
-            reader = self._modality_readers[msg.type]
-            modality_encodings.append((msg.type, reader.read(msg.content)))
-        record['modality_inputs'] = modality_encodings
-        return record
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
         chat_records = [self._convert_to_chat(r) for r in records]

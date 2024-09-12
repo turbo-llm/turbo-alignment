@@ -101,7 +101,8 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
     @abstractmethod
     def _read_records(records):
         ...
-        
+
+
 class BaseIterableDataset(IterableDataset, ABC, Generic[RecordT]):
     def __init__(
         self,
