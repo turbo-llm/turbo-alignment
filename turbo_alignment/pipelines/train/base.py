@@ -15,13 +15,13 @@ from transformers import (
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.common.data.io import write_json
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.common.logging.logging import LoggingRegistry
 from turbo_alignment.common.tf.loaders.model import load_model
 from turbo_alignment.common.tf.loaders.tokenizer import load_tokenizer
 from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.pipelines.base import BaseStrategy
 from turbo_alignment.pipelines.mixin import S3Mixin
+from turbo_alignment.pipelines.mixin.logging import LoggingRegistry
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.s3 import ExperimentMetadata, S3HandlerParameters

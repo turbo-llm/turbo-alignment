@@ -35,7 +35,7 @@ class WandbLoggingMixin(LoggingMixin):
 
 
 @LoggingRegistry.register(ClearMLSettings.__name__)
-class ClearMLLogging(LoggingMixin):
+class ClearMLLoggingMixin(LoggingMixin):
     @staticmethod
     def get_logging_callback(experiment_settings: BaseTrainExperimentSettings) -> ClearMLLoggingCallback:
         logging_settings: ClearMLSettings = ClearMLSettings(**experiment_settings.logging_settings.dict())
