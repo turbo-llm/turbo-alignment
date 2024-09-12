@@ -1,7 +1,7 @@
-from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
+from pydantic_settings import BaseSettings
 
 
-class ClearMLSettings(ExtraFieldsNotAllowedBaseModel):
+class ClearMLSettings(BaseSettings):
     project_name: str
     task_name: str
     tags: list[str] = []

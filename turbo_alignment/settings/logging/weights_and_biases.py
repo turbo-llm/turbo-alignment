@@ -1,6 +1,6 @@
 from enum import Enum
 
-from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
+from pydantic_settings import BaseSettings
 
 
 class WandbMode(str, Enum):
@@ -9,7 +9,7 @@ class WandbMode(str, Enum):
     DISABLED: str = 'disabled'
 
 
-class WandbSettings(ExtraFieldsNotAllowedBaseModel):
+class WandbSettings(BaseSettings):
     project_name: str
     run_name: str
     entity: str
