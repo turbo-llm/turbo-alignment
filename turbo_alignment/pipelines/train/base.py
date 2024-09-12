@@ -156,22 +156,36 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
         special_tokens_setter.setup_model_config(self.model)
 
         logger.info('Model is loaded!')
+        
+        
+        # train_dataset: ConcatDataset = ConcatDataset(
+        #     datasets=DatasetLoader().load_datasets(
+        #         experiment_settings.train_dataset_settings,
+        #         tokenizer=self.tokenizer,
+        #         strategy=DatasetStrategy.TRAIN,
+        #     )
+        # )
 
-        train_dataset: ConcatDataset = ConcatDataset(
-            datasets=DatasetLoader().load_datasets(
+        # val_dataset: ConcatDataset = ConcatDataset(
+        #     datasets=DatasetLoader().load_datasets(
+        #         experiment_settings.val_dataset_settings,
+        #         tokenizer=self.tokenizer,
+        #         strategy=DatasetStrategy.TRAIN,
+        #     )
+        # )
+        
+        train_dataset = datasets=DatasetLoader().load_datasets(
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.TRAIN,
-            )
-        )
-
-        val_dataset: ConcatDataset = ConcatDataset(
-            datasets=DatasetLoader().load_datasets(
+            )[0]
+            
+        val_dataset = datasets=DatasetLoader().load_datasets(
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.TRAIN,
-            )
-        )
+            )[0]
+        
 
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
 
