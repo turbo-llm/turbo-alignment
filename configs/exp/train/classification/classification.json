@@ -112,7 +112,7 @@
         },
         "save_total_limit": 10
     },
-    "wandb_settings": {
+    "logging_settings": {
         "project_name": "alignment",
         "run_name": "classification",
         "entity": "turbo-alignment"

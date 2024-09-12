@@ -20,7 +20,7 @@ from transformers import (
 from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.common.tf.callbacks.common import WandbMetricsCallbackHandler
+from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelCallback
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.settings.pipelines.train.dpo import (
@@ -416,7 +416,7 @@ class DPOTrainer(Trainer):
 
         default_callbacks = [DefaultFlowCallback] + get_reporting_integration_callbacks(self.args.report_to)
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
-        self.callback_handler = WandbMetricsCallbackHandler(
+        self.callback_handler = MetricsCallbackHandler(
             callbacks,
             model,
             tokenizer,

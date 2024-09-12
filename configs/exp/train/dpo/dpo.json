@@ -136,7 +136,7 @@
         "use_ref_model": true,
         "deepspeed": "configs/exp/deepspeed/stage2.json"
       },
-      "wandb_settings": {
+      "logging_settings": {
             "project_name": "alignment",
             "run_name": "sft",
             "entity": "turbo-alignment"
