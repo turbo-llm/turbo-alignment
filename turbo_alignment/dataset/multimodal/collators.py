@@ -12,12 +12,12 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
             modality_inputs = [feature['modality_inputs'] for feature in features]
         else:
             modality_inputs = [None for feature in features]
-        
+
         if 'messages' in features[0].keys():
             message_inputs = [feature['messages'] for feature in features]
         else:
             message_inputs = [None] * len(features)
-        
+
         if 'messages' in features[0].keys():
             modality_input_names = (label_name, 'modality_inputs', 'modality_tokens_mask', 'messages')
         else:
@@ -40,8 +40,8 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
         assert padding_side == 'right'
 
         batch['modality_inputs'] = modality_inputs
-        
-        if 'messages' in features[0].keys():        
+
+        if 'messages' in features[0].keys():
             batch['messages'] = message_inputs
 
         batch['modality_tokens_mask'] = torch.stack(
