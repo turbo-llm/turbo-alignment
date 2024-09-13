@@ -127,7 +127,7 @@
         "undesirable_weight": 1.0,
         "use_ref_model": true
       },
-      "wandb_settings": {
+      "logging_settings": {
             "project_name": "alignment",
             "run_name": "kto",
             "entity": "turbo-alignment"
