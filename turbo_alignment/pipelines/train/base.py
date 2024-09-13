@@ -11,19 +11,17 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
-from wandb.sdk.lib import RunDisabled
-from wandb.sdk.wandb_run import Run
 
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.common.data.io import write_json
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.common.tf.callbacks import BaseWandbCallback
 from turbo_alignment.common.tf.loaders.model import load_model
 from turbo_alignment.common.tf.loaders.tokenizer import load_tokenizer
 from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.pipelines.base import BaseStrategy
-from turbo_alignment.pipelines.mixin import LoggingMixin, S3Mixin
+from turbo_alignment.pipelines.mixin import S3Mixin
+from turbo_alignment.pipelines.mixin.logging import LoggingRegistry
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.s3 import ExperimentMetadata, S3HandlerParameters
@@ -34,14 +32,10 @@ logger = get_project_logger()
 ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
 
 
-class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentSettingsT]):
+class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
     tokenizer: PreTrainedTokenizerBase
     model: PreTrainedModel
     trainer: Trainer
-
-    @staticmethod
-    def _get_wandb_callback(wandb_run: Run | RunDisabled) -> BaseWandbCallback:
-        return BaseWandbCallback(wandb_run=wandb_run)
 
     @staticmethod
     @abstractmethod
@@ -112,8 +106,11 @@ class BaseTrainStrategy(S3Mixin, LoggingMixin, BaseStrategy, Generic[ExperimentS
 
     def _add_trainer_callbacks(self, experiment_settings: ExperimentSettingsT, **kwargs) -> None:
         if self.trainer.accelerator.is_main_process:
-            if experiment_settings.wandb_settings:
-                self.trainer.add_callback(self._get_wandb_callback(wandb_run=self._get_wandb_run(experiment_settings)))
+            self.trainer.add_callback(
+                LoggingRegistry.by_name(experiment_settings.logging_settings.__name__).get_logging_callback(
+                    experiment_settings=experiment_settings
+                )
+            )
 
         cherry_pick_callback = self._get_cherry_pick_callback(experiment_settings, self.tokenizer, **kwargs)
 
