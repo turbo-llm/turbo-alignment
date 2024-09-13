@@ -12,7 +12,7 @@ from turbo_alignment.common.data.multimodal import BaseModalityReader
 from turbo_alignment.common.data.multimodal.registry import ModalityReaderRegistry
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
-from turbo_alignment.dataset.base import AlignmentDataset
+from turbo_alignment.dataset.base import AlignmentDataset, AlignmentIterableDataset
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset, TrainChatDataset
 from turbo_alignment.dataset.chat.models import ChatDatasetRecord, ChatMessage
 from turbo_alignment.dataset.multimodal.models import (
@@ -29,7 +29,7 @@ VERBOSE_EVERY = 1000
 logger = get_project_logger()
 
 
-class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
+class MultimodalDataset(AlignmentIterableDataset[MultimodalDatasetRecord], ABC):
     def __init__(self, tokenizer, source, settings):
         super().__init__(tokenizer=tokenizer, source=source, settings=settings)
 
@@ -93,29 +93,6 @@ class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
         modality_message_span = ''.join(modality_token for _ in range(self._n_modality_embeddings))
         return f'{self._start_modality_token}{modality_message_span}{self._end_modality_token}'
 
-    def _read_modalities(self, record):
-        modality_messages_after_truncation = int(
-            (self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
-        )
-
-        modality_messages: list[MultimodalFileMessage] = [
-            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
-        ]
-
-        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
-
-        if self._truncate_top:
-            modality_messages = modality_messages[messages_to_delete:]
-        else:
-            modality_messages = modality_messages[:modality_messages_after_truncation]
-
-        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
-        for msg in modality_messages:
-            reader = self._modality_readers[msg.type]
-            modality_encodings.append((msg.type, reader.read(msg.content)))
-        record['modality_inputs'] = modality_encodings
-        return record
-
     def _convert_to_chat(self, record: MultimodalDatasetRecord) -> ChatDatasetRecord:
         """
         Обычные текстовые сообщения оставляем без изменений, а мультимодальные сообщения
@@ -145,7 +122,6 @@ class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
 class TrainMultimodalDataset(MultimodalDataset):
     def __init__(self, tokenizer, source, settings) -> None:
         """
-
         :param n_modality_embeddings: сколько токенов выделяем под одно сообщение с нетекстовой модальностью
         :param modality_token_mapping: modality -> token
         :param start_modality_token: начало блока с токенами, которые относятся к нетекстовой модальности
@@ -183,7 +159,6 @@ class TrainMultimodalDataset(MultimodalDataset):
             outputs.append(
                 {
                     **tokenized_record,
-                    # 'modality_inputs': encoded_modalities,
                     'messages': record.messages,
                     'modality_tokens_mask': modality_tokens_mask,
                 }
@@ -191,17 +166,38 @@ class TrainMultimodalDataset(MultimodalDataset):
 
         return outputs
 
+    def _read_modalities(self, record):
+        modality_messages_after_truncation = int(
+            (self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
+        )
+
+        modality_messages: list[MultimodalFileMessage] = [
+            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
+        ]
+
+        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+
+        if self._truncate_top:
+            modality_messages = modality_messages[messages_to_delete:]
+        else:
+            modality_messages = modality_messages[:modality_messages_after_truncation]
+
+        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        try:
+            for msg in modality_messages:
+                reader = self._modality_readers[msg.type]
+                modality_encodings.append((msg.type, reader.read(msg.content)))
+        except (OSError, RuntimeError, KeyError):
+            return None
+
+        record['modality_inputs'] = modality_encodings
+
+        if len(modality_encodings) != modality_messages_after_truncation:
+            return None
+
+        return record
+
     def __iter__(self):
-        # try:
-        #     encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-        # except (OSError, RuntimeError, KeyError):
-        #     outputs.append(None)
-        #     continue
-
-        # if len(encoded_modalities) != modality_messages_after_truncation:
-        #     outputs.append(None)
-        #     continue
-
         worker_info = torch.utils.data.get_worker_info()
 
         start = 0
@@ -211,8 +207,9 @@ class TrainMultimodalDataset(MultimodalDataset):
             worker_id = worker_info.id
             start = start + worker_id * per_worker
             end = min(start + per_worker, end)
-
-        return map(self._read_modalities, iter(self.records[start:end]))
+        for sample in map(self._read_modalities, iter(self.records[start:end])):
+            if sample:
+                yield sample
 
 
 @MultimodalDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
@@ -231,6 +228,27 @@ class InferenceMultimodalDataset(MultimodalDataset):
         )
         self._read()
 
+    def _read_modalities(
+        self, record: MultimodalDatasetRecord, modality_messages_after_truncation: int
+    ) -> list[tuple[Modality, torch.Tensor]]:
+        modality_messages: list[MultimodalFileMessage] = [
+            m for m in record.messages if isinstance(m, MultimodalFileMessage)
+        ]
+
+        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+
+        if self._truncate_top:
+            modality_messages = modality_messages[messages_to_delete:]
+        else:
+            modality_messages = modality_messages[:modality_messages_after_truncation]
+
+        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        for msg in modality_messages:
+            reader = self._modality_readers[msg.type]
+            print('inference reader')
+            modality_encodings.append((msg.type, reader.read(msg.content)))
+        return modality_encodings
+
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
         chat_records = [self._convert_to_chat(r) for r in records]
         tokenized_chat_records = self._chat_dataset.convert_records(chat_records)
@@ -239,6 +257,20 @@ class InferenceMultimodalDataset(MultimodalDataset):
 
         for record, tokenized_record in zip(records, tokenized_chat_records):
             if tokenized_record is None:
+                outputs.append(None)
+                continue
+
+            modality_messages_after_truncation = int(
+                (tokenized_record['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
+            )
+
+            try:
+                encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
+            except (OSError, RuntimeError, KeyError):
+                outputs.append(None)
+                continue
+
+            if len(encoded_modalities) != modality_messages_after_truncation:
                 outputs.append(None)
                 continue
 
@@ -255,7 +287,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
             outputs.append(
                 {
                     **tokenized_record,
-                    'messages': record.messages,
+                    'modality_inputs': encoded_modalities,
                     'modality_tokens_mask': modality_tokens_mask,
                     'modality_object_paths': modality_object_paths,
                 }
