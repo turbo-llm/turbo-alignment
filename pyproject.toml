@@ -43,13 +43,14 @@ pydantic ="^2.7.0"
 timm ="^0.9.7"
 opencv-python = "^4.10.0.84"
 langchain-huggingface = "^0.0.3"
+clearml = "^1.16.4"
+cached-path = "^1.6.3"
 
 faiss-gpu = { version = "^1.7.2", optional = true }
 xformers = { version = "^0.0.23.post1", optional = true }
 vllm = { version = "^0.4.0.post1", optional = true }
 deepspeed = { version = "0.12", optional = true }
 accelerate = { version = "0.27", optional = true }
-clearml = "^1.16.4"
 
 
 [tool.poetry.dev-dependencies]
