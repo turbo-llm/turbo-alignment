@@ -170,13 +170,13 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
         #     )
         # )
 
-        train_dataset = datasets = DatasetLoader().load_datasets(
+        train_dataset = DatasetLoader().load_datasets(
             experiment_settings.train_dataset_settings,
             tokenizer=self.tokenizer,
             strategy=DatasetStrategy.TRAIN,
         )[0]
 
-        val_dataset = datasets = DatasetLoader().load_datasets(
+        val_dataset = DatasetLoader().load_datasets(
             experiment_settings.val_dataset_settings,
             tokenizer=self.tokenizer,
             strategy=DatasetStrategy.TRAIN,

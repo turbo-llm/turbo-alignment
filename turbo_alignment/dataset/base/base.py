@@ -186,7 +186,28 @@ class BaseIterableDataset(IterableDataset, ABC, Generic[RecordT]):
         ...
 
 
-class AlignmentDataset(BaseIterableDataset, ABC, Generic[RecordT]):
+class AlignmentDataset(BaseDataset, ABC, Generic[RecordT]):
+    def __init__(
+        self,
+        source: DatasetSourceSettings,
+        settings: BaseDatasetSettings,
+        tokenizer: PreTrainedTokenizerBase,
+    ) -> None:
+        super().__init__(source=source, settings=settings)
+
+        self.tokenizer = tokenizer
+        self._logged = False
+
+    def _log_example(self, prompt: str, answer: str | None = None) -> None:
+        if not self._logged:
+            message = f'Source and target examples:\n' f'Prompt: {prompt}\n'
+            if answer:
+                message += f'Answer: {answer}'
+            logger.info(message)
+            self._logged = True
+
+
+class AlignmentIterableDataset(BaseIterableDataset, ABC, Generic[RecordT]):
     def __init__(
         self,
         source: DatasetSourceSettings,

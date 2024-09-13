@@ -1,2 +1,2 @@
-from .base import AlignmentDataset, BaseDataset
+from .base import AlignmentDataset, AlignmentIterableDataset, BaseDataset
 from .models import DatasetRecord
