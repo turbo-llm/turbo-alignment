@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 
-from allenai_common import Registrable
-
 from turbo_alignment.common.logging.clearml import create_clearml_task
 from turbo_alignment.common.logging.weights_and_biases import create_wandb_run
+from turbo_alignment.common.registry import Registrable
 from turbo_alignment.common.tf.callbacks.logging import (
     ClearMLLoggingCallback,
     LoggingCallback,

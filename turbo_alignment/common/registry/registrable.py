@@ -48,7 +48,7 @@ class Registrable(FromParams):
         return add_subclass_to_registry
 
     @classmethod
-    def by_name(cls: Type[_RegistrableT], name: str) -> Callable[..., _RegistrableT]:
+    def by_name(cls: Type[_RegistrableT], name):
         logger.debug(f'instantiating registered subclass {name} of {cls}')
         subclass, constructor = cls.resolve_class_name(name)
         if not constructor:
@@ -84,15 +84,8 @@ class Registrable(FromParams):
                     f'but unable to find class {class_name} in {submodule}'
                 )
 
-        # is not a qualified class name
-        available = cls.list_available()
-        suggestion = _get_suggestion(name, available)
         raise ConfigurationError(
-            (
-                f"'{name}' is not a registered name for '{cls.__name__}'"
-                + ('. ' if not suggestion else f", did you mean '{suggestion}'? ")
-            )
-            + "If your registered class comes from custom code, you'll need to import "
+            "If your registered class comes from custom code, you'll need to import "
             "the corresponding modules. If you're using AllenNLP from the command-line, "
             "this is done by using the '--include-package' flag, or by specifying your imports "
             "in a '.allennlp_plugins' file. "
@@ -154,16 +147,3 @@ class Registrable(FromParams):
                 continue
 
         return parameter_dict
-
-
-def _get_suggestion(name: str, available: list[str]) -> str | None:
-    for ch, repl_ch in (('_', '-'), ('-', '_')):
-        suggestion = name.replace(ch, repl_ch)
-        if suggestion in available:
-            return suggestion
-    from nltk.metrics.distance import edit_distance
-
-    for suggestion in available:
-        if edit_distance(name, suggestion, transpositions=True) == 1:
-            return suggestion
-    return None
