@@ -14,5 +14,8 @@ from turbo_alignment.settings.pipelines.train.multimodal import (
     MultimodalTrainExperimentSettings,
 )
 from turbo_alignment.settings.pipelines.train.rag import RAGTrainExperimentSettings
+from turbo_alignment.settings.pipelines.train.reinforce import (
+    REINFORCETrainExperimentSettings,
+)
 from turbo_alignment.settings.pipelines.train.rm import RMTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.sft import SftTrainExperimentSettings
