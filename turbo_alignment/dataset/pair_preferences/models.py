@@ -11,4 +11,4 @@ class PairPreferenceRecord(DatasetRecord):
     context: list[ChatMessage]
     answer_w: ChatMessage
     answer_l: ChatMessage
-    best_decode: ChatMessage | None = None
+    precomputed_margin: float | None = None

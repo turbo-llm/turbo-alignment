@@ -19,7 +19,7 @@ from transformers import (
 from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.common.tf.callbacks.common import WandbMetricsCallbackHandler
+from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.settings.pipelines.train.dpo import SyncRefModelSettings
 from turbo_alignment.trainers.dpo import DPOTrainer
 from turbo_alignment.trainers.utils import prepare_model
@@ -84,7 +84,7 @@ class KTOTrainer(DPOTrainer):
 
         default_callbacks = [DefaultFlowCallback] + get_reporting_integration_callbacks(self.args.report_to)
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
-        self.callback_handler = WandbMetricsCallbackHandler(
+        self.callback_handler = MetricsCallbackHandler(
             callbacks,
             model,
             tokenizer,
