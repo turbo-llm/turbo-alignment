@@ -1,4 +1,4 @@
-from allenai_common import Registrable
+from turbo_alignment.common.registry import Registrable
 
 
 class ModalityEncoderRegistry(Registrable):

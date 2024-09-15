@@ -6,9 +6,10 @@ from typing import Any
 import torch
 from accelerate import Accelerator
 from accelerate.utils import is_deepspeed_available
-from allenai_common import Registrable
 from torch import nn
 from transformers import PreTrainedModel
+
+from turbo_alignment.common.registry import Registrable
 
 
 def concatenated_inputs(
