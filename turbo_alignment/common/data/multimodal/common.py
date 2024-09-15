@@ -1,4 +1,11 @@
 from pathlib import Path
+import json
+import torch
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import gc 
+from functools import reduce
+import os
+
 
 import torch
 
@@ -15,16 +22,15 @@ from turbo_alignment.settings.modality import ModalityReader
 class FileReader(BaseImageReader):
     def __init__(self, **_kwargs):
         self.processed_batches = None
+        self.index = None
 
-    @staticmethod
-    def _get_pt_files(path: Path) -> Path:
-        return list(path.glob('*.pt'))
-
-    def read(self, path: str) -> torch.Tensor:
-        if self.processed_batches is None:
-            self.processed_batches = {}
-            pt_files = self._get_pt_files(Path(path).parent)
-            for pt_file in pt_files:
-                file_tensor_dict = torch.load(pt_file)
-                self.processed_batches.update(file_tensor_dict)
-        return self.processed_batches[Path(path).name]
+    def read(self, path: str):
+        with open("/from_s3/dataset/llava_next_data_dialogs_index_file/index.json", 'r') as f:
+            self.index = json.load(f)
+        cur_file = self.index[Path(path).name]
+        cur_tensor = torch.load(cur_file)
+        special_vector = cur_tensor[Path(path).name].clone()
+        del cur_tensor
+        del self.index
+        gc.collect()
+        return special_vector

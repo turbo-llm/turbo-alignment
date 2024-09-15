@@ -120,7 +120,7 @@ class PreprocessMultimodalDatasetStrategy(BaseStrategy):
                             + '.'
                             + experiment_settings.encoder_settings.modality_encoder_type
                             + '.pt'
-                        ),
+                        )
                     )
 
                 except Exception as exc:
