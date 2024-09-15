@@ -82,7 +82,13 @@ class MultimodalDataset(AlignmentIterableDataset[MultimodalDatasetRecord], ABC):
     @staticmethod
     def _read_records(records) -> list[MultimodalDatasetRecord]:
         if isinstance(records, Path):
-            return [MultimodalDatasetRecord(**record) for record in read_jsonl(records)]
+            total_records = []
+            for record in read_jsonl(records):
+                try:
+                    total_records.append(MultimodalDatasetRecord(**record))
+                except Exception as E:
+                    print(record, E)
+            return total_records
         if isinstance(records, list):
             return [MultimodalDatasetRecord(**record) for record in records]
         raise NotImplementedError
