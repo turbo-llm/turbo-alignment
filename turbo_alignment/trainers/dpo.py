@@ -345,7 +345,6 @@ class APODownLoss(DPOLossRegistry):
         policy_rejected_logps: torch.FloatTensor,
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
-        policy_best_decode_logps: torch.FloatTensor | None,
         precomputed_margins: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         chosen_logratios = policy_chosen_logps - reference_chosen_logps
@@ -378,7 +377,6 @@ class APOZeroLoss(DPOLossRegistry):
         policy_rejected_logps: torch.FloatTensor,
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
-        policy_best_decode_logps: torch.FloatTensor | None,
         precomputed_margins: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         chosen_logratios = policy_chosen_logps - reference_chosen_logps
