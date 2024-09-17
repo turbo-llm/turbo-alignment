@@ -1,12 +1,6 @@
 from pathlib import Path
-import json
-import torch
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import gc 
-from functools import reduce
-import os
 
-
+import h5py
 import torch
 
 from turbo_alignment.common.data.multimodal.image.base import BaseImageReader
@@ -21,16 +15,13 @@ from turbo_alignment.settings.modality import ModalityReader
 @ImageModalityReaderRegistry.register(ModalityReader.PICKLE)
 class FileReader(BaseImageReader):
     def __init__(self, **_kwargs):
-        self.processed_batches = None
-        self.index = None
+        self.processed_tensors = None
 
-    def read(self, path: str):
-        with open("/from_s3/dataset/llava_next_data_dialogs_index_file/index.json", 'r') as f:
-            self.index = json.load(f)
-        cur_file = self.index[Path(path).name]
-        cur_tensor = torch.load(cur_file)
-        special_vector = cur_tensor[Path(path).name].clone()
-        del cur_tensor
-        del self.index
-        gc.collect()
-        return special_vector
+    @staticmethod
+    def _get_h5_file(path: Path) -> Path:
+        return list(path.glob('*.h5'))[0]  # FIXME: What if there is more than one h5 file?
+
+    def read(self, path: str) -> torch.Tensor:
+        h5_file = self._get_h5_file(Path(path).parent)
+        with h5py.File(h5_file, 'r') as f:
+            return torch.tensor(f[Path(path).name])

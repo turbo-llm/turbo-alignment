@@ -8,7 +8,7 @@
         "encoder_path": "tests/fixtures/models/clip_tiny"
     },
     "modality": "image",
-    "dataset_path": "tests/fixtures/datasets/multimodal/images",
-    "batch_size": 256,
-    "output_file_path": "tests/fixtures/datasets/multimodal/images"
+    "dataset_path": "/mnt/e.rykov/turbo-alignment/images/00000",
+    "batch_size": 2,
+    "output_file_path": "/mnt/e.rykov/turbo-alignment/images/00000"
 }
