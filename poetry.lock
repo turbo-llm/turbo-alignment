@@ -182,7 +182,7 @@ frozenlist = ">=1.1.0"
 name = "albucore"
 version = "0.0.15"
 description = "A high-performance image processing library designed to optimize and extend the Albumentations library with specialized functions for advanced image transformations. Perfect for developers working in computer vision who require efficient and scalable image augmentation."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "albucore-0.0.15-py3-none-any.whl", hash = "sha256:9e3e2112c510ef954c19a645fb859944b394f6b273b50c6b3db7d6812c2c06d0"},
@@ -197,7 +197,7 @@ opencv-python-headless = ">=4.9.0.80"
 name = "albumentations"
 version = "1.4.15"
 description = "An efficient library for image augmentation, providing extensive transformations to support machine learning and computer vision tasks."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "albumentations-1.4.15-py3-none-any.whl", hash = "sha256:dc941a2eb5a08361efa4eca55074a432d4986546fb6036731cd8763cf67d87bf"},
@@ -448,7 +448,7 @@ tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
 name = "av"
 version = "13.0.0"
 description = "Pythonic bindings for FFmpeg's libraries."
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "av-13.0.0-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:a0f3563eb232c46811388d19eb8da3435ebd98e3b26c567da76acb878c772a4f"},
@@ -1251,7 +1251,7 @@ files = [
 name = "eval-type-backport"
 version = "0.2.0"
 description = "Like `typing._eval_type`, but lets older Python versions use newer typing features."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "eval_type_backport-0.2.0-py3-none-any.whl", hash = "sha256:ac2f73d30d40c5a30a80b8739a789d6bb5e49fdffa66d7912667e2015d9c9933"},
@@ -1576,7 +1576,7 @@ six = ">=1.8.0"
 name = "fvcore"
 version = "0.1.5.post20221221"
 description = "Collection of common code shared among different research projects in FAIR computer vision team"
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "fvcore-0.1.5.post20221221.tar.gz", hash = "sha256:f2fb0bb90572ae651c11c78e20493ed19b2240550a7e4bbb2d6de87bdd037860"},
@@ -1968,7 +1968,7 @@ files = [
 name = "imageio"
 version = "2.35.1"
 description = "Library for reading and writing a wide range of image, video, scientific, and volumetric data formats."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "imageio-2.35.1-py3-none-any.whl", hash = "sha256:6eb2e5244e7a16b85c10b5c2fe0f7bf961b40fcb9f1a9fd1bd1d2c2f8fb3cd65"},
@@ -2659,7 +2659,7 @@ regex = ["regex"]
 name = "lazy-loader"
 version = "0.4"
 description = "Makes it easy to load subpackages and functions on demand."
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "lazy_loader-0.4-py3-none-any.whl", hash = "sha256:342aa8e14d543a154047afb4ba8ef17f5563baad3fc610d7b15b213b0f119efc"},
@@ -3610,7 +3610,7 @@ files = [
 name = "opencv-python"
 version = "4.10.0.84"
 description = "Wrapper package for OpenCV python bindings."
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "opencv-python-4.10.0.84.tar.gz", hash = "sha256:72d234e4582e9658ffea8e9cae5b63d488ad06994ef12d81dc303b17472f3526"},
@@ -3634,7 +3634,7 @@ numpy = [
 name = "opencv-python-headless"
 version = "4.10.0.84"
 description = "Wrapper package for OpenCV python bindings."
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "opencv-python-headless-4.10.0.84.tar.gz", hash = "sha256:f2017c6101d7c2ef8d7bc3b414c37ff7f54d64413a1847d89970b6b7069b4e1a"},
@@ -3877,7 +3877,7 @@ files = [
 name = "parameterized"
 version = "0.9.0"
 description = "Parameterized testing with any Python test framework"
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "parameterized-0.9.0-py2.py3-none-any.whl", hash = "sha256:4e0758e3d41bea3bbd05ec14fc2c24736723f243b28d702081aef438c9372b1b"},
@@ -4711,7 +4711,7 @@ files = [
 name = "pytorchvideo"
 version = "0.1.5"
 description = "A video understanding deep learning library."
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "pytorchvideo-0.1.5.tar.gz", hash = "sha256:69a3424c7feb70422da59d0cec17b56657984bd0ba8d5d78cad08a328cf6341b"},
@@ -5495,7 +5495,7 @@ torch = ["safetensors[numpy]", "torch (>=1.10)"]
 name = "scikit-image"
 version = "0.24.0"
 description = "Image processing in Python"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "scikit_image-0.24.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:cb3bc0264b6ab30b43c4179ee6156bc18b4861e78bb329dd8d16537b7bbf827a"},
@@ -5936,7 +5936,7 @@ files = [
 name = "soundfile"
 version = "0.12.1"
 description = "An audio library based on libsndfile, CFFI and NumPy"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "soundfile-0.12.1-py2.py3-none-any.whl", hash = "sha256:828a79c2e75abab5359f780c81dccd4953c45a2c4cd4f05ba3e233ddf984b882"},
@@ -6023,7 +6023,7 @@ dev = ["hypothesis (>=6.70.0)", "pytest (>=7.1.0)"]
 name = "tabulate"
 version = "0.9.0"
 description = "Pretty-print tabular data"
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f"},
@@ -6052,7 +6052,7 @@ test = ["pytest", "tornado (>=4.5)", "typeguard"]
 name = "termcolor"
 version = "2.4.0"
 description = "ANSI color formatting for output in terminal"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "termcolor-2.4.0-py3-none-any.whl", hash = "sha256:9297c0df9c99445c2412e832e882a7884038a25617c60cea2ad69488d4040d63"},
@@ -6098,7 +6098,7 @@ files = [
 name = "tifffile"
 version = "2024.8.30"
 description = "Read and write TIFF files"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "tifffile-2024.8.30-py3-none-any.whl", hash = "sha256:8bc59a8f02a2665cd50a910ec64961c5373bee0b8850ec89d3b7b485bf7be7ad"},
@@ -6172,7 +6172,7 @@ blobfile = ["blobfile (>=2)"]
 name = "timm"
 version = "0.9.16"
 description = "PyTorch Image Models"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "timm-0.9.16-py3-none-any.whl", hash = "sha256:bf5704014476ab011589d3c14172ee4c901fd18f9110a928019cac5be2945914"},
@@ -6400,7 +6400,7 @@ opt-einsum = ["opt-einsum (>=3.3)"]
 name = "torchaudio"
 version = "2.1.2"
 description = "An audio package for PyTorch"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "torchaudio-2.1.2-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:06f8c02814e6cdd78626bbf44ad2bb8afa5b39ab650c6af18328a32311461058"},
@@ -6432,7 +6432,7 @@ torch = "2.1.2"
 name = "torchvision"
 version = "0.16.2"
 description = "image and video datasets and models for torch deep learning"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "torchvision-0.16.2-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:bc86f2800cb2c0c1a09c581409cdd6bff66e62f103dc83fc63f73346264c3756"},
@@ -7383,7 +7383,7 @@ files = [
 name = "yacs"
 version = "0.1.8"
 description = "Yet Another Configuration System"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "yacs-0.1.8-py2-none-any.whl", hash = "sha256:d43d1854c1ffc4634c5b349d1c1120f86f05c3a294c9d141134f282961ab5d94"},
@@ -7521,8 +7521,9 @@ type = ["pytest-mypy"]
 [extras]
 deepspeed = ["accelerate", "deepspeed"]
 gpu = ["faiss-gpu", "vllm", "xformers"]
+multimodal = ["albumentations", "opencv-python", "pytorchvideo", "soundfile", "timm"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "0cb2678ff3385b17d0e7d094ef38ac3c8521fed9777a91a1d6c8dffa9e1c4199"
+content-hash = "a8d2f1aaa3d7e289c186a87f494c3211b4f214084245c373aaa592bf4bc14bbf"
