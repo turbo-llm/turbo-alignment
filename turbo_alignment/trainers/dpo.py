@@ -292,6 +292,10 @@ class ORPOLoss(DPOLossRegistry):
 
         ratio = -F.logsigmoid(log_odds)
         losses = self.beta * ratio
+        
+        nll_loss = -policy_chosen_logps
+
+        losses += nll_loss
 
         chosen_rewards = self.beta * policy_chosen_logps.detach()
         rejected_rewards = self.beta * policy_rejected_logps.detach()
@@ -657,9 +661,11 @@ class DPOTrainer(Trainer):
                 - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
             )
             ratio = -F.logsigmoid(log_odds)
+            or_loss = self.dpo_loss_registry.beta * ratio
             nll_loss = -length_norm_policy_chosen_logps
 
             metrics[f'{prefix}orpo/nll_loss'] = nll_loss.clone().detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/or_loss'] = or_loss.clone().detach().cpu().mean().item()
             metrics[f'{prefix}orpo/ratio'] = (ratio).detach().cpu().mean().item()
             metrics[f'{prefix}orpo/log_odds'] = (log_odds).detach().cpu().mean().item()
 
