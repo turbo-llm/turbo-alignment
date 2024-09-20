@@ -291,11 +291,7 @@ class ORPOLoss(DPOLossRegistry):
         )
 
         ratio = -F.logsigmoid(log_odds)
-        losses = self.beta * ratio
-
-        nll_loss = -policy_chosen_logps
-
-        losses += nll_loss
+        losses = -policy_chosen_logps + self.beta * ratio
 
         chosen_rewards = self.beta * policy_chosen_logps.detach()
         rejected_rewards = self.beta * policy_rejected_logps.detach()
