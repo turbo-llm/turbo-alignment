@@ -1,12 +1,14 @@
 from pathlib import Path
+try:
+    import soundfile as sf
+    import torch
+    from transformers import AutoFeatureExtractor
 
-import soundfile as sf
-import torch
-from transformers import AutoFeatureExtractor
-
-from turbo_alignment.common.data.multimodal.image.base import BaseImageReader
-from turbo_alignment.common.data.multimodal.registry import AudioModalityReaderRegistry
-from turbo_alignment.settings.modality import ModalityReader
+    from turbo_alignment.common.data.multimodal.image.base import BaseImageReader
+    from turbo_alignment.common.data.multimodal.registry import AudioModalityReaderRegistry
+    from turbo_alignment.settings.modality import ModalityReader
+except:
+    ...
 
 
 @AudioModalityReaderRegistry.register(ModalityReader.WHISPER)

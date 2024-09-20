@@ -1,15 +1,17 @@
-from pathlib import Path
-from typing import Optional
+try:
+    from pathlib import Path
+    from typing import Optional
 
-import torch
-from transformers import CLIPModel
+    import torch
+    from transformers import CLIPModel
 
-from turbo_alignment.modeling.multimodal.encoders.image.base import BaseImageEncoder
-from turbo_alignment.modeling.multimodal.encoders.registry import (
-    ModalityEncoderRegistry,
-)
-from turbo_alignment.settings.modality import ModalityEncoderType
-
+    from turbo_alignment.modeling.multimodal.encoders.image.base import BaseImageEncoder
+    from turbo_alignment.modeling.multimodal.encoders.registry import (
+        ModalityEncoderRegistry,
+    )
+    from turbo_alignment.settings.modality import ModalityEncoderType
+except:
+    ...
 
 @ModalityEncoderRegistry.register(ModalityEncoderType.CLIP)
 class CLIPImageModeling(BaseImageEncoder):

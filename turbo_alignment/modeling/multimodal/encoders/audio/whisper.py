@@ -1,12 +1,14 @@
 import torch
-from transformers import WhisperForConditionalGeneration
+try:
+    from transformers import WhisperForConditionalGeneration
 
-from turbo_alignment.modeling.multimodal.encoders.audio.base import BaseAudioEncoder
-from turbo_alignment.modeling.multimodal.encoders.registry import (
-    ModalityEncoderRegistry,
-)
-from turbo_alignment.settings.modality import ModalityEncoderType
-
+    from turbo_alignment.modeling.multimodal.encoders.audio.base import BaseAudioEncoder
+    from turbo_alignment.modeling.multimodal.encoders.registry import (
+        ModalityEncoderRegistry,
+    )
+    from turbo_alignment.settings.modality import ModalityEncoderType
+except:
+    ...
 
 @ModalityEncoderRegistry.register(ModalityEncoderType.WHISPER)
 class WhisperAudioModeling(BaseAudioEncoder):

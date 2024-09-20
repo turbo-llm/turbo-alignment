@@ -6,6 +6,7 @@ from turbo_alignment.common.tf.loaders.model.registry import (
     PeftConfigRegistry,
     TransformersAutoModelRegistry,
 )
+from turbo_alignment.common.tf.monkey_patch_liger import apply_liger_kernel_to_gemma2
 from turbo_alignment.settings.model import (
     ModelForPeftSettings,
     PreTrainedAdaptersModelSettings,
@@ -43,6 +44,9 @@ def load_model(
     model_settings: PreTrainedModelSettings,
     tokenizer: PreTrainedTokenizerBase,
 ) -> PreTrainedModel:
+    
+    apply_liger_kernel_to_gemma2()
+
     model = TransformersAutoModelRegistry.by_name(model_settings.model_type).from_pretrained(
         model_settings.model_path,
         **model_settings.transformers_settings.dict(exclude_none=True),

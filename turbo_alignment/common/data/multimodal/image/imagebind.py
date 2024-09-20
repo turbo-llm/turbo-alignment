@@ -1,11 +1,14 @@
 from pathlib import Path
 
-import cv2
-import numpy as np
-import torch
-import torchvision.transforms as transforms
-import torchvision.transforms.functional as F
-
+try:
+    import cv2
+    import numpy as np
+    import torch
+    import torchvision.transforms as transforms
+    import torchvision.transforms.functional as F
+except:
+    ...
+    
 from turbo_alignment.common.data.multimodal.image.base import BaseImageReader
 from turbo_alignment.common.data.multimodal.registry import ImageModalityReaderRegistry
 from turbo_alignment.settings.modality import ModalityReader

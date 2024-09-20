@@ -1,10 +1,16 @@
 from pathlib import Path
 
 import torch
-import torchaudio
+try:
+    import torchaudio
+except:
+    ...
 from loguru import logger
-from pytorchvideo.data.clip_sampling import ConstantClipsPerVideoSampler
-from torchvision import transforms
+try:
+    from pytorchvideo.data.clip_sampling import ConstantClipsPerVideoSampler
+    from torchvision import transforms
+except:
+    ...
 
 from turbo_alignment.common.data.multimodal.image.base import BaseImageReader
 from turbo_alignment.common.data.multimodal.registry import AudioModalityReaderRegistry

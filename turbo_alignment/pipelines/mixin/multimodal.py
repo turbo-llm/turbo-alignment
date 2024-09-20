@@ -1,6 +1,6 @@
 import torch
 
-from turbo_alignment.modeling.multimodal.encoders import ModalityEncoderRegistry
+# from turbo_alignment.modeling.multimodal.encoders import ModalityEncoderRegistry
 from turbo_alignment.modeling.multimodal.encoders.base import BaseModalityEncoder
 from turbo_alignment.settings.modality import Modality, ModalityEncoderSettings
 
