@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from turbo_alignment.dataset.base.models import DatasetRecord
 
@@ -16,6 +16,12 @@ class ChatMessage(BaseModel):
     role: ChatMessageRole
     content: str
     disable_loss: bool = False
+
+    @field_validator('role', mode='before')
+    def set_bot_role(cls, values: str) -> str:
+        if values == 'assistant':
+            return ChatMessageRole.BOT
+        return values
 
 
 class ChatDatasetRecord(DatasetRecord):

@@ -7,17 +7,27 @@ from transformers.trainer_pt_utils import nested_detach
 from transformers.utils import logging
 
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
+from turbo_alignment.trainers.utils import concatenated_inputs
 
 logger = logging.get_logger(__name__)
 
 
 class RMTrainer(MultiGPUCherryPicksTrainer):
-    def compute_loss(self, model, inputs, return_outputs=False) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
-        inputs_w = inputs['inputs_w']
-        inputs_l = inputs['inputs_l']
+    def concatenated_forward(self, model: nn.Module, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
+        concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
+        all_rewards = model(
+            concatenated_batch['input_ids'], attention_mask=concatenated_batch['attention_mask'], return_dict=True
+        )[0]
 
-        rewards_w = model(**inputs_w, return_dict=True)[0]
-        rewards_l = model(**inputs_l, return_dict=True)[0]
+        chosen_idxs = batch['inputs_w']['input_ids'].shape[0]
+
+        chosen_rewards = all_rewards[:chosen_idxs]
+        rejected_rewards = all_rewards[chosen_idxs:]
+
+        return chosen_rewards, rejected_rewards
+
+    def compute_loss(self, model, inputs, return_outputs=False) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
+        rewards_w, rewards_l = self.concatenated_forward(model, inputs)
 
         loss = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean()
         if return_outputs:

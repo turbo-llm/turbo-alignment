@@ -91,6 +91,10 @@
           "transformers_settings": {}
       },
       "tokenizer_settings": {},
+      "special_tokens_settings": {
+        "bos_token": "<|begin_of_text|>",
+        "eos_token": "<|end_of_text|>"
+        },
       "trainer_settings": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
