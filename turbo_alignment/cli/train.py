@@ -139,15 +139,8 @@ def reinforce_training(
         exists=True,
         help="Path to experiment config file",
     ),
-    num_servers: int = typer.Option(
-        ...,
-        "--num_servers",
-        exists=True,
-        help="Number of gpus dedicated to server",
-    ),
 ) -> None:
     experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(
         experiment_settings_path
     )
-    experiment_settings.trainer_settings.num_servers = num_servers
     pipelines.TrainREINFORCEStrategy().run(experiment_settings)

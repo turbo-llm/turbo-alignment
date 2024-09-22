@@ -1,163 +1,160 @@
 {
-    "train_dataset_settings": {
-        "sources": [
-                {
-                "name": "train_preferences",
-                  "records_path": "train_preferences.jsonl",
-                  "sample_rate": 1.0
-              }
-        ],
-        "chat_settings":{
-            "prompt_template": {
-                "role_tag_mapping": {
-                    "bot": "assistant",
-                    "user": "user",
-                    "system": "system"
-                },
-                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
-                "suffix_template": "<|eot_id|>"
-            },
-            "max_tokens_count": 2000
-        },
-        "add_labels": true,
-        "dataset_type": "pair_preferences"
-    },
-    "val_dataset_settings": {
-        "sources": [
-              {
-                "name": "val_preferences",
-                "records_path": "val_preferences.jsonl",
-                "sample_rate": 1.0
-              }
-        ],
-        "chat_settings":{
-            "prompt_template": {
-              "role_tag_mapping": {
-                  "bot": "assistant",
-                  "user": "user",
-                  "system": "system"
-              },
-              "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
-              "suffix_template": "<|eot_id|>"
-          },
-            "max_tokens_count": 2000
-        },
-        "add_labels": true,
-        "dataset_type": "pair_preferences"
-    },
-    "cherry_pick_settings": {
-      "generator_transformers_settings": {
-              "num_beams": 1,
-              "do_sample": true,
-              "repetition_penalty": 1.02,
-              "max_new_tokens": 512
-          },
-          "custom_generation_settings": {
-              "generation_eos_token": "<|eot_id|>",
-              "skip_special_tokens": true
-          },
-          "dataset_settings": {
-              "sources": [
-                {
-                  "name": "chat_dataset",
-                  "records_path": "val_chat.jsonl",
-                  "num_samples": 10
-                }
-            ],
-            "prompt_template": {
-                "role_tag_mapping": {
-                    "bot": "assistant",
-                    "user": "user",
-                    "system": "system"
-                },
-                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
-                "suffix_template": "<|eot_id|>"
-            },
-              "dataset_type": "chat",
-              "max_tokens_count": 2000,
-              "only_answer_loss": true
-          },
-          "metric_settings": [
-            {
-                "type": "kl",
-                "parameters": {
-                    "need_average": [true],
-                    "ref_logits_type": "reference"
-                }
-            }
-        ]
-    },
-    "reward_model_settings": {
-      "model_path": "/from_s3/model",
-      "model_type": "causal",
-      "transformers_settings": {},
-      "model_kwargs": {
-          "attn_implementation": "flash_attention_2"
+  "train_dataset_settings": {
+    "sources": [
+      {
+        "name": "train_chat",
+        "records_path": "/from_s3/dataset/train_chat.jsonl",
+        "sample_rate": 1.0
       }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+        "bot": "assistant",
+        "user": "user",
+        "system": "system"
+      },
+      "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+      "suffix_template": "<|eot_id|>"
     },
-    "model_settings": {
-        "model_path": "/from_s3/model",
-        "model_type": "causal",
-        "transformers_settings": {},
-        "model_kwargs": {
-            "attn_implementation": "flash_attention_2"
+    "dataset_type": "chat",
+    "max_tokens_count": 2000,
+    "only_answer_loss": true
+  },
+  "val_dataset_settings": {
+    "sources": [
+      {
+        "name": "val_chat",
+        "records_path": "/from_s3/dataset/val_chat.jsonl",
+        "sample_rate": 1.0
+      }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+        "bot": "assistant",
+        "user": "user",
+        "system": "system"
+      },
+      "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+      "suffix_template": "<|eot_id|>"
+    },
+    "dataset_type": "chat",
+    "max_tokens_count": 2000,
+    "only_answer_loss": true
+  },
+  "cherry_pick_settings": {
+    "generator_transformers_settings": {
+      "num_beams": 1,
+      "do_sample": true,
+      "repetition_penalty": 1.02,
+      "max_new_tokens": 512
+    },
+    "custom_generation_settings": {
+      "generation_eos_token": "<|eot_id|>",
+      "skip_special_tokens": true
+    },
+    "dataset_settings": {
+      "sources": [
+        {
+          "name": "val_preferences",
+          "records_path": "val_preferences.jsonl",
+          "sample_rate": 1.0
         }
+      ],
+      "prompt_template": {
+        "role_tag_mapping": {
+          "bot": "assistant",
+          "user": "user",
+          "system": "system"
+        },
+        "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+        "suffix_template": "<|eot_id|>"
+      },
+      "dataset_type": "chat",
+      "max_tokens_count": 2000,
+      "only_answer_loss": true
     },
-    "tokenizer_settings": {},
-    "trainer_settings": {
-        "evaluation_strategy": "steps",
-        "per_device_train_batch_size": 8,
-        "per_device_eval_batch_size": 8,
-        "gradient_accumulation_steps": 10,
-        "adam_beta1": 0.9,
-        "adam_beta2": 0.95,
-        "adam_epsilon": 1e-5,
-        "eval_steps": 50,
-        "save_steps": 100,
-        "save_strategy": "steps",
-        "load_best_model_at_end": false,
-        "logging_steps": 1,
-        "learning_rate": 1e-5,
-        "max_steps": 1001,
-        "lr_scheduler_type": "constant_with_warmup",
-        "warmup_ratio": 0.03,
-        "fp16": false,
-        "bf16": true,
-        "optim": "adamw_torch",
-        "weight_decay": 0.0,
-        "max_grad_norm": 2,
-        "save_total_limit": 11,
-        "dataloader_num_workers": 12,
-        "deepspeed": "configs/exp/deepspeed/ds_config_stage_2_reinforce.json",
-
-        "max_response_length": 1024,
-        "stop_token": "<|eot_id|>",
-        "temperature": 0.7,
-        "non_eos_penalty": true,
-        "penalty_reward_value": -1,
-        "clip_rewards_min": -1e8,
-        "clip_rewards_max": 1e8,
-        "whiten_rewards": false,
-        "kl_coef": 0.05,
-        "risk_coef": 0.00,
-        "mean_baseline_coef": 0.95,
-
-        "init_kl_coef": null,
-        "target_kl": null,
-        "adaptive_kl_k": null,
-        "adaptive_kl_clip_value": null,
-        "min_kl_coef": null,
-        "max_kl_coef": null,
-
-        "num_samples_for_reward_stats": 1000
-
-    },
-    "wandb_settings": {
-      "project_name": "alignment",
-      "run_name": "sft",
-      "entity": "turbo-alignment"
-    },
-    "seed": 0,
-    "log_path": "train_output"
+    "metric_settings": [
+      {
+        "type": "kl",
+        "parameters": {
+          "need_average": [
+            true
+          ],
+          "ref_logits_type": "reference"
+        }
+      }
+    ]
+  },
+  "reward_model_settings": {
+    "model_path": "/from_s3/model",
+    "model_type": "causal",
+    "transformers_settings": {},
+    "model_kwargs": {
+      "attn_implementation": "flash_attention_2"
+    }
+  },
+  "model_settings": {
+    "model_path": "/from_s3/model",
+    "model_type": "causal",
+    "transformers_settings": {},
+    "model_kwargs": {
+      "attn_implementation": "flash_attention_2"
+    }
+  },
+  "tokenizer_settings": {},
+  "trainer_settings": {
+    "evaluation_strategy": "steps",
+    "per_device_train_batch_size": 8,
+    "per_device_eval_batch_size": 8,
+    "gradient_accumulation_steps": 10,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.95,
+    "adam_epsilon": 0.00001,
+    "eval_steps": 50,
+    "save_steps": 100,
+    "save_strategy": "steps",
+    "load_best_model_at_end": false,
+    "logging_steps": 1,
+    "learning_rate": 0.00001,
+    "max_steps": 1001,
+    "lr_scheduler_type": "constant_with_warmup",
+    "warmup_ratio": 0.03,
+    "fp16": false,
+    "bf16": true,
+    "optim": "adamw_torch",
+    "weight_decay": 0.0,
+    "max_grad_norm": 2,
+    "save_total_limit": 11,
+    "dataloader_num_workers": 12,
+    "deepspeed": "configs/exp/deepspeed/ds_config_stage_2_reinforce.json",
+    "max_response_length": 1024,
+    "stop_token": "<|eot_id|>",
+    "temperature": 0.7,
+    "non_eos_penalty": true,
+    "penalty_reward_value": -1,
+    "clip_rewards_min": -1E+8,
+    "clip_rewards_max": 1E+8,
+    "whiten_rewards": false,
+    "kl_coef": 0.05,
+    "risk_coef": 0.00,
+    "mean_baseline_coef": 0.95,
+    "init_kl_coef": null,
+    "target_kl": null,
+    "adaptive_kl_k": null,
+    "adaptive_kl_clip_value": null,
+    "min_kl_coef": null,
+    "max_kl_coef": null,
+    "num_samples_for_reward_stats": 1000
+  },
+  "special_tokens_settings": {
+    "bos_token": "<|begin_of_text|>",
+    "eos_token": "<|end_of_text|>"
+  },
+  "logging_settings": {
+    "project_name": "alignment",
+    "run_name": "sft",
+    "entity": "turbo-alignment"
+  },
+  "seed": 0,
+  "log_path": "train_output"
 }
-

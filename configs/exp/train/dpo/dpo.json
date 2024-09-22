@@ -100,7 +100,7 @@
         "bos_token": "<|begin_of_text|>",
         "eos_token": "<|end_of_text|>"
     },
-      "trainer_settings": {
+    "trainer_settings": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
         "per_device_eval_batch_size": 1,
