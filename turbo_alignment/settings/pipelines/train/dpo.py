@@ -22,6 +22,8 @@ class DPOLossesType(str, Enum):
     CPO = 'cpo'
     ORPO = 'orpo'
     SIMPO = 'simpo'
+    APO_ZERO = 'apo_zero'
+    APO_DOWN = 'apo_down'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -75,6 +77,14 @@ class ORPOLossSettings(DPOLossSettings):
     beta: float = 0.1
 
 
+class APOZeroLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.APO_ZERO]
+
+
+class APODownLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.APO_DOWN]
+
+
 class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
     sync_ref_model: bool = False
     alpha: float = 1.0
@@ -92,6 +102,8 @@ class DPOTrainerSettings(TrainerSettings):
         | SimPOLossSettings
         | SlicHfLossSettings
         | SigmoidLossWithMarginSettings
+        | APOZeroLossSettings
+        | APODownLossSettings
     )
     sync_ref_settings: SyncRefModelSettings
     use_ref_model: bool = True

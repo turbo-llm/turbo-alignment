@@ -24,6 +24,8 @@ from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelCallback
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.settings.pipelines.train.dpo import (
+    APODownLossSettings,
+    APOZeroLossSettings,
     CPOLossSettings,
     DPOLossesType,
     HingeLossSettings,
@@ -289,7 +291,7 @@ class ORPOLoss(DPOLossRegistry):
         )
 
         ratio = -F.logsigmoid(log_odds)
-        losses = self.beta * ratio
+        losses = -policy_chosen_logps + self.beta * ratio
 
         chosen_rewards = self.beta * policy_chosen_logps.detach()
         rejected_rewards = self.beta * policy_rejected_logps.detach()
@@ -331,6 +333,70 @@ class SigmoidLossWithMargin(DPOLossRegistry):
         )
 
 
+@DPOLossRegistry.register(DPOLossesType.APO_DOWN)
+class APODownLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_logratios = policy_chosen_logps - reference_chosen_logps
+        rejected_logratios = policy_rejected_logps - reference_rejected_logps
+
+        losses_chosen = F.sigmoid(self.beta * chosen_logratios)
+        losses_rejected = 1 - F.sigmoid(self.beta * (chosen_logratios - rejected_logratios))
+
+        loss = losses_chosen + losses_rejected
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        return (
+            loss,
+            chosen_rewards,
+            rejected_rewards,
+        )
+
+
+@DPOLossRegistry.register(DPOLossesType.APO_ZERO)
+class APOZeroLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_logratios = policy_chosen_logps - reference_chosen_logps
+        rejected_logratios = policy_rejected_logps - reference_rejected_logps
+
+        losses_chosen = 1 - F.sigmoid(self.beta * chosen_logratios)
+        losses_rejected = F.sigmoid(self.beta * rejected_logratios)
+
+        loss = losses_chosen + losses_rejected
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        return (
+            loss,
+            chosen_rewards,
+            rejected_rewards,
+        )
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
     loss_settings: (
@@ -344,6 +410,8 @@ class DPOTrainingArguments(TrainingArguments):
         | SimPOLossSettings
         | SlicHfLossSettings
         | SigmoidLossWithMarginSettings
+        | APOZeroLossSettings
+        | APODownLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
@@ -544,6 +612,8 @@ class DPOTrainer(Trainer):
 
         metrics = self._compute_metrics(metrics, dpo_prefix_name, chosen_rewards, rejected_rewards)
 
+        logp_accuracies = (policy_chosen_logps > policy_rejected_logps).float()
+        metrics[f'{prefix}logps/accuracies'] = (logp_accuracies).detach().cpu().mean().item()
         metrics[f'{prefix}logps/rejected'] = (policy_rejected_logps).detach().cpu().mean().item()
         metrics[f'{prefix}logps/chosen'] = (policy_chosen_logps).detach().cpu().mean().item()
 
@@ -551,8 +621,14 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix}logits/chosen'] = (policy_chosen_logits).detach().cpu().mean().item()
 
         if self.args.use_ref_model:
+            ref_logp_accuracies = (reference_chosen_logps > reference_rejected_logps).float()
+            metrics[f'{prefix}logps/ref_accuracies'] = (ref_logp_accuracies).detach().cpu().mean().item()
             metrics[f'{prefix}logps/ref_rejected'] = (reference_rejected_logps).detach().cpu().mean().item()
             metrics[f'{prefix}logps/ref_chosen'] = (reference_chosen_logps).detach().cpu().mean().item()
+
+            metrics = self._compute_flips(
+                metrics, prefix, logp_accuracies.detach().cpu(), ref_logp_accuracies.detach().cpu()
+            )
 
         if self.loss_type == DPOLossesType.KTO:
             kto_chosen_KL = (
@@ -572,18 +648,16 @@ class DPOTrainer(Trainer):
             metrics[f'{prefix}rewards/kto_grad_term_rejected'] = kto_grad_term_rejected.item()
 
         elif self.loss_type == DPOLossesType.ORPO:
-            labels_w = batch['inputs_w']['labels'][:, 1:].clone()
-            loss_mask_w = labels_w != DISABLE_LOSS_LABEL
-            length_norm_policy_chosen_logps = policy_chosen_logps / loss_mask_w.sum(-1)
-
             log_odds = (policy_chosen_logps - policy_rejected_logps) - (
                 torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
                 - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
             )
             ratio = -F.logsigmoid(log_odds)
-            nll_loss = -length_norm_policy_chosen_logps
+            or_loss = self.dpo_loss_registry.beta * ratio
+            nll_loss = -policy_chosen_logps
 
-            metrics[f'{prefix}orpo/nll_loss'] = nll_loss.clone().detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/nll_loss'] = nll_loss.detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/or_loss'] = or_loss.detach().cpu().mean().item()
             metrics[f'{prefix}orpo/ratio'] = (ratio).detach().cpu().mean().item()
             metrics[f'{prefix}orpo/log_odds'] = (log_odds).detach().cpu().mean().item()
 
@@ -619,6 +693,37 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix_name}grad_term_std'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
         )
+
+        return metrics
+
+    def _compute_flips(
+        self,
+        metrics: dict[str, Any],
+        prefix_name: str,
+        logp_accuracies: torch.Tensor,
+        ref_logp_accuracies: torch.Tensor,
+    ):
+        correct_correct = (ref_logp_accuracies == 1) & (logp_accuracies == 1)
+        correct_incorrect = (ref_logp_accuracies == 1) & (logp_accuracies == 0)
+        incorrect_correct = (ref_logp_accuracies == 0) & (logp_accuracies == 1)
+        incorrect_incorrect = (ref_logp_accuracies == 0) & (logp_accuracies == 0)
+
+        correct_correct_count = correct_correct.sum().item()
+        correct_incorrect_count = correct_incorrect.sum().item()
+        incorrect_correct_count = incorrect_correct.sum().item()
+        incorrect_incorrect_count = incorrect_incorrect.sum().item()
+
+        total_count = len(logp_accuracies)
+
+        correct_correct_ratio = correct_correct_count / total_count
+        correct_incorrect_ratio = correct_incorrect_count / total_count
+        incorrect_correct_ratio = incorrect_correct_count / total_count
+        incorrect_incorrect_ratio = incorrect_incorrect_count / total_count
+
+        metrics[f'{prefix_name}flips/correct->correct'] = correct_correct_ratio
+        metrics[f'{prefix_name}flips/correct->incorrect'] = correct_incorrect_ratio
+        metrics[f'{prefix_name}flips/incorrect->correct'] = incorrect_correct_ratio
+        metrics[f'{prefix_name}flips/incorrect->incorrect'] = incorrect_incorrect_ratio
 
         return metrics
 
