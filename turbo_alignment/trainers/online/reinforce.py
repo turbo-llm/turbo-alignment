@@ -1,6 +1,5 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from abc import ABC
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
