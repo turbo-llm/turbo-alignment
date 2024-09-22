@@ -132,7 +132,7 @@
     "weight_decay": 0.01,
     "max_grad_norm": 0.11
   },
-  "wandb_settings": {
+  "logging_settings": {
     "project_name": "alignment",
     "run_name": "sft",
     "entity": "turbo-alignment"

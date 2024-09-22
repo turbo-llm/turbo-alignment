@@ -127,7 +127,7 @@
         "load_best_model_at_end": false,
         "deepspeed": "configs/exp/deepspeed/ds_config_stage_2.json"
     },
-    "wandb_settings": null,
+    "logging_settings": null,
     "log_path": "train_output",
     "modality_encoder_settings_mapping": {
         "image": {
