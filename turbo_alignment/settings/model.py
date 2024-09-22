@@ -23,6 +23,8 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
 
     embeddings_initialization_strategy: dict[str, str] | None = None
 
+    use_liger_kernels: bool = False
+
 
 class PreTrainedAdaptersModelSettings(PreTrainedModelSettings):
     adapter_path: Path
