@@ -1,4 +1,5 @@
 from transformers import PretrainedConfig, PreTrainedModel
+
 from turbo_alignment.common.tf.liger_kernels.cross_entropy import LigerCrossEntropyLoss
 from turbo_alignment.common.tf.liger_kernels.geglu import LigerGEGLUMLP
 from turbo_alignment.common.tf.liger_kernels.rope import liger_rotary_pos_emb
@@ -37,7 +38,7 @@ def apply_liger_kernel_to_gemma2(
         # instance variables that reference already-instantiated modules
         config: PretrainedConfig = model.config
 
-        if hasattr(model, "model"):
+        if hasattr(model, 'model'):
             # The case for Gemma2ForCausalLM, Gemma2ForTokenClassification for example
             base_model = model.model
         else:
@@ -50,4 +51,4 @@ def apply_liger_kernel_to_gemma2(
             if geglu:
                 decoder_layer.mlp = LigerGEGLUMLP(config).to(torch_dtype)
 
-    print('🙈'*15)
+    print('🙈' * 15)

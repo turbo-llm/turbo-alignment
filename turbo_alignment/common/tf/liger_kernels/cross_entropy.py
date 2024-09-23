@@ -1,7 +1,6 @@
 import torch
 import triton
 import triton.language as tl
-
 from torch.nn import CrossEntropyLoss
 
 
@@ -63,11 +62,9 @@ def liger_cross_entropy_kernel(
     # Refer to Algorithm 3 in the paper: https://arxiv.org/pdf/1805.02867
 
     # 3. [Online softmax] first pass: find max + sum
-    m = float("-inf")  # m is the max value. use the notation from the paper
+    m = float('-inf')  # m is the max value. use the notation from the paper
     d = 0.0  # d is the sum. use the notation from the paper
-    ori_X_y = tl.load(
-        X_ptr + y
-    )  # we need to store the original value of X_y for the loss calculation
+    ori_X_y = tl.load(X_ptr + y)  # we need to store the original value of X_y for the loss calculation
 
     # Label smoothing is a general case of normal cross entropy
     # See the full derivation at https://github.com/linkedin/Liger-Kernel/pull/198#issue-2503665310
@@ -76,9 +73,7 @@ def liger_cross_entropy_kernel(
 
     for i in range(0, n_cols, BLOCK_SIZE):
         X_offsets = i + tl.arange(0, BLOCK_SIZE)
-        X_block = tl.load(
-            X_ptr + X_offsets, mask=X_offsets < n_cols, other=float("-inf")
-        )
+        X_block = tl.load(X_ptr + X_offsets, mask=X_offsets < n_cols, other=float('-inf'))
         block_max = tl.max(X_block)
         if label_smoothing > 0:
             # scale X beforehand to avoid overflow
@@ -106,10 +101,8 @@ def liger_cross_entropy_kernel(
 
     for i in range(0, n_cols, BLOCK_SIZE):
         X_offsets = i + tl.arange(0, BLOCK_SIZE)
-        X_block = tl.load(
-            X_ptr + X_offsets, mask=X_offsets < n_cols, other=float("-inf")
-        )
-        if reduction == "mean":
+        X_block = tl.load(X_ptr + X_offsets, mask=X_offsets < n_cols, other=float('-inf'))
+        if reduction == 'mean':
             X_block = (tl.exp(X_block - m) / d - eps) / (n_non_ignore)
         else:
             X_block = tl.exp(X_block - m) / d - eps
@@ -141,12 +134,12 @@ def liger_cross_entropy_kernel(
         loss = loss * (1 - label_smoothing) + smooth_loss
 
     # Normalize the loss by the number of non-ignored elements if reduction is "mean"
-    if reduction == "mean":
+    if reduction == 'mean':
         loss = loss / n_non_ignore
 
     # 6. Specially handle the i==y case where `dx_y = (softmax(x_y) - (1 - label_smoothing) / N`
     X_y = tl.load(X_ptr + y)
-    if reduction == "mean":
+    if reduction == 'mean':
         X_y += -(1 - label_smoothing) / (n_non_ignore)
     else:
         X_y += -(1 - label_smoothing)
@@ -268,9 +261,7 @@ class LigerCrossEntropyFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(
-        ctx, _input, target, ignore_index=-100, label_smoothing=0.0, reduction="mean"
-    ):
+    def forward(ctx, _input, target, ignore_index=-100, label_smoothing=0.0, reduction='mean'):
         """
         The forward pass of the Liger Cross Entropy loss.
 
@@ -285,9 +276,7 @@ class LigerCrossEntropyFunction(torch.autograd.Function):
         Returns:
         tensor: The computed loss.
         """
-        loss, _input = cross_entropy_forward(
-            _input, target, ignore_index, label_smoothing, reduction
-        )
+        loss, _input = cross_entropy_forward(_input, target, ignore_index, label_smoothing, reduction)
         # TODO: investigation
         # If we don't detach the _input tensor, the memory will double
         # Not sure why but seems that there will be a time both grad and value exist but in different location
@@ -315,21 +304,19 @@ class LigerCrossEntropyFunction(torch.autograd.Function):
             None,
             None,
         )
-    
+
 
 class LigerCrossEntropyLoss(CrossEntropyLoss):
     def __init__(self, *args, **kwargs):
         super(LigerCrossEntropyLoss, self).__init__(*args, **kwargs)
         assert (self.label_smoothing >= 0) and (
             self.label_smoothing <= 1
-        ), f"label_smoothing must be between 0.0 and 1.0. Got: {self.label_smoothing}"
+        ), f'label_smoothing must be between 0.0 and 1.0. Got: {self.label_smoothing}'
         assert self.reduction in {
-            "mean",
-            "sum",
-            "none",
+            'mean',
+            'sum',
+            'none',
         }, f"reduction must be one of 'mean', 'sum', or 'none'. Got: {self.reduction}"
 
     def forward(self, _input, target):
-        return LigerCrossEntropyFunction.apply(
-            _input, target, self.ignore_index, self.label_smoothing, self.reduction
-        )
+        return LigerCrossEntropyFunction.apply(_input, target, self.ignore_index, self.label_smoothing, self.reduction)

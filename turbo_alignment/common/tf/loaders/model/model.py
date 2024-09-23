@@ -2,7 +2,9 @@ import torch
 from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
-from turbo_alignment.common.tf.liger_kernels.monkey_patch_liger import apply_liger_kernel_to_gemma2
+from turbo_alignment.common.tf.liger_kernels.monkey_patch_liger import (
+    apply_liger_kernel_to_gemma2,
+)
 from turbo_alignment.common.tf.loaders.model.registry import (
     PeftConfigRegistry,
     TransformersAutoModelRegistry,
@@ -44,7 +46,6 @@ def load_model(
     model_settings: PreTrainedModelSettings,
     tokenizer: PreTrainedTokenizerBase,
 ) -> PreTrainedModel:
-    
     if model_settings.use_liger_kernels:
         apply_liger_kernel_to_gemma2()
 
