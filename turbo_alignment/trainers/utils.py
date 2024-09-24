@@ -97,5 +97,7 @@ class DPOLossRegistry(Registrable):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int | None,
+        rejected_lens: int | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         ...
