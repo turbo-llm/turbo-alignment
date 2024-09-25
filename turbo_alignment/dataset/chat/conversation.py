@@ -14,7 +14,7 @@ class Conversation:
         self._messages: list[ChatMessage] = []
 
         if system_prompt and ignore_system_prompt:
-            raise ValueError('You can not ignore system_prompt and use system prompt in config simultaneoulsy')
+            raise ValueError('You can not ignore system_prompt and use system prompt in config simultaneously')
 
         if system_prompt or ignore_system_prompt:
             if messages[0].role == ChatMessageRole.SYSTEM:
