@@ -13,10 +13,8 @@ from turbo_alignment.common.tf.liger_kernels.utils import (
 
 if compare_version('triton', operator.ge, '3.0.0'):
     try:
-        # typical import path with dispatch available
         from triton.language.extra.libdevice import tanh
     except ModuleNotFoundError:
-        # for working with NGC containers
         from triton.language.extra.cuda.libdevice import tanh
 else:
     from triton.language.math import tanh
@@ -26,7 +24,6 @@ else:
 def _geglu_tanh_forward_kernel(a, b, c, stride, n_cols: tl.constexpr, BLOCK_SIZE: tl.constexpr):
     program_id = tl.program_id(0)
 
-    # locate start index
     a += program_id * stride
     b += program_id * stride
     c += program_id * stride
@@ -36,9 +33,7 @@ def _geglu_tanh_forward_kernel(a, b, c, stride, n_cols: tl.constexpr, BLOCK_SIZE
     a_row = tl.load(a + col_offsets, mask=mask, other=0).to(tl.float32)
     b_row = tl.load(b + col_offsets, mask=mask, other=0)
 
-    # tanh approximation form of GELU is computed with:
-    # 0.5 * a * (1 + tanh(sqrt(2 / pi) * (a + 0.044715 * a^3)))
-    sqrt_2_over_pi = 0.7978845608028654  # sqrt(2 / pi)
+    sqrt_2_over_pi = 0.7978845608028654
     a_cubed = a_row * a_row * a_row
     tanh_arg = sqrt_2_over_pi * (a_row + 0.044715 * a_cubed)
     tanh_result = tanh(tanh_arg)
@@ -51,7 +46,6 @@ def _geglu_tanh_forward_kernel(a, b, c, stride, n_cols: tl.constexpr, BLOCK_SIZE
 def _geglu_tanh_backward_kernel(dc, a, b, stride, n_cols: tl.constexpr, BLOCK_SIZE: tl.constexpr):
     program_id = tl.program_id(0)
 
-    # locate start index
     dc += program_id * stride
     a += program_id * stride
     b += program_id * stride
@@ -63,8 +57,7 @@ def _geglu_tanh_backward_kernel(dc, a, b, stride, n_cols: tl.constexpr, BLOCK_SI
     a_row = tl.load(a + col_offsets, mask=mask, other=0).to(tl.float32)
     b_row = tl.load(b + col_offsets, mask=mask, other=0)
 
-    # recomputation to save memory
-    sqrt_2_over_pi = 0.7978845608028654  # sqrt(2 / pi)
+    sqrt_2_over_pi = 0.7978845608028654
     a_cubed = a_row * a_row * a_row
     tanh_arg = sqrt_2_over_pi * (a_row + 0.044715 * a_cubed)
     tanh_result = tanh(tanh_arg)
@@ -72,9 +65,6 @@ def _geglu_tanh_backward_kernel(dc, a, b, stride, n_cols: tl.constexpr, BLOCK_SI
 
     db_row = dc_row * geglu_a
 
-    # Gradient w.r.t. a can be computed with:
-    # b * (0.5 * (1 + tanh(z)) + 0.5 * a * (1 - tanh(z)^2) * (sqrt(2/pi) * (1 + 3 * 0.044715 * a^2)))
-    # where z = sqrt(2/pi) * (a + 0.044715 * a^3)
     term1 = 0.5 * (1 + tanh_result)
     tanh_sq = tanh_result * tanh_result
     term2 = 0.5 * a_row * (1 - tanh_sq) * (sqrt_2_over_pi * (1 + 3 * 0.044715 * a_row * a_row))
@@ -153,11 +143,6 @@ class LigerGEGLUMLP(nn.Module):
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
-        # TODO: support exact GELU
-        # Right now Gemma 1, 1.1 and 2 models are all using `gelu_pytorch_tanh`
-        # https://github.com/huggingface/transformers/blob/v4.40.1/src/transformers/models/gemma/modeling_gemma.py#L175
-        # https://github.com/huggingface/transformers/blob/v4.40.1/src/transformers/activations.py#L46
-        # So we can safely assume we use tanh approximation form all the time
 
     def forward(self, x):
         return self.down_proj(LigerGELUMulFunction.apply(self.gate_proj(x), self.up_proj(x)))
