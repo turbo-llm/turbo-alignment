@@ -50,10 +50,10 @@
               "num_beams": 1,
               "do_sample": true,
               "repetition_penalty": 1.02,
+              "stop_strings": "<|eot_id|>",
               "max_new_tokens": 8
           },
           "custom_generation_settings": {
-              "generation_eos_token": "<|eot_id|>",
               "skip_special_tokens": true
           },
           "dataset_settings": {
