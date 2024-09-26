@@ -5,8 +5,24 @@ message: >-
   metadata from this file.
 type: software
 authors:
-  - given-names: Surnachev
-    family-names: Nikita
+  - given-names: Alexander
+    family-names: Zamiralov
+  - given-names: Alexey
+    family-names: Gorbatovski
+  - given-names: Alexey
+    family-names: Malakhov
+  - given-names: Boris
+    family-names: Shaposhnikov
+  - given-names: Daniil
+    family-names: Taranets
+  - given-names: Elisey
+    family-names: Rykov
+  - given-names: Nikita
+    family-names: Surnachev
+  - given-names: Sergey
+    family-names: Kochetkov
+  - given-names: Yana
+    family-names: Shishkina
 repository-code: 'https://github.com/turbo-llm/turbo-alignment'
 abstract: "Turbo-Alignment is a library designed to streamline the fine-tuning and alignment of large language models, leveraging advanced techniques to enhance efficiency and scalability."
 keywords:
