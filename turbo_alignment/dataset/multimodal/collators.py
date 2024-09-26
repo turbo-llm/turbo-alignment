@@ -11,7 +11,7 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
         if 'modality_inputs' in features[0].keys():
             modality_inputs = [feature['modality_inputs'] for feature in features]
         else:
-            modality_inputs = [None for feature in features]
+            modality_inputs = [None for _ in features]
 
         if 'messages' in features[0].keys():
             message_inputs = [feature['messages'] for feature in features]
