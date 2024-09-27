@@ -40,3 +40,4 @@ class ModalityProjectorType(str, Enum):
     C_ABSTRACTOR = 'c_abstractor'
     ATTENTION_POOLING = 'attention_pooling'
     TOP_K_ATTENTION_POOLING = 'top_k_attention_pooling'
+    THRESHOLD_SELECTOR = 'threshold_selector'

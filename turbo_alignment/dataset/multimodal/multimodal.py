@@ -1,3 +1,4 @@
+import gc
 import math
 from abc import ABC
 from pathlib import Path
@@ -6,7 +7,6 @@ from typing import Any, overload
 import numpy as np
 import torch
 from allenai_common import Params
-import gc
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
