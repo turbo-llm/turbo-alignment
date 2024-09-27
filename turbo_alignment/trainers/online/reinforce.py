@@ -14,23 +14,26 @@ from transformers import (
     TrainingArguments,
 )
 
+from turbo_alignment.settings.online import LLMActorType, CriticType
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.common.distributed import get_global_mean, get_global_std, get_log_mean_std
+from turbo_alignment.trainers.online.rm_actor import Critic
 from turbo_alignment.trainers.utils import prepare_model
 from turbo_alignment.trainers.online.reward_processor import RewardProcessor
 from turbo_alignment.trainers.online.llm_actor import LLMActor
 
 
+# FIXME
 @dataclass
 class REINFORCETrainingArguments(TrainingArguments):
-    max_tokens_count: int
-    stop_token: str
+    max_tokens_count: int = 1024
+    stop_token: str = '<eos>'
 
-    penalty_reward_value: float
-    clip_rewards_min: float
-    clip_rewards_max: float
-    kl_coef: float
-    mean_baseline_coef: float
+    penalty_reward_value: float = 0.1
+    clip_rewards_min: float = 0.1
+    clip_rewards_max: float = 1.
+    kl_coef: float = 0.05
+    mean_baseline_coef: float = 0.1
 
     num_generations: int = 1
     num_samples_for_reward_stats: int = 0
@@ -38,6 +41,9 @@ class REINFORCETrainingArguments(TrainingArguments):
     non_eos_penalty: bool = True
     temperature: float | None = None
     whiten_rewards: bool = False
+
+    actor_type: str = LLMActorType.LOCAL_TRANSFORMERS
+    critic_type: str = CriticType.LOCAL_TRANSFORMERS
 
 
 class REINFORCETrainer(MultiGPUCherryPicksTrainer):
@@ -47,9 +53,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         args: REINFORCETrainingArguments,
         tokenizer: PreTrainedTokenizer,
         policy: PreTrainedModel | torch.nn.Module,
-        ref_model: PreTrainedModel | torch.nn.Module,
+        reward_model: PreTrainedModel | torch.nn.Module,
         train_dataset: Dataset,
         eval_dataset: Dataset,
+        ref_model: PreTrainedModel | torch.nn.Module | None = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ) -> None:
@@ -82,22 +89,39 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             effective_num_previous_samples * self.args.gradient_accumulation_steps
         )
 
-        self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
-            model=self.model, dataloader=self.get_train_dataloader()
-        )
-
         stop_generation_token_id = tokenizer.encode(
             self.args.stop_token, add_special_tokens=False
         )
         assert len(stop_generation_token_id) == 1, stop_generation_token_id
 
         # FIXME: registry
-        self.llm_actor = LLMActor(
+        self.llm_actor = LLMActor.by_name(args.actor_type)(
             max_tokens_count=args.max_tokens_count,
             stop_token_id=stop_generation_token_id,
             temperature=args.temperature,
+            tokenizer=self.tokenizer,
         )
+        self.critic = Critic.by_name(args.critic_type)(reward_model)
         self.reward_processor = RewardProcessor(mean_baseline_coef=args.mean_baseline_coef)
+
+        self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
+            model=self.model, dataloader=self.get_train_dataloader()
+        )
+
+    def get_answers_and_rewards(
+        self,
+        model: torch.nn.Module | PreTrainedModel,
+        inputs: dict[str, torch.Tensor],
+    ) -> ...:
+        responses = self.llm_actor.generate_responses(
+            model=self.accelerator.unwrap_model(model),
+            queries=inputs["input_ids"],
+            attention_mask=inputs["attention_mask"],
+        )
+
+        rewards = self.critic.generate_responses(responses)
+        return responses, rewards
+
 
     def get_batch_loss_metrics(
         self, 
@@ -105,11 +129,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: torch.Tensor, 
         train_eval: Literal["train", "eval"] = "train",
     ):
-        assert inputs["input_ids"].shape[1] <= self.args.max_tokens_count, (
-            f"Input length {inputs['input_ids'].shape[1]} exceeds max_tokens_count {self.args.max_tokens_count}",
-            self.tokenizer.decode(inputs["input_ids"][0]),
-        )
-
         with torch.no_grad():
             (
                 (
@@ -221,7 +240,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     def reward_stats(
         self, 
         model: torch.nn.Module | PreTrainedModel, 
-        dataloader: torch.utils.data.Dataloader
+        dataloader: torch.utils.data.DataLoader
     ) -> tuple[float, float]:
         if self.args.num_samples_for_reward_stats == 0:
             norm_reward_mean = 0

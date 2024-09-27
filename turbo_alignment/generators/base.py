@@ -36,9 +36,9 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
     @abstractmethod
     def _generate_from_batch(
         self,
-        records: list[dict[str, Any]],
-        original_records: list[DatasetRecordT],
         dataset_name: str,
+        records: list[dict[str, Any]],
+        original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         ...
 
@@ -65,9 +65,9 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
             ):
                 generations.append(
                     self._generate_from_batch(
+                        dataset.source.name,
                         records_batch,
                         original_records_batch,
-                        dataset.source.name,
                     )
                 )
         else:
@@ -76,9 +76,9 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
             ) as accelerator_records:
                 generations = [
                     self._generate_from_batch(
+                        dataset.source.name,
                         records_batch,
                         original_records_batch,
-                        dataset.source.name,
                     )
                     for records_batch, original_records_batch in accelerator_records
                 ][: len(records_batches)]
@@ -109,23 +109,23 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
     @abstractmethod
     def _generate_from_single_record(
         self,
-        record: dict[str, torch.Tensor],
-        original_record: DatasetRecordT,
         dataset_name: str,
+        record: dict[str, torch.Tensor],
+        original_record: DatasetRecordT | None = None,
     ) -> InferenceOutputT:
         ...
 
     @abstractmethod
     def _generate_from_batch_records(
         self,
-        records: list[dict[str, torch.Tensor]],
-        original_records: list[DatasetRecordT],
         dataset_name: str,
+        records: list[dict[str, torch.Tensor]],
+        original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         ...
 
     def _generate_from_batch(
-        self, records: list[dict[str, Any]], original_records: list[DatasetRecordT], dataset_name: str
+        self, dataset_name: str, records: list[dict[str, Any]], original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         if self._custom_generation_settings.batch > 1:
             if self._transformers_generator_parameters.num_beams != 1:
@@ -134,10 +134,10 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
             self._tokenizer.padding_side = 'left'
             self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 
-            return self._generate_from_batch_records(records, original_records, dataset_name)
+            return self._generate_from_batch_records(dataset_name, records, original_records)
 
         return [
-            self._generate_from_single_record(record, original_record, dataset_name)
+            self._generate_from_single_record(dataset_name, record, original_record)
             for record, original_record in zip(records, original_records)
         ]
 

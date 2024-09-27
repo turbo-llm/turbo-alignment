@@ -3,7 +3,7 @@
     "sources": [
       {
         "name": "train_chat",
-        "records_path": "/from_s3/dataset/train_chat.jsonl",
+        "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
         "sample_rate": 1.0
       }
     ],
@@ -24,7 +24,7 @@
     "sources": [
       {
         "name": "val_chat",
-        "records_path": "/from_s3/dataset/val_chat.jsonl",
+        "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
         "sample_rate": 1.0
       }
     ],
@@ -44,20 +44,19 @@
   "cherry_pick_settings": {
     "generator_transformers_settings": {
       "num_beams": 1,
-      "do_sample": true,
-      "repetition_penalty": 1.02,
-      "max_new_tokens": 512
+      "do_sample": false,
+      "stop_strings": "</RS>",
+      "max_new_tokens": 8
     },
     "custom_generation_settings": {
-      "generation_eos_token": "<|eot_id|>",
-      "skip_special_tokens": true
+      "skip_special_tokens": false
     },
     "dataset_settings": {
       "sources": [
         {
-          "name": "val_preferences",
-          "records_path": "val_preferences.jsonl",
-          "sample_rate": 1.0
+          "name": "chat_test",
+          "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+          "num_samples": 2
         }
       ],
       "prompt_template": {
@@ -70,10 +69,27 @@
         "suffix_template": "<|eot_id|>"
       },
       "dataset_type": "chat",
-      "max_tokens_count": 2000,
+      "max_tokens_count": 150,
       "only_answer_loss": true
     },
     "metric_settings": [
+      {
+        "type": "length",
+        "parameters": {
+          "need_average": [
+            true
+          ]
+        }
+      },
+      {
+        "type": "kl",
+        "parameters": {
+          "need_average": [
+            true
+          ],
+          "ref_logits_type": "sft"
+        }
+      },
       {
         "type": "kl",
         "parameters": {
@@ -86,19 +102,18 @@
     ]
   },
   "reward_model_settings": {
-    "model_path": "/from_s3/model",
-    "model_type": "causal",
-    "transformers_settings": {},
-    "model_kwargs": {
-      "attn_implementation": "flash_attention_2"
-    }
+    "model_path": "tests/fixtures/models/llama2_tiny",
+    "model_type": "seq_cls",
+    "transformers_settings": {}
   },
   "model_settings": {
-    "model_path": "/from_s3/model",
+    "model_path": "tests/fixtures/models/llama2_tiny",
     "model_type": "causal",
     "transformers_settings": {},
-    "model_kwargs": {
-      "attn_implementation": "flash_attention_2"
+    "embeddings_initialization_strategy": {
+      "<|start_header_id|>": "<s>",
+      "<|end_header_id|>": "</s>",
+      "<|eot_id|>": "</s>"
     }
   },
   "tokenizer_settings": {},
@@ -120,31 +135,23 @@
     "lr_scheduler_type": "constant_with_warmup",
     "warmup_ratio": 0.03,
     "fp16": false,
-    "bf16": true,
+    "bf16": false,
     "optim": "adamw_torch",
     "weight_decay": 0.0,
     "max_grad_norm": 2,
     "save_total_limit": 11,
     "dataloader_num_workers": 12,
-    "deepspeed": "configs/exp/deepspeed/ds_config_stage_2_reinforce.json",
-    "max_response_length": 1024,
     "stop_token": "<|eot_id|>",
     "temperature": 0.7,
     "non_eos_penalty": true,
     "penalty_reward_value": -1,
-    "clip_rewards_min": -1E+8,
-    "clip_rewards_max": 1E+8,
+    "clip_rewards_min": -1e+8,
+    "clip_rewards_max": 1e+8,
     "whiten_rewards": false,
     "kl_coef": 0.05,
-    "risk_coef": 0.00,
     "mean_baseline_coef": 0.95,
-    "init_kl_coef": null,
-    "target_kl": null,
-    "adaptive_kl_k": null,
-    "adaptive_kl_clip_value": null,
-    "min_kl_coef": null,
-    "max_kl_coef": null,
-    "num_samples_for_reward_stats": 1000
+    "num_samples_for_reward_stats": 1000,
+    "no_cuda": true
   },
   "special_tokens_settings": {
     "bos_token": "<|begin_of_text|>",

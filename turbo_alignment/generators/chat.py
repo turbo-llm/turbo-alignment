@@ -13,9 +13,9 @@ from turbo_alignment.settings.generators.outputs.chat import (
 class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
     def _generate_from_batch_records(
         self,
-        records: list[dict[str, torch.Tensor]],
-        original_records: list[ChatDatasetRecord],
         dataset_name: str,
+        records: list[dict[str, torch.Tensor]],
+        original_records: list[ChatDatasetRecord] | None = None,
     ) -> list[ChatInferenceOutput]:
         input_ids = [record['input_ids'].tolist() for record in records]
         attention_mask = [record['attention_mask'].tolist() for record in records]
@@ -51,31 +51,62 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         answers = self._decode(token_indices=postprocessed_output_indices)
 
+        logits: torch.Tensor | None = None
+        input_token_ids: torch.Tensor | None = None
+        answer_tokens_ids: torch.Tensor | None = None
+
+        if self._return_logits:
+            with torch.no_grad():
+                logits = self._model(output_indices).logits.cpu()
+
+                answer_tokens_ids = postprocessed_output_indices
+                input_token_ids = input_ids
+
+        if original_records is not None:
+            return [
+                ChatInferenceOutput(
+                    id=original_record.id,
+                    dataset_name=dataset_name,
+                    messages=original_record.messages,
+                    label=original_record.label,
+                    meta=original_record.meta,
+                    answers=[
+                        AnswerMessage(
+                            id='0',
+                            content=answer,
+                            input_token_ids=None,
+                            answer_token_ids=None,
+                            logits=None,
+                        )
+                    ],
+                )
+                for original_record, answer in zip(original_records, answers)
+            ]
+
         return [
             ChatInferenceOutput(
-                id=original_record.id,
+                id=None,
                 dataset_name=dataset_name,
-                messages=original_record.messages,
-                label=original_record.label,
-                meta=original_record.meta,
+                messages=None,
+                label=None,
+                meta=None,
                 answers=[
                     AnswerMessage(
                         id='0',
                         content=answer,
-                        input_token_ids=None,
-                        answer_token_ids=None,
-                        logits=None,
+                        input_token_ids=
                     )
-                ],
+                ]
             )
-            for original_record, answer in zip(original_records, answers)
+            for id, answer in enumerate(answers)
+
         ]
 
     def _generate_from_single_record(
         self,
-        record: dict[str, Any],
-        original_record: ChatDatasetRecord,
         dataset_name: str,
+        record: dict[str, Any],
+        original_record: ChatDatasetRecord | None = None,
     ) -> ChatInferenceOutput:
         input_ids = torch.unsqueeze(record['input_ids'], 0).to(self.device)
         attention_mask = torch.unsqueeze(record['attention_mask'], 0).to(self.device)

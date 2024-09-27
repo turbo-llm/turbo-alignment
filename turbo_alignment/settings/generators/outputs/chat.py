@@ -1,8 +1,9 @@
 import torch
 
-from turbo_alignment.dataset.chat import ChatDatasetRecord
+from turbo_alignment.dataset.chat import ChatMessage
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.generators.outputs.base import BaseInferenceOutput
+from typing import Any
 
 
 class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
@@ -17,8 +18,11 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
         arbitrary_types_allowed = True
 
 
-class ChatInferenceOutput(BaseInferenceOutput, ChatDatasetRecord):
+class ChatInferenceOutput(BaseInferenceOutput):
     answers: list[AnswerMessage]
+    messages: list[ChatMessage] | None
+    label: str | None = None
+    meta: dict[str, Any] | None = None
 
 
 class RagInferenceOutput(ChatInferenceOutput):

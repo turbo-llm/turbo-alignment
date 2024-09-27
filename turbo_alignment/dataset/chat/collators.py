@@ -3,8 +3,10 @@ from typing import Any
 
 import torch
 import transformers
-from src.constants import DISABLE_LOSS_LABEL
 from transformers import PreTrainedTokenizerBase
+
+
+DISABLE_LOSS_LABEL = -100  # FIXME
 
 
 @dataclass

@@ -4,7 +4,7 @@ from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import DataCollatorMixin
 
-import turbo_alignment.trainers.reinforce as reinforce_trainers
+from turbo_alignment.trainers.online.reinforce import REINFORCETrainer
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
@@ -19,7 +19,7 @@ from turbo_alignment.settings.pipelines.train.reinforce import (
     REINFORCETrainerSettings,
     REINFORCETrainExperimentSettings,
 )
-from turbo_alignment.trainers.reinforce import REINFORCETrainingArguments
+from turbo_alignment.trainers.online.reinforce import REINFORCETrainingArguments
 
 logger = get_project_logger()
 
@@ -70,7 +70,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,
-            report_to=[],
+            # report_to=[],
             **experiment_settings.trainer_settings.dict(),
         )
 
@@ -84,9 +84,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         val_dataset: Dataset,
         data_collator: Callable,
     ):
-        cls = getattr(reinforce_trainers, experiment_settings.reinforce_class)
-
-        return cls(
+        return REINFORCETrainer(
             args=training_args,
             tokenizer=tokenizer,
             policy=model,
@@ -94,9 +92,6 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             eval_dataset=val_dataset,
             data_collator=data_collator,
             callbacks=[],
-            peft_config=experiment_settings.peft_settings.dict(),
-            policy_model_dir=experiment_settings.model_settings.model_path,
-            max_tokens_count=experiment_settings.train_dataset_settings.max_tokens_count,
         )
 
     def _dataset_and_collator_sanity_check(
