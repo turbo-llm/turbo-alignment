@@ -39,3 +39,4 @@ class ModalityProjectorType(str, Enum):
     LLAVA = 'llava'
     C_ABSTRACTOR = 'c_abstractor'
     ATTENTION_POOLING = 'attention_pooling'
+    TOP_K_ATTENTION_POOLING = 'top_k_attention_pooling'
