@@ -24,4 +24,5 @@ class FileReader(BaseImageReader):
     def read(self, path: str) -> torch.Tensor:
         h5_file = self._get_h5_file(Path(path).parent)
         with h5py.File(h5_file, 'r') as f:
-            return torch.tensor(f[Path(path).name])
+            output = torch.tensor(f[Path(path).name])
+        return output
