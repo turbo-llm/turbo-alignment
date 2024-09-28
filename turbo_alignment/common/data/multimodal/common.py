@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import h5py
 import torch
 
 from turbo_alignment.common.data.multimodal.image.base import BaseImageReader
@@ -14,17 +15,14 @@ from turbo_alignment.settings.modality import ModalityReader
 @ImageModalityReaderRegistry.register(ModalityReader.PICKLE)
 class FileReader(BaseImageReader):
     def __init__(self, **_kwargs):
-        self.processed_batches = None
+        self.processed_tensors = None
 
     @staticmethod
-    def _get_pt_files(path: Path) -> Path:
-        return list(path.glob('*.pt'))
+    def _get_h5_file(path: Path) -> Path:
+        return list(path.glob('*.h5'))[0]  # FIXME: What if there is more than one h5 file?
 
     def read(self, path: str) -> torch.Tensor:
-        if self.processed_batches is None:
-            self.processed_batches = {}
-            pt_files = self._get_pt_files(Path(path).parent)
-            for pt_file in pt_files:
-                file_tensor_dict = torch.load(pt_file)
-                self.processed_batches.update(file_tensor_dict)
-        return self.processed_batches[Path(path).name]
+        h5_file = self._get_h5_file(Path(path).parent)
+        with h5py.File(h5_file, 'r') as f:
+            output = torch.tensor(f[Path(path).name])
+        return output

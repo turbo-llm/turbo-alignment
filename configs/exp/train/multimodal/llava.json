@@ -1,0 +1,205 @@
+{
+    "train_dataset_settings": {
+        "sources": [
+            {
+                "name": "train",
+                "records_path": "/from_s3/dataset/llava_next_data_dialogs/train_chat.jsonl",
+                "sample_rate": 1.0
+            }
+        ],
+        "prompt_template": {
+            "role_tag_mapping": {
+                "bot": "assistant",
+                "user": "user",
+                "system": "system"
+            },
+            "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+            "suffix_template": "<|eot_id|>"
+        },
+        "modality_token_mapping": {
+            "image": "<img>",
+            "audio": "<audio>"
+        },
+        "modality_reader_settings_mapping": {
+                "image": {
+                    "reader_type": "pickle",
+                    "reader_path": null
+                },
+                "audio": null
+        },
+        "n_modality_embeddings": 576,
+        "start_modality_token": "<MS>",
+        "end_modality_token": "</MS>",
+        "dataset_type": "multimodal",
+        "max_tokens_count": 2000,
+        "only_answer_loss": true,
+        "truncate_top": false
+    },
+    "val_dataset_settings": {
+        "sources": [
+            {
+                "name": "test",
+                "records_path": "/from_s3/dataset/llava_next_data_dialogs/test_chat.jsonl",
+                "num_samples": 10000
+            }
+        ],
+        "prompt_template": {
+            "role_tag_mapping": {
+                "bot": "assistant",
+                "user": "user",
+                "system": "system"
+            },
+            "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+            "suffix_template": "<|eot_id|>"
+        },
+        "modality_token_mapping": {
+            "image": "<img>",
+            "audio": "<audio>"
+        },
+        "modality_reader_settings_mapping": {
+                "image": {
+                    "reader_type": "pickle",
+                    "reader_path": null
+                },
+                "audio": null
+            },
+        "n_modality_embeddings": 576,
+        "start_modality_token": "<MS>",
+        "end_modality_token": "</MS>",
+        "dataset_type": "multimodal",
+        "max_tokens_count": 2000,
+        "only_answer_loss": true,
+        "truncate_top": false
+    },
+    "model_settings": {
+        "model_path": "/from_s3/model",
+        "model_type": "causal",
+        "transformers_settings": {
+        },
+        "model_kwargs": {
+            "attn_implementation": "flash_attention_2"
+        },
+        "embeddings_initialization_strategy": {
+            "<MS>": "bot",
+            "</MS>": "bot",
+            "<img>": "bot",
+            "<audio>": "bot"
+        },
+        "peft_settings": {
+            "r": 16,
+            "lora_alpha": 16,
+            "lora_dropout": 0.05,
+            "target_modules": [
+                "q_proj",
+                "v_proj",
+                "k_proj",
+                "o_proj"
+            ],
+            "task_type": "CAUSAL_LM",
+            "modules_to_save": ["embed_tokens", "lm_head"],
+            "name": "LORA"
+        }
+    },
+    "tokenizer_settings": {
+        "tokenizer_path": "/from_s3/model"
+    },
+    "special_tokens_settings": {
+        "bos_token": "<|begin_of_text|>",
+        "eos_token": "<|im_end|>",
+        "pad_token": "<|end_of_text|>"
+    },
+    "trainer_settings": {
+        "evaluation_strategy": "steps",
+        "save_strategy": "steps",
+        "eval_steps": 250,
+        "save_steps": 250,
+        "per_device_train_batch_size": 2,
+        "per_device_eval_batch_size": 2,
+        "gradient_accumulation_steps": 16,
+        "logging_steps": 1,
+        "learning_rate": 1e-4,
+        "num_train_epochs": 1,
+        "lr_scheduler_type": "cosine",
+        "warmup_ratio": 0.3,
+        "fp16": false,
+        "bf16": true,
+        "optim": "adamw_torch",
+        "save_total_limit": 5,
+        "load_best_model_at_end": false,
+        "deepspeed": "configs/exp/deepspeed/stage2.json",
+        "dispatch_batches": false,
+        "dataloader_num_workers": 16,
+        "dataloader_pin_memory": false
+    },
+    "wandb_settings": {
+        "project_name": "rykov",
+        "run_name": "multimodal",
+        "entity": "rykov"
+    },
+    "log_path": "train_output",
+    "modality_encoder_settings_mapping": {
+        "image": {
+            "modality_encoder_type": "clip",
+            "is_pickle": true,
+            "encoder_path": "/from_s3/clip"
+        },
+        "audio": null
+    },
+    "modality_projector_mapping": {
+        "image": "llava",
+        "audio": null
+    },
+    "modality_projector_initialization_mapping": {
+        "image": null,
+        "audio": null
+    },
+    "cherry_pick_settings": {
+        "generator_transformers_settings": {
+            "num_beams": 1,
+            "max_new_tokens": 64,
+            "repetition_penalty": 1.0,
+            "stop_strings": "<|eot_id|>"
+        },
+        "custom_generation_settings": {
+            "skip_special_tokens": true
+          },
+        "dataset_settings": {
+            "sources": [
+                {
+                    "name": "cherry_pickls",
+                    "records_path": "/from_s3/dataset/llava_next_data_dialogs/test_chat.jsonl",
+                    "num_samples": 100
+                }
+            ],
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "assistant",
+                    "user": "user",
+                    "system": "system"
+                },
+                "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+                "suffix_template": "<|eot_id|>"
+            },
+            "dataset_type": "multimodal",
+            "max_tokens_count": 2000,
+            "n_modality_embeddings": 576,
+            "start_modality_token": "<MS>",
+            "end_modality_token": "</MS>",
+            "only_answer_loss": true,
+            "random_cut": true,
+            "modality_token_mapping": {
+                "image": "<img>",
+                "audio": "<audio>"
+            },
+            "modality_reader_settings_mapping": {
+                "image": {
+                    "reader_type": "pickle",
+                    "reader_path": null
+                },
+                "audio": null
+        },
+            "truncate_top": false
+        },
+        "metric_settings": []
+    }
+}
