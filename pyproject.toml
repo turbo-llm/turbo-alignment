@@ -70,7 +70,7 @@ annotated-types = "^0.6.0"
 
 [tool.poetry.extras]
 deepspeed = ["deepspeed", "accelerate"]
-gpu = ["faiss-gpu", "xformers"]
+gpu = ["faiss-gpu", "xformers", "vllm"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
