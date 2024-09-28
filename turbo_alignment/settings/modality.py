@@ -41,3 +41,4 @@ class ModalityProjectorType(str, Enum):
     ATTENTION_POOLING = 'attention_pooling'
     TOP_K_ATTENTION_POOLING = 'top_k_attention_pooling'
     THRESHOLD_SELECTOR = 'threshold_selector'
+    LLAVA_WITH_REPLICA = 'llava_with_replica'

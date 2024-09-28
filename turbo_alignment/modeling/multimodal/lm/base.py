@@ -12,6 +12,7 @@ from turbo_alignment.settings.modality import Modality, ModalityProjectorType
 class BaseMultiModalModeling(Module, ABC):
     def __init__(
         self,
+        tokenizer,
         language_model: PreTrainedModel,
         encoders: dict[Modality, BaseModalityEncoder],
         n_modality_embs: int,
@@ -31,6 +32,7 @@ class BaseMultiModalModeling(Module, ABC):
         self.modality_projector_mapping = modality_projector_mapping
         self.modality_projector_initialization_mapping = modality_projector_initialization_mapping
         self.peft = peft
+        self.tokenizer = tokenizer
 
         self.language_model_dim = (
             language_model.base_model.model.model.embed_tokens.modules_to_save.default.weight.shape[1]

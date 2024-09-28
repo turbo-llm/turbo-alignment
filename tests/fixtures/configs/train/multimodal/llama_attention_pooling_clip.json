@@ -22,8 +22,8 @@
       },
       "modality_reader_settings_mapping": {
         "image": {
-          "reader_type": "pickle",
-          "reader_path": null
+          "reader_type": "clip",
+          "reader_path": "tests/fixtures/models/clip_tiny"
         },
         "audio": null
       },
@@ -31,7 +31,7 @@
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
-      "max_tokens_count": 300,
+      "max_tokens_count": 2000,
       "only_answer_loss": true,
       "truncate_top": false
     },
@@ -58,8 +58,8 @@
       },
       "modality_reader_settings_mapping": {
         "image": {
-          "reader_type": "pickle",
-          "reader_path": null
+          "reader_type": "clip",
+          "reader_path": "tests/fixtures/models/clip_tiny"
         },
         "audio": null
       },
@@ -67,7 +67,7 @@
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
-      "max_tokens_count": 300,
+      "max_tokens_count": 2000,
       "only_answer_loss": true,
       "truncate_top": false
     },
@@ -133,13 +133,13 @@
     "modality_encoder_settings_mapping": {
       "image": {
         "modality_encoder_type": "clip",
-        "is_pickle": true,
+        "is_pickle": false,
         "encoder_path": "tests/fixtures/models/clip_tiny"
       },
       "audio": null
     },
     "modality_projector_mapping": {
-      "image": "c_abstractor",
+      "image": "attention_pooling",
       "audio": null
     },
     "modality_projector_initialization_mapping": {
@@ -149,7 +149,7 @@
     "cherry_pick_settings": {
       "generator_transformers_settings": {
         "num_beams": 1,
-        "max_new_tokens": 16,
+        "max_new_tokens": 128,
         "repetition_penalty": 1.1,
         "stop_strings": "</RS>",
         "do_sample": true
@@ -175,7 +175,7 @@
           "suffix_template": "</RS>"
         },
         "dataset_type": "multimodal",
-        "max_tokens_count": 300,
+        "max_tokens_count": 2000,
         "n_modality_embeddings": 225,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
@@ -186,8 +186,8 @@
         },
         "modality_reader_settings_mapping": {
           "image": {
-            "reader_type": "pickle",
-            "reader_path": null
+            "reader_type": "clip",
+            "reader_path": "tests/fixtures/models/clip_tiny"
           },
           "audio": null
         },

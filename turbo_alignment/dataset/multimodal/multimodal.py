@@ -19,6 +19,7 @@ from turbo_alignment.dataset.chat.models import ChatDatasetRecord, ChatMessage
 from turbo_alignment.dataset.multimodal.models import (
     MultimodalDatasetRecord,
     MultimodalFileMessage,
+    MultimodalMessage,
     MultimodalTextMessage,
 )
 from turbo_alignment.dataset.registry import MultimodalDatasetTypeRegistry
@@ -94,32 +95,28 @@ class MultimodalDataset(AlignmentIterableDataset[MultimodalDatasetRecord], ABC):
             return [MultimodalDatasetRecord(**record) for record in records]
         raise NotImplementedError
 
-    def __get_modality_message(self, modality: Modality) -> str:
-        assert modality != Modality.TEXT
-        modality_token = self._modality_token_mapping[modality]
+    def __get_modality_message(self, msg) -> str:
+        modality_token = self._modality_token_mapping[Modality.IMAGE]
         modality_message_span = ''.join(modality_token for _ in range(self._n_modality_embeddings))
-        return f'{self._start_modality_token}{modality_message_span}{self._end_modality_token}'
+        return f'{msg.content}\n{self._start_modality_token}{modality_message_span}{self._end_modality_token}'
 
     def _convert_to_chat(self, record: MultimodalDatasetRecord) -> ChatDatasetRecord:
-        """
-        Обычные текстовые сообщения оставляем без изменений, а мультимодальные сообщения
-        преобразуем в <M><modality_tag><modality_tag>...</M>.
-        <modality_tag> повторяется n_modality_embeddings раз.
-        """
-
         converted_messages: list[ChatMessage] = []
         for msg in record.messages:
-            if isinstance(msg, MultimodalTextMessage):
-                converted_messages.append(
-                    ChatMessage(role=msg.role, content=msg.content, disable_loss=msg.disable_loss)
-                )
-            else:
+            print(msg)
+            print(hasattr(msg, 'modality_object_path'))
+
+            if msg.modality_object_path:  # if there is a path to modality object
                 converted_messages.append(
                     ChatMessage(
                         role=msg.role,
-                        content=self.__get_modality_message(msg.type),
+                        content=self.__get_modality_message(msg),
                         disable_loss=msg.disable_loss,
                     )
+                )
+            else:  # if the message is textual
+                converted_messages.append(
+                    ChatMessage(role=msg.role, content=msg.content, disable_loss=msg.disable_loss)
                 )
 
         return ChatDatasetRecord(id=record.id, messages=converted_messages)
@@ -178,9 +175,7 @@ class TrainMultimodalDataset(MultimodalDataset):
             (self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
         )
 
-        modality_messages: list[MultimodalFileMessage] = [
-            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
-        ]
+        modality_messages: list[MultimodalMessage] = [m for m in record['messages'] if m.modality_object_path]
 
         messages_to_delete = len(modality_messages) - modality_messages_after_truncation
 
@@ -192,9 +187,11 @@ class TrainMultimodalDataset(MultimodalDataset):
         modality_encodings: list[tuple[Modality, torch.Tensor]] = []
         try:
             for msg in modality_messages:
-                reader = self._modality_readers[msg.type]
-                modality_encodings.append((msg.type, reader.read(msg.content)))
-        except (OSError, RuntimeError, KeyError):
+                # reader = self._modality_readers[msg.type]
+                reader = self._modality_readers[Modality.IMAGE]
+                modality_encodings.append((Modality.IMAGE, reader.read(msg.modality_object_path)))
+                # modality_encodings.append((msg.type, reader.read(msg.content)))
+        except (OSError, RuntimeError, KeyError) as E:
             return None
 
         # record['modality_inputs'] = modality_encodings
@@ -202,7 +199,6 @@ class TrainMultimodalDataset(MultimodalDataset):
         if len(modality_encodings) != modality_messages_after_truncation:
             return None
 
-        # return record
         return modality_encodings
 
     def __iter__(self):
@@ -240,9 +236,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
     def _read_modalities(
         self, record: MultimodalDatasetRecord, modality_messages_after_truncation: int
     ) -> list[tuple[Modality, torch.Tensor]]:
-        modality_messages: list[MultimodalFileMessage] = [
-            m for m in record.messages if isinstance(m, MultimodalFileMessage)
-        ]
+        modality_messages: list[MultimodalMessage] = [m for m in record.messages if m.modality_object_path]
 
         messages_to_delete = len(modality_messages) - modality_messages_after_truncation
 
@@ -253,9 +247,11 @@ class InferenceMultimodalDataset(MultimodalDataset):
 
         modality_encodings: list[tuple[Modality, torch.Tensor]] = []
         for msg in modality_messages:
-            reader = self._modality_readers[msg.type]
+            # reader = self._modality_readers[msg.type]
+            reader = self._modality_readers[Modality.IMAGE]
             print('inference reader')
-            modality_encodings.append((msg.type, reader.read(msg.content)))
+            # modality_encodings.append((msg.type, reader.read(msg.content)))
+            modality_encodings.append((Modality.IMAGE, reader.read(msg.modality_object_path)))
         return modality_encodings
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
@@ -291,7 +287,8 @@ class InferenceMultimodalDataset(MultimodalDataset):
             if 'labels' in tokenized_record:
                 tokenized_record['labels'][modality_tokens_mask] = DISABLE_LOSS_LABEL
 
-            modality_object_paths = [str(r.content) for r in record.messages if r.type in ('image', 'audio')]
+            # modality_object_paths = [str(r.content) for r in record.messages if r.type in ('image', 'audio')]
+            modality_object_paths = [str(r.modality_object_path) for r in record.messages if r.modality_object_path]
 
             outputs.append(
                 {

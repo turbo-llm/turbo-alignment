@@ -95,6 +95,9 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
     ) -> torch.nn.Module | PreTrainedModel:
         language_model = load_model(experiment_settings.model_settings, tokenizer)
 
+        print(tokenizer)
+        exit()
+
         modality_encoders = TrainMultimodalStrategy._load_modality_encoders(
             experiment_settings.modality_encoder_settings_mapping,
             device=language_model.device,
@@ -108,6 +111,7 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
             modality_projector_mapping=experiment_settings.modality_projector_mapping,
             modality_projector_initialization_mapping=experiment_settings.modality_projector_initialization_mapping,
             peft=True,
+            tokenizer=tokenizer,
         )
 
     def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:

@@ -3,7 +3,7 @@
       "sources": [
         {
           "name": "train",
-          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+          "records_path": "tests/fixtures/datasets/multimodal/new_image_chat.jsonl",
           "sample_rate": 1
         }
       ],
@@ -39,7 +39,7 @@
       "sources": [
         {
           "name": "test",
-          "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+          "records_path": "tests/fixtures/datasets/multimodal/new_image_chat.jsonl",
           "sample_rate": 1
         }
       ],
@@ -116,14 +116,15 @@
       "gradient_accumulation_steps": 1,
       "logging_steps": 1,
       "learning_rate": 0.00002,
-      "num_train_epochs": 1,
+      "num_train_epochs": 5,
       "lr_scheduler_type": "cosine",
       "warmup_steps": 0,
       "fp16": false,
       "bf16": false,
       "optim": "adamw_torch",
       "save_total_limit": 1,
-      "no_cuda": true
+      "no_cuda": true,
+      "dispatch_batches": false
     },
     "wandb_settings": {
       "project_name": "alignment",
@@ -139,7 +140,7 @@
       "audio": null
     },
     "modality_projector_mapping": {
-      "image": "llava",
+      "image": "llava_with_replica",
       "audio": null
     },
     "modality_projector_initialization_mapping": {
@@ -161,7 +162,7 @@
         "sources": [
           {
             "name": "cherry_picks",
-            "records_path": "tests/fixtures/datasets/multimodal/image_chat.jsonl",
+            "records_path": "tests/fixtures/datasets/multimodal/new_image_chat.jsonl",
             "sample_rate": 1
           }
         ],

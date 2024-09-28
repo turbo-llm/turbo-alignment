@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 from scipy.ndimage.measurements import find_objects, label
+from torch.nn.utils.rnn import pad_sequence
 from transformers.utils import ModelOutput
 
 from turbo_alignment.common.logging import get_project_logger
@@ -53,6 +54,38 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
 
         self.config = self.language_model.config
 
+    @staticmethod
+    def get_replica_spans(input_ids, start_token_id=32000, end_token_id=32001):
+        spans = []
+        inside_replica = False
+        start_idx = 0
+
+        for i, token_id in enumerate(input_ids):
+            if token_id == start_token_id:
+                inside_replica = True
+                start_idx = i
+            elif token_id == end_token_id and inside_replica:
+                spans.append((start_idx, i))
+                inside_replica = False
+
+        return spans
+
+    @staticmethod
+    def filter_replica_spans_with_modality(replica_spans, modality_spans):
+        filtered_spans = []
+
+        # Convert slice objects to start and end indices for modality spans
+        modality_indices = [(s[0].start, s[0].stop - 1) for s in modality_spans]  # FIXME: why [0]?
+
+        # Check if each replica span includes any modality span
+        for r_start, r_end in replica_spans:
+            for m_start, m_end in modality_indices:
+                if r_start <= m_start and r_end >= m_end:
+                    filtered_spans.append((r_start, r_end))
+                    break  # No need to check other modality spans once one is found
+
+        return filtered_spans
+
     def convert_inputs_to_embeds(
         self,
         input_ids: torch.LongTensor,
@@ -63,13 +96,15 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
 
         lm_input_embeds = self.language_model.base_model.model.model.embed_tokens.modules_to_save.default(input_ids)
 
-        for sample_lm_input_embeds, sample_modality_tokens_mask, sample_modality_inputs in zip(
-            lm_input_embeds, modality_tokens_mask, modality_inputs
+        for sample_input_ids, sample_lm_input_embeds, sample_modality_tokens_mask, sample_modality_inputs in zip(
+            input_ids, lm_input_embeds, modality_tokens_mask, modality_inputs
         ):
             span_mask, _ = label(
                 sample_modality_tokens_mask.cpu().detach().numpy()
             )  # returns mask with ids of spans from 1 to N
             modality_spans = find_objects(span_mask)  # returns list of tuples with start index and end index
+            replica_spans = self.get_replica_spans(sample_input_ids)
+            filtered_replica_spans = self.filter_replica_spans_with_modality(replica_spans, modality_spans)
 
             assert len(modality_spans) == len(sample_modality_inputs)
 
@@ -97,7 +132,14 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
                         torch.stack(modality_encoder_inputs, dim=0).to(self.language_model.device).bfloat16()
                     )
 
-                modality_encoder_embeddings = self.modality_adapters[modality](encoded_modality_object_batch)
+                modality_replica_lm_input_embeds = pad_sequence(
+                    [sample_lm_input_embeds[span[0] : span[1]] for span in filtered_replica_spans],
+                    padding_value=0,
+                    batch_first=True,
+                )
+                modality_encoder_embeddings = self.modality_adapters[modality](
+                    encoded_modality_object_batch, modality_replica_lm_input_embeds
+                )
 
                 sorted_modality_embeddings[modality_encoder_input_indexes, :] = modality_encoder_embeddings.to(
                     sorted_modality_embeddings.dtype

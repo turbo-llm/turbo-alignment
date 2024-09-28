@@ -7,6 +7,14 @@ from turbo_alignment.dataset.chat.models import ChatMessageRole
 from turbo_alignment.settings.modality import Modality
 
 
+class MultimodalMessage(BaseModel):
+    role: ChatMessageRole
+    content: str
+    # modality_object_type: Literal[Modality.IMAGE] = Modality.IMAGE
+    modality_object_path: str | None = None
+    disable_loss: bool = False
+
+
 class MultimodalChatMessage(BaseModel):
     role: ChatMessageRole
     type: Modality
@@ -32,6 +40,7 @@ class MultimodalAudioMessage(MultimodalFileMessage):
 
 class MultimodalDatasetRecord(DatasetRecord):
     messages: list[
-        Annotated[MultimodalImageMessage | MultimodalAudioMessage | MultimodalTextMessage, Field(discriminator='type')]
+        # Annotated[MultimodalImageMessage | MultimodalAudioMessage | MultimodalTextMessage, Field(discriminator='type')]
+        MultimodalMessage
     ]
     label: str | None = None
