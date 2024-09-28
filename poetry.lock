@@ -7781,7 +7781,7 @@ type = ["pytest-mypy"]
 
 [extras]
 deepspeed = ["accelerate", "deepspeed"]
-gpu = ["faiss-gpu"]
+gpu = ["faiss-gpu", "vllm"]
 
 [metadata]
 lock-version = "2.0"
