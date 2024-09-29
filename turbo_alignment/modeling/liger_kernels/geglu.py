@@ -5,7 +5,7 @@ import torch.nn as nn
 import triton
 import triton.language as tl
 
-from turbo_alignment.common.tf.liger_kernels.utils import (
+from turbo_alignment.modeling.liger_kernels.utils import (
     calculate_settings,
     compare_version,
     ensure_contiguous,

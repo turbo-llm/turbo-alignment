@@ -1,9 +1,9 @@
 from transformers import PretrainedConfig, PreTrainedModel
 
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.common.tf.liger_kernels.cross_entropy import LigerCrossEntropyLoss
-from turbo_alignment.common.tf.liger_kernels.geglu import LigerGEGLUMLP
-from turbo_alignment.common.tf.liger_kernels.rope import liger_rotary_pos_emb
+from turbo_alignment.modeling.liger_kernels.cross_entropy import LigerCrossEntropyLoss
+from turbo_alignment.modeling.liger_kernels.geglu import LigerGEGLUMLP
+from turbo_alignment.modeling.liger_kernels.rope import liger_rotary_pos_emb
 
 logger = get_project_logger()
 
