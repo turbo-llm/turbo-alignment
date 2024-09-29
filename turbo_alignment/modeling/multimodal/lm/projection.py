@@ -54,8 +54,9 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
 
         self.config = self.language_model.config
 
-    @staticmethod
-    def get_replica_spans(input_ids, start_token_id=32000, end_token_id=32001):
+    def get_replica_spans(self, input_ids, start_token='<|start_header_id|>', end_token='<|eot_id|>'):
+        start_token_id = self.tokenizer.encode(start_token, add_special_tokens=False)[0]
+        end_token_id = self.tokenizer.encode(end_token, add_special_tokens=False)[0]
         spans = []
         inside_replica = False
         start_idx = 0

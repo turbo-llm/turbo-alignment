@@ -95,9 +95,6 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
     ) -> torch.nn.Module | PreTrainedModel:
         language_model = load_model(experiment_settings.model_settings, tokenizer)
 
-        print(tokenizer)
-        exit()
-
         modality_encoders = TrainMultimodalStrategy._load_modality_encoders(
             experiment_settings.modality_encoder_settings_mapping,
             device=language_model.device,

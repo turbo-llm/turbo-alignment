@@ -103,9 +103,6 @@ class MultimodalDataset(AlignmentIterableDataset[MultimodalDatasetRecord], ABC):
     def _convert_to_chat(self, record: MultimodalDatasetRecord) -> ChatDatasetRecord:
         converted_messages: list[ChatMessage] = []
         for msg in record.messages:
-            print(msg)
-            print(hasattr(msg, 'modality_object_path'))
-
             if msg.modality_object_path:  # if there is a path to modality object
                 converted_messages.append(
                     ChatMessage(
@@ -192,11 +189,13 @@ class TrainMultimodalDataset(MultimodalDataset):
                 modality_encodings.append((Modality.IMAGE, reader.read(msg.modality_object_path)))
                 # modality_encodings.append((msg.type, reader.read(msg.content)))
         except (OSError, RuntimeError, KeyError) as E:
+            # print("😆"*10, E)
             return None
 
         # record['modality_inputs'] = modality_encodings
 
         if len(modality_encodings) != modality_messages_after_truncation:
+            # print("😆"*10, "len(modality_encodings) != modality_messages_after_truncation")
             return None
 
         return modality_encodings
@@ -213,8 +212,11 @@ class TrainMultimodalDataset(MultimodalDataset):
             end = min(start + per_worker, end)
         for i, sample in enumerate(self.records[start:end]):
             output = self._read_modalities(sample)
+            # print("😇"*10, output)
             if output:
                 yield sample | {'modality_inputs': output}
+            # else:
+            #     yield sample
 
 
 @MultimodalDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
