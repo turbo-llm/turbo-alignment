@@ -1,8 +1,7 @@
-from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
-
 import torch
 from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 
 from turbo_alignment.common.tf.loaders.model.registry import (
     PeftConfigRegistry,
@@ -90,4 +89,3 @@ def load_model(
             model.base_model.model.score.weight.requires_grad = True
 
     return model
-
