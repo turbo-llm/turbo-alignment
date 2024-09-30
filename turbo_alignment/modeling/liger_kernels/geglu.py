@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+# pylint: skip-file
 import operator
 
 import torch

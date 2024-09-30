@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+# pylint: skip-file
 import torch
 import triton
 import triton.language as tl
