@@ -1,9 +1,13 @@
+import os
+from pathlib import Path
 from typing import Any
 
 import torch
+from peft import PeftModel
 from torch import nn
 from transformers import PreTrainedModel
 from transformers.trainer_pt_utils import nested_detach
+from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from transformers.utils import logging
 
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
@@ -64,3 +68,16 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
         labels = labels.long()
 
         return loss, logits, labels
+
+    def _save_checkpoint(self, model, trial, metrics=None):
+        if isinstance(model, PeftModel) and self.accelerator.state.deepspeed_plugin.zero_stage == 3:
+            logger.info('Running custom _save_checkpoint')
+            checkpoint_folder = f'{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}'
+            run_dir = self._get_output_dir(trial=trial)
+            output_dir = Path(os.path.join(run_dir, checkpoint_folder))
+
+            (output_dir / 'cls_head').mkdir(parents=True, exist_ok=True)
+
+            torch.save(model.base_model.model.score.state_dict(), output_dir / 'cls_head' / 'cls_head.pt')
+
+        return super()._save_checkpoint(model=model, trial=trial, metrics=metrics)  # pylint: disable=no-member
