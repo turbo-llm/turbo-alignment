@@ -130,31 +130,26 @@ python -m turbo_alignment train_kto --experiment_settings_path configs/exp/train
 <a name="-multimodal-train"></a>
 ## Multimodal train
 ⌛️  in progress..
-<!-- ## Multimodal Tasks 
-To start multimodal training, you should:
-- **Prepare the multimodal dataset**. See examples [here](docs/dataset_example.md#-multimodel-dataset).
-- **Preprocess the data (OPTIONAL)**. If you plan to run many experiments on the same dataset, you should preprocess it. The preprocessing stage includes reading `pixel_values` from images, encoding them with the specified encoder, and saving them in safetensors format. Later, during training, the pipeline will skip the stage of reading and encoding images and only extract prepared encodings from the safetensors files.
-- **Suitable config**: [llava.json](tests/fixtures/configs/train/multimodal/llama_llava_base_clip.json),[c_abs.json](tests/fixtures/configs/train/multimodal/llama_c_abs_clip_pickle.json) -->
+
 
 <a name="-rag-train"></a>
 ## RAG (Retrieval-Augmented Generation) 
-
 <a name="-sft-rag-train"></a>
 ### SFT-RAG
 - **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
 - **📝 Configs Example**: [sft_with_retrieval_utility](configs/exp/train/sft/llama/sft_with_retrieval_utility.json)
-- **🖥️ CLI launch command**: ```bash
+- **🖥️ CLI launch command**: 
+```bash
 python -m turbo_alignment train_sft --experiment_settings_path configs/exp/train/sft/llama/sft_with_retrieval_utility.json
 ```
-
 <a name="-e2e-rag-train"></a>
 ### End2End-RAG
 - **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
 - **📝 Configs Example**: [end2end_rag](configs/exp/train/rag/end2end_rag.json)
-- **🖥️ CLI launch command**: ```bash
+- **🖥️ CLI launch command**:
+```bash
 python -m turbo_alignment train_rag --experiment_settings_path configs/exp/train/rag/end2end_rag.json
 ```
-
 
 <a name="-inference"></a>
 # Inference
@@ -307,10 +302,11 @@ This project is licensed, see the [LICENSE](https://github.com/turbo-llm/turbo-a
 
 
 ## Citation
+Author names are listed in alphabetical order.
 
 ```bibtex
 @misc{surnachev2024turbo-alignment,
-  author = {Nikita Surnachev},
+  author = {Alexander Zamiralov and Alexey Gorbatovski and Alexey Malakhov and Boris Shaposhnikov and Daniil Taranets and Elisey Rykov and Nikita Surnachev and Sergey Kochetkov and Yana Shishkina},
   title = {turbo-alignment},
   year = {2024},
   publisher = {GitHub},
