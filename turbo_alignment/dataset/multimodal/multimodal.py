@@ -174,12 +174,16 @@ class TrainMultimodalDataset(MultimodalDataset):
 
         modality_messages: list[MultimodalMessage] = [m for m in record['messages'] if m.modality_object_path]
 
-        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+        # print("🙂"*10, modality_messages)
 
-        if self._truncate_top:
-            modality_messages = modality_messages[messages_to_delete:]
-        else:
-            modality_messages = modality_messages[:modality_messages_after_truncation]
+        # messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+
+        # if self._truncate_top:
+        #     modality_messages = modality_messages[messages_to_delete:]
+        # else:
+        #     modality_messages = modality_messages[:modality_messages_after_truncation]
+
+        # print("🙂"*10, modality_messages, len(modality_messages))
 
         modality_encodings: list[tuple[Modality, torch.Tensor]] = []
         try:
@@ -194,9 +198,9 @@ class TrainMultimodalDataset(MultimodalDataset):
 
         # record['modality_inputs'] = modality_encodings
 
-        if len(modality_encodings) != modality_messages_after_truncation:
-            # print("😆"*10, "len(modality_encodings) != modality_messages_after_truncation")
-            return None
+        # if len(modality_encodings) != modality_messages_after_truncation:
+            # print("😆"*10, f"len(modality_encodings) != modality_messages_after_truncation {modality_messages_after_truncation} {len(modality_encodings)}")
+            # return None
 
         return modality_encodings
 

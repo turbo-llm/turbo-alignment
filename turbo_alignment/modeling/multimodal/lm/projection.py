@@ -107,6 +107,8 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
             replica_spans = self.get_replica_spans(sample_input_ids)
             filtered_replica_spans = self.filter_replica_spans_with_modality(replica_spans, modality_spans)
 
+            # print("😆"*10, f"{len(modality_spans)=} {len(replica_spans)=} {len(sample_modality_inputs)=}")
+
             assert len(modality_spans) == len(sample_modality_inputs)
 
             grouped_modality_encoder_inputs: dict[Modality, list[tuple[int, torch.Tensor]]] = defaultdict(list)
@@ -121,7 +123,7 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
             ).to(self.language_model.device)
 
             # Encode modalities and insert into input embeds
-            for modality, modality_encoder_inputs_with_indices in grouped_modality_encoder_inputs.items():
+            for modality, modality_encoder_inputs_with_indices in grouped_modality_encoder_inputs.items(): # FIXME: works only with image modality
                 modality_encoder_input_indexes, modality_encoder_inputs = zip(*modality_encoder_inputs_with_indices)
 
                 if self.language_model.dtype == torch.float32:
@@ -134,10 +136,11 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
                     )
 
                 modality_replica_lm_input_embeds = pad_sequence(
-                    [sample_lm_input_embeds[span[0] : span[1]] for span in filtered_replica_spans],
+                    [sample_lm_input_embeds[replica_span[0] : modality_span[0].start] for replica_span, modality_span in zip(filtered_replica_spans, modality_spans)],
                     padding_value=0,
                     batch_first=True,
                 )
+
                 modality_encoder_embeddings = self.modality_adapters[modality](
                     encoded_modality_object_batch, modality_replica_lm_input_embeds
                 )
