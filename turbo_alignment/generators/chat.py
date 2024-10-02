@@ -11,30 +11,16 @@ from turbo_alignment.settings.generators.outputs.chat import (
 
 
 class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
-    def _generate_from_batch_records(
+    def generate_from_batch_records(
         self,
         dataset_name: str,
-        records: list[dict[str, torch.Tensor]],
+        records_batch: dict[str, torch.Tensor],
         original_records: list[ChatDatasetRecord] | None = None,
     ) -> list[ChatInferenceOutput]:
-        input_ids = [record['input_ids'].tolist() for record in records]
-        attention_mask = [record['attention_mask'].tolist() for record in records]
+        batched_input_ids = records_batch['input_ids'].to(self.device)
+        batched_attention_mask = records_batch['attention_mask'].to(self.device)
 
-        max_input_length = max(len(sample) for sample in input_ids)
-
-        batch = self._tokenizer.pad(
-            {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask,
-            },
-            padding='max_length',
-            max_length=max_input_length,
-            return_tensors='pt',
-        )
-
-        batched_input_ids = batch['input_ids'].to(self.device)
-        batched_attention_mask = batch['attention_mask'].to(self.device)
-
+        assert self._tokenizer.padding_side == 'left'
         output_indices = self._model.generate(
             inputs=batched_input_ids,
             attention_mask=batched_attention_mask,
@@ -43,66 +29,52 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
-        postprocessed_output_indices = self._postprocess(
-            input_indices=batched_input_ids,
-            output_indices=output_indices,
-            remove_prompt=self._custom_generation_settings.remove_prompt,
-        )
-
-        answers = self._decode(token_indices=postprocessed_output_indices)
-
         logits: torch.Tensor | None = None
-        input_token_ids: torch.Tensor | None = None
-        answer_tokens_ids: torch.Tensor | None = None
 
         if self._return_logits:
             with torch.no_grad():
-                logits = self._model(output_indices).logits.cpu()
+                logits = self._model(output_indices).logits
 
-                answer_tokens_ids = postprocessed_output_indices
-                input_token_ids = input_ids
+        postprocessed_output_indices, postprocessed_logits = self._postprocess(
+            input_indices=batched_input_ids,
+            output_indices=output_indices,
+            logits=logits,
+            remove_prompt=self._custom_generation_settings.remove_prompt,
+            only_answer_logits=self._custom_generation_settings.only_answer_logits,
+        )
+        answers = self._decode(token_indices=postprocessed_output_indices)
 
-        if original_records is not None:
-            return [
-                ChatInferenceOutput(
-                    id=original_record.id,
-                    dataset_name=dataset_name,
-                    messages=original_record.messages,
-                    label=original_record.label,
-                    meta=original_record.meta,
-                    answers=[
-                        AnswerMessage(
-                            id='0',
-                            content=answer,
-                            input_token_ids=None,
-                            answer_token_ids=None,
-                            logits=None,
-                        )
-                    ],
-                )
-                for original_record, answer in zip(original_records, answers)
-            ]
+        outputs = []
+        for i, input_ids in enumerate(batched_input_ids):
+            ans_batch_start = i * self._transformers_generator_parameters.num_return_sequences
+            ans_batch_end = (i + 1) * self._transformers_generator_parameters.num_return_sequences
+            batch_answer_tokens =  postprocessed_output_indices[ans_batch_start:ans_batch_end, :]
+            batch_answers = answers[ans_batch_start:ans_batch_end]
 
-        return [
-            ChatInferenceOutput(
-                id=None,
-                dataset_name=dataset_name,
-                messages=None,
-                label=None,
-                meta=None,
-                answers=[
-                    AnswerMessage(
-                        id='0',
-                        content=answer,
-                        input_token_ids=
+            for j, (answer, answer_tokens) in enumerate(zip(batch_answers, batch_answer_tokens)):
+                answer_logits = postprocessed_logits[i + j, :, :] if postprocessed_logits else None
+
+                outputs.append(
+                    ChatInferenceOutput(
+                        dataset_name=dataset_name,
+                        messages=original_records[i].messages if original_records else None,
+                        label=original_records[i].label if original_records else None,
+                        meta=original_records[i].meta if original_records else None,
+                        input_token_ids=input_ids,
+                        answers=[
+                            AnswerMessage(
+                                id=str(i),
+                                content=answer,
+                                answer_token_ids=answer_tokens,
+                                logits=answer_logits,
+                            )
+                        ],
                     )
-                ]
-            )
-            for id, answer in enumerate(answers)
+                )
 
-        ]
+        return outputs
 
-    def _generate_from_single_record(
+    def generate_from_single_record(
         self,
         dataset_name: str,
         record: dict[str, Any],
@@ -119,49 +91,35 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
-        postprocessed_output_indices = self._postprocess(
-            input_indices=input_ids,
-            output_indices=output_indices,
-            remove_prompt=self._custom_generation_settings.remove_prompt,
-        )
-
-        answers = self._decode(token_indices=postprocessed_output_indices)
-
         logits: torch.Tensor | None = None
-        input_token_ids: torch.Tensor | None = None
-        answer_tokens_ids: torch.Tensor | None = None
 
         if self._return_logits:
             with torch.no_grad():
                 logits = self._model(output_indices).logits.cpu()
 
-            answer_tokens_ids = postprocessed_output_indices
-            input_token_ids = input_ids
+        postprocessed_output_indices, postprocessed_logits = self._postprocess(
+            input_indices=input_ids,
+            output_indices=output_indices,
+            logits=logits,
+            remove_prompt=self._custom_generation_settings.remove_prompt,
+            only_answer_logits=self._custom_generation_settings.only_answer_logits,
+        )
 
-            answer_messages = [
+        answers = self._decode(token_indices=postprocessed_output_indices)
+
+        answer_messages = []
+        for i, (answer, answer_tokens) in enumerate(zip(answers, postprocessed_output_indices)):
+            answer_logits = postprocessed_logits[i, :, :].unsqueeze(0) if postprocessed_logits else None
+            answer_messages.append(
                 AnswerMessage(
                     id=str(i),
-                    content=a,
-                    input_token_ids=input_token_ids,
-                    answer_token_ids=a_t_ids.unsqueeze(0),
-                    logits=l.unsqueeze(0),
+                    content=answer,
+                    answer_token_ids=answer_tokens.unsqueeze(0),
+                    logits=answer_logits,
                 )
-                for i, (a, a_t_ids, l) in enumerate(zip(answers, answer_tokens_ids, logits))  # type: ignore[arg-type]
-            ]
-        else:
-            answer_messages = [
-                AnswerMessage(
-                    id=str(i),
-                    content=a,
-                    input_token_ids=input_token_ids,
-                    answer_token_ids=answer_tokens_ids,
-                    logits=logits,
-                )
-                for i, a in enumerate(answers)
-            ]
+            )
 
         return ChatInferenceOutput(
-            id=original_record.id,
             dataset_name=dataset_name,
             messages=original_record.messages,
             label=original_record.label,

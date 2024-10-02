@@ -19,7 +19,7 @@ class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]
 
         super().__init__(tokenizer=tokenizer, **kwargs)
 
-    def _generate_from_batch(
+    def generate_from_batch(
         self, records: list[dict[str, Any]], original_records: list[PairPreferenceRecord], dataset_name: str
     ) -> list[RMPairInferenceOutput]:
         merged_inputs = [r['inputs_w'] for r in records] + [r['inputs_l'] for r in records]
@@ -51,7 +51,7 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
         self._micro_batch = micro_batch
         super().__init__(tokenizer=tokenizer, **kwargs)
 
-    def _generate_from_batch(
+    def generate_from_batch(
         self, records: list[dict[str, Any]], original_records: list[SamplingDatasetRecord], dataset_name: str
     ) -> list[RMSamplingInferenceOutput]:
         merged_inputs = [inputs for record in records for key, inputs in record['answers'].items()]

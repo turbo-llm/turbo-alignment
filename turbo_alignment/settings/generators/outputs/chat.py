@@ -10,7 +10,6 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
     id: str
     content: str
     sequence_score: float | None = None
-    input_token_ids: torch.Tensor | None = None
     answer_token_ids: torch.Tensor | None = None
     logits: torch.Tensor | None = None
 
@@ -19,6 +18,7 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
 
 
 class ChatInferenceOutput(BaseInferenceOutput):
+    input_token_ids: torch.Tensor | None
     answers: list[AnswerMessage]
     messages: list[ChatMessage] | None
     label: str | None = None

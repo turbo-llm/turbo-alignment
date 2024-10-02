@@ -26,7 +26,7 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
             **kwargs,
         )
 
-    def _generate_from_batch_records(
+    def generate_from_batch_records(
         self,
         records: list[dict[str, torch.Tensor]],
         original_records: list[MultimodalDatasetRecord],
@@ -34,7 +34,7 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
     ) -> list[MultimodalInferenceOutput]:
         raise ValueError('You can not use batch generation with multimodаl generator')
 
-    def _generate_from_single_record(
+    def generate_from_single_record(
         self,
         record: dict[str, torch.Tensor],
         original_record: MultimodalDatasetRecord,

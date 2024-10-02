@@ -136,6 +136,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
         training_args = self._get_training_args(experiment_settings)
 
+        print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
         self.tokenizer = self._load_tokenizer(experiment_settings)
 
         logger.info('Tokenizer is loaded!')

@@ -4,19 +4,19 @@ from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import DataCollatorMixin
 
+from turbo_alignment.common.tf.loaders import load_model
+from turbo_alignment.dataset.pair_preferences import PairPreferenceDataCollator
 from turbo_alignment.trainers.online.reinforce import REINFORCETrainer
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
-from turbo_alignment.dataset.chat.collators import REINFORCEDataCollator
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.reinforce import (
-    REINFORCETrainerSettings,
     REINFORCETrainExperimentSettings,
 )
 from turbo_alignment.trainers.online.reinforce import REINFORCETrainingArguments
@@ -31,7 +31,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
     ) -> Callable:
-        return REINFORCEDataCollator(tokenizer)
+        return PairPreferenceDataCollator(tokenizer=tokenizer)
 
     @staticmethod
     def _get_cherry_pick_callback(
@@ -65,18 +65,17 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     @staticmethod
     def _get_training_args(
         experiment_settings: REINFORCETrainExperimentSettings,
-    ) -> REINFORCETrainerSettings:
+    ) -> REINFORCETrainingArguments:
         return REINFORCETrainingArguments(
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,
-            # report_to=[],
             **experiment_settings.trainer_settings.dict(),
         )
 
     @staticmethod
     def _get_trainer(
-        training_args: REINFORCETrainerSettings,
+        training_args: REINFORCETrainingArguments,
         experiment_settings: REINFORCETrainExperimentSettings,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
@@ -84,6 +83,11 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         val_dataset: Dataset,
         data_collator: Callable,
     ):
+        # FIXME: different tokenizer for reward model
+        reward_model = load_model(experiment_settings.model_settings, tokenizer)
+        for _, param in reward_model.named_parameters():
+            param.requires_grad = False
+
         return REINFORCETrainer(
             args=training_args,
             tokenizer=tokenizer,
@@ -91,6 +95,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             data_collator=data_collator,
+            reward_model=reward_model,
             callbacks=[],
         )
 

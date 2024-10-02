@@ -54,7 +54,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
 
         self._return_logits = return_logits
 
-    def _generate_from_batch(
+    def generate_from_batch(
         self, records: list[dict[str, Any]], original_records: list[ChatDatasetRecord], dataset_name: str
     ) -> list[ChatInferenceOutput]:
         input_ids = [record['input_ids'].tolist() for record in records]

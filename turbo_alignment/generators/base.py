@@ -34,7 +34,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
         self._batch = batch
 
     @abstractmethod
-    def _generate_from_batch(
+    def generate_from_batch(
         self,
         dataset_name: str,
         records: list[dict[str, Any]],
@@ -64,7 +64,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
                 zip(records_batches, original_records_batches)
             ):
                 generations.append(
-                    self._generate_from_batch(
+                    self.generate_from_batch(
                         dataset.source.name,
                         records_batch,
                         original_records_batch,
@@ -75,7 +75,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
                 list(zip(records_batches, original_records_batches)), apply_padding=True
             ) as accelerator_records:
                 generations = [
-                    self._generate_from_batch(
+                    self.generate_from_batch(
                         dataset.source.name,
                         records_batch,
                         original_records_batch,
@@ -107,7 +107,7 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         self._custom_generation_settings = custom_generation_settings
 
     @abstractmethod
-    def _generate_from_single_record(
+    def generate_from_single_record(
         self,
         dataset_name: str,
         record: dict[str, torch.Tensor],
@@ -116,15 +116,15 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         ...
 
     @abstractmethod
-    def _generate_from_batch_records(
+    def generate_from_batch_records(
         self,
         dataset_name: str,
-        records: list[dict[str, torch.Tensor]],
+        records_batch: dict[str, torch.Tensor],
         original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         ...
 
-    def _generate_from_batch(
+    def generate_from_batch(
         self, dataset_name: str, records: list[dict[str, Any]], original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         if self._custom_generation_settings.batch > 1:
@@ -134,18 +134,46 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
             self._tokenizer.padding_side = 'left'
             self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 
-            return self._generate_from_batch_records(dataset_name, records, original_records)
+            input_ids = [record['input_ids'].tolist() for record in records]
+            attention_mask = [record['attention_mask'].tolist() for record in records]
+
+            max_input_length = max(len(sample) for sample in input_ids)
+
+            # FIXME: type batchencoding, not dict[str, tensor]
+            records_batch = self._tokenizer.pad(
+                {
+                    'input_ids': input_ids,
+                    'attention_mask': attention_mask,
+                },
+                padding='max_length',
+                max_length=max_input_length,
+                return_tensors='pt',
+            )
+
+            return self.generate_from_batch_records(dataset_name, records_batch, original_records)
 
         return [
-            self._generate_from_single_record(dataset_name, record, original_record)
+            self.generate_from_single_record(dataset_name, record, original_record)
             for record, original_record in zip(records, original_records)
         ]
 
     @staticmethod
-    def _postprocess(input_indices: torch.Tensor, output_indices: torch.Tensor, remove_prompt: bool) -> torch.Tensor:
+    def _postprocess(
+        input_indices: torch.Tensor,
+        output_indices: torch.Tensor,
+        logits: torch.Tensor | None,
+        remove_prompt: bool,
+        only_answer_logits: bool,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        processed_logits: torch.Tensor | None = None
+        if logits is not None :
+            processed_logits = logits.cpu()
+            if only_answer_logits:
+                processed_logits = logits[:, input_indices.shape[1] :, :].cpu()
+
         if remove_prompt:
-            return output_indices[:, input_indices.shape[1] :].cpu()
-        return output_indices.cpu()
+            return output_indices[:, input_indices.shape[1] :].cpu(), processed_logits
+        return output_indices.cpu(), logits
 
     def _decode(self, token_indices: torch.Tensor) -> list[str]:
         return self._tokenizer.batch_decode(

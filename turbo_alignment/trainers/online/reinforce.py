@@ -9,18 +9,19 @@ import torch.utils.data
 from datasets import Dataset
 from transformers import (
     PreTrainedModel,
-    PreTrainedTokenizer,
     TrainerCallback,
-    TrainingArguments,
+    TrainingArguments, PreTrainedTokenizerBase,
 )
 
+from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator
+from turbo_alignment.generators.base import ChatGeneratorBase, BaseGenerator
+from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.online import LLMActorType, CriticType
+from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.common.distributed import get_global_mean, get_global_std, get_log_mean_std
-from turbo_alignment.trainers.online.rm_actor import Critic
 from turbo_alignment.trainers.utils import prepare_model
 from turbo_alignment.trainers.online.reward_processor import RewardProcessor
-from turbo_alignment.trainers.online.llm_actor import LLMActor
 
 
 # FIXME
@@ -45,13 +46,15 @@ class REINFORCETrainingArguments(TrainingArguments):
     actor_type: str = LLMActorType.LOCAL_TRANSFORMERS
     critic_type: str = CriticType.LOCAL_TRANSFORMERS
 
+    rm_micro_batch: int = 1
+
 
 class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
     def __init__(
         self,
         args: REINFORCETrainingArguments,
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: PreTrainedTokenizerBase,
         policy: PreTrainedModel | torch.nn.Module,
         reward_model: PreTrainedModel | torch.nn.Module,
         train_dataset: Dataset,
@@ -94,30 +97,64 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         )
         assert len(stop_generation_token_id) == 1, stop_generation_token_id
 
-        # FIXME: registry
-        self.llm_actor = LLMActor.by_name(args.actor_type)(
-            max_tokens_count=args.max_tokens_count,
-            stop_token_id=stop_generation_token_id,
-            temperature=args.temperature,
+        self.rm_generator = RMSamplingGenerator(
+            model=reward_model,
             tokenizer=self.tokenizer,
+            micro_batch=args.rm_micro_batch,
+            accelerator=self.accelerator,
         )
-        self.critic = Critic.by_name(args.critic_type)(reward_model)
+        self.generator_transformers_settings = GeneratorTransformersSettings(
+            temperature=args.temperature,
+            max_length=args.max_tokens_count,
+        )
+        self.generator_custom_settings = CustomChatGenerationSettings(batch=self.args.per_device_train_batch_size)
         self.reward_processor = RewardProcessor(mean_baseline_coef=args.mean_baseline_coef)
 
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
 
+    def _get_rm_generator(self, reward_model: torch.nn.Module | PreTrainedModel) -> BaseGenerator:
+        match self.args.critic_type:
+            case CriticType.LOCAL_TRANSFORMERS:
+                generator = RMSamplingGenerator(
+                    model=reward_model,
+                    tokenizer=self.tokenizer,
+
+                )
+            case CriticType.DISTRIBUTED_VLLM:
+                generator = ...
+            case _:
+                raise ValueError(f'Critic {self.args.critic_type} is not supported')
+        return generator
+
+    def _get_chat_generator(self, model: torch.nn.Module | PreTrainedModel) -> ChatGeneratorBase:
+        match self.args.actor_type:
+            case LLMActorType.LOCAL_TRANSFORMERS:
+                generator = ChatGenerator(
+                    model=model,
+                    tokenizer=self.tokenizer,
+                    transformers_settings=self.generator_transformers_settings,
+                    custom_generation_settings=self.generator_custom_settings,
+                    accelerator=self.accelerator,
+                    return_logits=True,
+                )
+            case LLMActorType.DISTRIBUTED_VLLM:
+                generator = ...
+            case _:
+                raise ValueError(f'LLM Actor {self.args.actor_type} is not supported')
+        return generator
+
+
     def get_answers_and_rewards(
         self,
         model: torch.nn.Module | PreTrainedModel,
         inputs: dict[str, torch.Tensor],
     ) -> ...:
-        responses = self.llm_actor.generate_responses(
-            model=self.accelerator.unwrap_model(model),
-            queries=inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
-        )
+        generator = self._get_chat_generator(model)
+        generations = generator.generate_from_batch_records(dataset_name='online', records_batch=inputs)
+
+        print('GENERATIONS: ', generations)
 
         rewards = self.critic.generate_responses(responses)
         return responses, rewards
@@ -139,11 +176,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     rewards,
                 ),
                 gen_metrics,
-            ) = self.llm_actor.generate_responses(
+            ) = self.get_answers_and_rewards(
                 model=self.accelerator.unwrap_model(model),
-                queries=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-                train_eval=train_eval,
+                inputs=inputs,
             )
 
             ref_logprobs = self.get_logprobs(
@@ -216,6 +251,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         return loss.mean(), metrics
 
     def compute_loss(self, model, inputs, return_outputs: bool = False):
+        print("INPUTS: ", inputs)
         loss, metrics = self.get_batch_loss_metrics(model, inputs, "train")
 
         self.store_metrics(metrics=metrics, train_eval="train")
@@ -249,11 +285,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             all_rewards = []
             samples_processed = 0
             for batch in dataloader:
-                (_, _, _, _, rewards), _ = self.llm_actor.generate_responses(
-                    model=model,
-                    queries=batch["input_ids"],
-                    attention_mask=batch["attention_mask"],
-                    train_eval="eval",
+                (_, _, _, _, rewards), _ = self.get_answers_and_rewards(
+                    model=self.accelerator.unwrap_model(model),
+                    inputs=batch,
                 )
                 rewards, _ = self.reward_processor.postprocess_rewards(rewards=rewards)
 
