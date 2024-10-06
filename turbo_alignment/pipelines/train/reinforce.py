@@ -2,10 +2,9 @@ from typing import Callable
 
 from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
-from transformers.data.data_collator import DataCollatorMixin
+from transformers.data.data_collator import DataCollatorMixin, DataCollatorForTokenClassification
 
 from turbo_alignment.common.tf.loaders import load_model
-from turbo_alignment.dataset.pair_preferences import PairPreferenceDataCollator
 from turbo_alignment.trainers.online.reinforce import REINFORCETrainer
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
@@ -31,7 +30,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
     ) -> Callable:
-        return PairPreferenceDataCollator(tokenizer=tokenizer)
+        return DataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8)
 
     @staticmethod
     def _get_cherry_pick_callback(
@@ -83,8 +82,8 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         val_dataset: Dataset,
         data_collator: Callable,
     ):
-        # FIXME: different tokenizer for reward model
-        reward_model = load_model(experiment_settings.model_settings, tokenizer)
+        # TODO: different tokenizer for reward model
+        reward_model = load_model(experiment_settings.reward_model_settings, tokenizer)
         for _, param in reward_model.named_parameters():
             param.requires_grad = False
 

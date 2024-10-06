@@ -22,7 +22,6 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         model: LLM,
         tokenizer: PreTrainedTokenizerBase,
         batch: int,
-        return_logits: bool = False,
     ):
         model.set_tokenizer(tokenizer)
         super().__init__(model, tokenizer, batch=batch)
@@ -52,7 +51,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             **beam_search_params,
         )
 
-        self._return_logits = return_logits
+        self._custom_generation_settings = custom_generation_settings
 
     def generate_from_batch(
         self, records: list[dict[str, Any]], original_records: list[ChatDatasetRecord], dataset_name: str
@@ -74,7 +73,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
                     content=a.text,
                     sequence_score=a.cumulative_logprob,
                 )
-                if self._return_logits:
+                if self._custom_generation_settings.return_logits:
                     ans_msg.input_token_ids = torch.tensor(request_output.prompt_token_ids).unsqueeze(0)
                     ans_msg.answer_token_ids = torch.tensor(a.token_ids).unsqueeze(0)
 

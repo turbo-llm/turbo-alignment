@@ -60,7 +60,7 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
         input_token_ids: torch.Tensor | None = None
         answer_tokens_ids: torch.Tensor | None = None
 
-        if self._return_logits:
+        if self._custom_generation_settings.return_logits:
             with torch.no_grad():
                 logits = self._model(output_indices).logits
 

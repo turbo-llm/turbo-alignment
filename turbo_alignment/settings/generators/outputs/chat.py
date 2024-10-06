@@ -9,8 +9,9 @@ from typing import Any
 class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
     id: str
     content: str
+    answer_token_ids: torch.Tensor
+    answer_attention_mask: torch.Tensor
     sequence_score: float | None = None
-    answer_token_ids: torch.Tensor | None = None
     logits: torch.Tensor | None = None
 
     class Config:
@@ -18,11 +19,15 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
 
 
 class ChatInferenceOutput(BaseInferenceOutput):
-    input_token_ids: torch.Tensor | None
+    input_token_ids: torch.Tensor
+    input_attention_mask: torch.Tensor
     answers: list[AnswerMessage]
     messages: list[ChatMessage] | None
     label: str | None = None
     meta: dict[str, Any] | None = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class RagInferenceOutput(ChatInferenceOutput):

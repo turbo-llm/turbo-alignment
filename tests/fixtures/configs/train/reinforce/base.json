@@ -104,6 +104,9 @@
   "reward_model_settings": {
     "model_path": "tests/fixtures/models/llama2_tiny",
     "model_type": "seq_cls",
+    "model_kwargs": {
+      "num_labels": 1
+    },
     "transformers_settings": {}
   },
   "model_settings": {
