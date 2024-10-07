@@ -37,6 +37,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SimPOLossSettings,
     SlicHfLossSettings,
     SyncRefModelSettings,
+    RDPOLossSettings,
 )
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
@@ -61,6 +62,8 @@ class SigmoidLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int | None,
+        rejected_lens: int | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
@@ -95,6 +98,8 @@ class KTOLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         chosen_KL = (policy_chosen_logps - reference_chosen_logps).mean().clamp(min=0)
         rejected_KL = (policy_rejected_logps - reference_rejected_logps).mean().clamp(min=0)
@@ -129,6 +134,8 @@ class IPOLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
@@ -157,6 +164,8 @@ class CPOLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
@@ -188,6 +197,8 @@ class HingeLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
@@ -220,6 +231,8 @@ class SlicHfLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
@@ -254,6 +267,8 @@ class SimPOLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor | None,
         reference_rejected_logps: torch.FloatTensor | None,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
 
@@ -263,6 +278,46 @@ class SimPOLoss(DPOLossRegistry):
         rejected_rewards = self.beta * (policy_rejected_logps).detach()
 
         loss = -F.logsigmoid(self.beta * logits)
+
+        return (
+            loss,
+            chosen_rewards,
+            rejected_rewards,
+        )
+
+
+@DPOLossRegistry.register(DPOLossesType.RDPO)
+class RDPOLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, alpha: float = 0, **kwargs) -> None:
+        self.beta = beta
+        self.alpha = alpha
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        policy_best_decode_logps: torch.FloatTensor | None,
+        precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pi_logratios = policy_chosen_logps - policy_rejected_logps
+        ref_logratios = reference_chosen_logps - reference_rejected_logps
+
+        logits = pi_logratios - ref_logratios
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        unscaled = self.beta * logits
+
+        if chosen_lens is not None and rejected_lens is not None:
+            unscaled -= self.alpha * rejected_lens - self.alpha * chosen_lens
+
+        loss = -F.logsigmoid(unscaled)
 
         return (
             loss,
@@ -284,6 +339,8 @@ class ORPOLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor | None,
         reference_rejected_logps: torch.FloatTensor | None,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         log_odds = (policy_chosen_logps - policy_rejected_logps) - (
             torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
@@ -312,6 +369,8 @@ class SigmoidLossWithMargin(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
@@ -346,6 +405,8 @@ class APODownLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         chosen_logratios = policy_chosen_logps - reference_chosen_logps
         rejected_logratios = policy_rejected_logps - reference_rejected_logps
@@ -378,6 +439,8 @@ class APOZeroLoss(DPOLossRegistry):
         reference_chosen_logps: torch.FloatTensor,
         reference_rejected_logps: torch.FloatTensor,
         precomputed_margins: torch.FloatTensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         chosen_logratios = policy_chosen_logps - reference_chosen_logps
         rejected_logratios = policy_rejected_logps - reference_rejected_logps
@@ -412,6 +475,7 @@ class DPOTrainingArguments(TrainingArguments):
         | SigmoidLossWithMarginSettings
         | APOZeroLossSettings
         | APODownLossSettings
+        | RDPOLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
@@ -507,6 +571,8 @@ class DPOTrainer(Trainer):
         reference_chosen_logps: torch.Tensor,
         reference_rejected_logps: torch.Tensor,
         precomputed_margins: torch.Tensor | None,
+        chosen_lens: int| None,
+        rejected_lens: int| None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self.dpo_loss_registry.compute_loss(
             policy_chosen_logps=policy_chosen_logps,
@@ -514,6 +580,8 @@ class DPOTrainer(Trainer):
             reference_chosen_logps=reference_chosen_logps,
             reference_rejected_logps=reference_rejected_logps,
             precomputed_margins=precomputed_margins,
+            chosen_lens=chosen_lens,
+            rejected_lens=rejected_lens,
         )
 
     def _get_batch_logps(
@@ -559,9 +627,16 @@ class DPOTrainer(Trainer):
         chosen_logps = all_logps[:chosen_idxs]
         rejected_logps = all_logps[chosen_idxs : chosen_idxs + rejected_idx]
 
+        if self.loss_type == DPOLossesType.RDPO:
+            chosen_lens = len(torch.where(batch['inputs_w']['labels'] != -100)[1])
+            rejected_lens = len(torch.where(batch['inputs_l']['labels'] != -100)[1])
+        else:
+            chosen_lens = None
+            rejected_lens = None
+
         chosen_logits = all_logits[:chosen_idxs]
         rejected_logits = all_logits[chosen_idxs:]
-        return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
+        return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins, chosen_lens, rejected_lens
 
     def _get_logps(self, model: nn.Module | None, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
         with torch.no_grad():
@@ -591,6 +666,8 @@ class DPOTrainer(Trainer):
             policy_chosen_logits,
             policy_rejected_logits,
             precomputed_margins,
+            chosen_lens,
+            rejected_lens,
         ) = self.concatenated_forward(model, batch)
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
@@ -604,6 +681,8 @@ class DPOTrainer(Trainer):
             reference_chosen_logps=reference_chosen_logps,
             reference_rejected_logps=reference_rejected_logps,
             precomputed_margins=precomputed_margins,
+            chosen_lens=chosen_lens,
+            rejected_lens=rejected_lens,
         )
 
         prefix = 'eval_' if train_eval == 'eval' else ''
@@ -671,6 +750,8 @@ class DPOTrainer(Trainer):
                     reference_chosen_logps=sft_chosen_logps,
                     reference_rejected_logps=sft_rejected_logps,
                     precomputed_margins=precomputed_margins,
+                    chosen_lens=chosen_lens,
+                    rejected_lens=rejected_lens,
                 )
 
             sft_prefix_name = prefix + 'rewards/sft_'
