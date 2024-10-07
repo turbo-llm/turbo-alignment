@@ -299,18 +299,3 @@ This project is licensed, see the [LICENSE](https://github.com/turbo-llm/turbo-a
 - Registry implementation inspired by Matt Gardner, Joel Grus, Mark Neumann, Oyvind Tafjord, Pradeep Dasigi, Nelson F. Liu, Matthew Peters, Michael Schmitz, and Luke S. Zettlemoyer. 2017. AllenNLP: A Deep Semantic Natural Language Processing Platform. Available at: [arXiv:1803.07640](https://arxiv.org/abs/1803.07640).
 
 - Liger Kernels implementation inspired by Hsu, Pin-Lun, Dai, Yun, Kothapalli, Vignesh, Song, Qingquan, Tang, Shao, and Zhu, Siyu, 2024. Liger-Kernel: Efficient Triton Kernels for LLM Training. Available at: [https://github.com/linkedin/Liger-Kernel](https://github.com/linkedin/Liger-Kernel).
-
-
-## Citation
-Author names are listed in alphabetical order.
-
-```bibtex
-@misc{surnachev2024turbo-alignment,
-  author = {Alexander Zamiralov and Alexey Gorbatovski and Alexey Malakhov and Boris Shaposhnikov and Daniil Taranets and Elisey Rykov and Nikita Surnachev and Sergey Kochetkov and Yana Shishkina},
-  title = {turbo-alignment},
-  year = {2024},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/turbo-llm/turbo-alignment}}
-}
-```
