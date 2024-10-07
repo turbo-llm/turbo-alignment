@@ -1,6 +1,7 @@
 import torch
 from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 
 from turbo_alignment.common.tf.loaders.model.registry import (
     PeftConfigRegistry,
@@ -9,6 +10,7 @@ from turbo_alignment.common.tf.loaders.model.registry import (
 from turbo_alignment.modeling.liger_kernels import apply_liger_kernel_to_gemma2
 from turbo_alignment.settings.model import (
     ModelForPeftSettings,
+    ModelType,
     PreTrainedAdaptersModelSettings,
     PreTrainedModelSettings,
 )
@@ -84,5 +86,14 @@ def load_model(
     elif isinstance(model_settings, ModelForPeftSettings):
         # creating learnable adapters and freezing non-training parameters
         model = _prepare_model_for_peft(model, model_settings.peft_settings)
+
+        # deepspeed stage3 is currently doens't work with seq_cls head and peft
+        if model_settings.model_type == ModelType.SEQ_CLS and is_deepspeed_zero3_enabled():
+            model.base_model.model.score = torch.nn.Linear(
+                in_features=model.base_model.model.score.original_module.in_features,
+                out_features=model.base_model.model.score.original_module.out_features,
+                bias=model.base_model.model.score.original_module.bias,
+            )
+            model.base_model.model.score.weight.requires_grad = True
 
     return model
