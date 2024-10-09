@@ -51,7 +51,7 @@
         "is_trainable": true
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "do_sample": false,
             "stop_strings": "</RS>",

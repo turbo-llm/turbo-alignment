@@ -49,7 +49,7 @@
         "is_trainable": true
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "max_new_tokens": 8
         },

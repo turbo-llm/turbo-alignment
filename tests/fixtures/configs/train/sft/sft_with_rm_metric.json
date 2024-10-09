@@ -67,10 +67,11 @@
         }
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "num_return_sequences": 2,
             "stop_strings": "</RS>",
+            "do_sample": true,
             "max_new_tokens": 8
         },
         "custom_generation_settings": {

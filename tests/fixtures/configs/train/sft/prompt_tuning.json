@@ -59,7 +59,7 @@
   }
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "max_new_tokens": 35,
             "repetition_penalty": 1.1,
