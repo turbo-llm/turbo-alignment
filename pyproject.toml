@@ -3,19 +3,22 @@ name = "turbo-alignment"
 packages = [
     { include = "turbo_alignment" },
 ]
-version = "0.0.3"
+version = "0.0.2"
 description = "turbo-alignment repository"
 authors = ["T Mega Alignment Team <n.surnachev@tcsbank.ru>" ]
+readme = "README.md"
+repository = "https://github.com/turbo-llm/turbo-alignment"
+keywords = ["alignment", "llm", "dpo", "ppo", "rlhf"]
 
 
 [tool.poetry.dependencies]
 python = "^3.10"
-transformers = "4.42.0"
+transformers = "4.43.1"
 peft = "0.8.2"
 typer ="^0.9.0"
 wandb ="^0.15.3"
 scipy = "^1.1.0"
-torch = "2.1.2"
+torch = "2.3.1"
 numpy = "^1.21"
 tomlkit ="^0.11.8"
 platformdirs ="^3.5.3"
@@ -30,27 +33,26 @@ protobuf ="^3.20.0"
 rouge-score ="^0.1.2"
 ftfy ="^6.1.1"
 iopath ="^0.1.10"
-torchaudio ="^2.0.2"
-pytorchvideo ="^0.1.5"
 jupyter ="^1.0.0"
 evaluate ="^0.4.1"
-albumentations ="^1.3.1"
-soundfile ="^0.12.1"
 wheel ="^0.42.0"
 datasets ="^2.18.0"
 pydantic-settings ="^2.2.1"
 pydantic ="^2.7.0"
-timm ="^0.9.7"
-opencv-python = "^4.10.0.84"
 langchain-huggingface = "^0.0.3"
 clearml = "^1.16.4"
 cached-path = "^1.6.3"
+timm = "^0.9.7"
+pytorchvideo = "^0.1.5"
+torchaudio = "^2.0.2"
+soundfile = "^0.12.1"
+albumentations = "^1.3.1"
+opencv-python = "^4.10.0.84"
 
 faiss-gpu = { version = "^1.7.2", optional = true }
-xformers = { version = "^0.0.23.post1", optional = true }
-vllm = { version = "^0.4.0.post1", optional = true }
 deepspeed = { version = "0.12", optional = true }
-accelerate = { version = "0.27", optional = true }
+accelerate = { version = "0.29.0", optional = true }
+vllm = {version = "0.5.3", optional = true}
 
 
 [tool.poetry.dev-dependencies]
