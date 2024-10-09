@@ -1,0 +1,49 @@
+{
+  "inference_settings": [
+    {
+      "model_settings": {
+        "model_path": "tests/fixtures/models/llama2_tiny",
+        "model_type": "causal",
+        "transformers_settings": {},
+        "adapter_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/trainer/adapter_model"
+      },
+      "tokenizer_settings": {
+        "use_fast": false,
+        "tokenizer_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/tokenizer_with_special_tokens"
+      },
+      "generation_settings": [
+        {
+          "transformers_settings": {
+            "num_beams": 3,
+            "max_new_tokens": 8
+          },
+          "custom_settings": {}
+        }
+      ],
+      "use_vllm": true,
+      "tensor_parallel_size": 2
+    }
+  ],
+  "dataset_settings": {
+    "sources": [
+      {
+        "name": "chat_test",
+        "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+        "sample_rate": 1
+      }
+    ],
+    "prompt_template": {
+      "role_tag_mapping": {
+          "bot": "<bot>",
+          "user": "<user>",
+          "system": "<system>"
+      },
+      "prefix_template": "<RS>{role}",
+      "suffix_template": "</RS>"
+    },
+    "dataset_type": "chat",
+    "max_tokens_count": 150,
+    "only_answer_loss": true
+  },
+  "save_path": "test_inference_sft_output"
+}

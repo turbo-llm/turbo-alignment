@@ -93,38 +93,38 @@ Examples of datasets are available [here](docs/dataset_example.md).
 <a name="-sft-train"></a>
 ## Supervised Fine-Tuning
 - **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [sft.json](configs/exp/train/sft/sft.json)
+- **📝 Configs Example**: [sft.json](tutorials/sft/sft.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_sft --experiment_settings_path configs/exp/train/sft/sft.json
+python -m turbo_alignment train_sft --experiment_settings_path tutorials/sft/sft.json
 ```
 <a name="-preftune-train"></a>
 ## Preference Tuning
 <a name="-rm-train"></a>
 ### Reward Modeling
 - **📚 Dataset type** prepare your dataset  in the `PairPreferencesDataset` format, examples available [here](docs/dataset_example.md#-pair-preferences)
-- **📝 Configs Example**: [rm.json](configs/exp/train/rm/rm.json)
+- **📝 Configs Example**: [rm.json](tutorials/rm/rm.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_rm --experiment_settings_path configs/exp/train/rm/rm.json
+python -m turbo_alignment train_rm --experiment_settings_path tutorials/rm/rm.json
 ```
 
 <a name="-dpo-train"></a>
 ### DPO, IPO, CPO, KTO (Paired)
 - **📚 Dataset type** prepare your dataset in the `PairPreferencesDataset` format, examples available [here](docs/dataset_example.md#pair-preferences)
-- **📝 Configs Example**: [dpo.json](configs/exp/train/dpo/dpo.json)
+- **📝 Configs Example**: [dpo.json](tutorials/dpo/dpo.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_dpo --experiment_settings_path configs/exp/train/dpo/dpo.json
+python -m turbo_alignment train_dpo --experiment_settings_path tutorials/dpo/dpo.json
 ```
 
 <a name="-kto-train"></a>
 ### KTO (Unpaired)
 - **📚 Dataset type** prepare your dataset in the `KTODataset` format, examples available [here](docs/dataset_example.md#-kto-dataset)
-- **📝 Configs Examples**: [kto.json](configs/exp/train/kto/kto.json)
+- **📝 Configs Examples**: [kto.json](tutorials/kto/kto.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_kto --experiment_settings_path configs/exp/train/kto/kto.json
+python -m turbo_alignment train_kto --experiment_settings_path tutorials/kto/kto.json
 ```
 
 <a name="-multimodal-train"></a>
@@ -137,18 +137,18 @@ python -m turbo_alignment train_kto --experiment_settings_path configs/exp/train
 <a name="-sft-rag-train"></a>
 ### SFT-RAG
 - **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [sft_with_retrieval_utility](configs/exp/train/sft/llama/sft_with_retrieval_utility.json)
+- **📝 Configs Example**: [sft_with_retrieval_utility...](...)
 - **🖥️ CLI launch command**: 
 ```bash
-python -m turbo_alignment train_sft --experiment_settings_path configs/exp/train/sft/llama/sft_with_retrieval_utility.json
+python -m turbo_alignment train_sft --experiment_settings_path ...
 ```
 <a name="-e2e-rag-train"></a>
 ### End2End-RAG
 - **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [end2end_rag](configs/exp/train/rag/end2end_rag.json)
+- **📝 Configs Example**: [end2end_rag...](...)
 - **🖥️ CLI launch command**:
 ```bash
-python -m turbo_alignment train_rag --experiment_settings_path configs/exp/train/rag/end2end_rag.json
+python -m turbo_alignment train_rag --experiment_settings_path ...
 ```
 
 <a name="-inference"></a>
@@ -156,37 +156,37 @@ python -m turbo_alignment train_rag --experiment_settings_path configs/exp/train
 <a name="-chat-inference"></a>
 ## Chat Inference
 - **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [sft.json](configs/exp/inference/generation/default_llama_adapter.json)
+- **📝 Configs Example**: [...sft.json](...)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_chat --inference_settings_path configs/exp/inference/generation/default_llama_adapter.json
+python -m turbo_alignment inference_chat --inference_settings_path ...
 ```
 
 <a name="-classification-inference"></a>
 ## Classification Inference
 - **📚 Dataset type** prepare your dataset  in the `ClassificationDataset`, examples available [here](docs/dataset_example.md#-classification-dataset) format.
-- **📝 Configs Example**: [classification_inference.json](configs/exp/inference/classification/classification_inference.json)
+- **📝 Configs Example**: [...classification_inference.json](...)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_classification --inference_settings_path configs/exp/train/sft/sft.json
+python -m turbo_alignment inference_classification --inference_settings_path ...
 ```
 
 <a name="-multimodal-inference"></a>
 ## Multimodal Inference
 - **📚 Dataset type** prepare your dataset  in the `MultimodalDataset`, examples available [here](docs/dataset_example.md#-multimodal-dataset) format.
-- **📝 Configs Example**: [mlp.json](configs/exp/inference/multimodal/mlp.json)
+- **📝 Configs Example**: [...mlp.json](...)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_multimodal --inference_settings_path configs/exp/inference/multimodal/mlp.json
+python -m turbo_alignment inference_multimodal --inference_settings_path ...
 ```
 
 <a name="-rag-inference"></a>
 ## RAG Inference
 - **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [rag_inference.json](configs/exp/inference/rag/rag_inference.json)
+- **📝 Configs Example**: [...rag_inference.json](...)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_rag --inference_settings_path configs/exp/inference/rag/rag_inference.json
+python -m turbo_alignment inference_rag --inference_settings_path ...
 ```
 
 <a name="-sampling"></a>
@@ -222,18 +222,18 @@ python -m turbo_alignment rm_sample --experiment_settings_path tests/fixtures/co
 # Common
 <a name="-merge_adapters_to_base"></a>
 ## Merge Adapters to base model
-- **📝 Configs Example**: [llama.json](configs/utils/merge_adapters_to_base/llama.json)
+- **📝 Configs Example**: [merge.json](tests/fixtures/configs/utils/merge_adapters_to_base/merge.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment merge_adapters_to_base --settings_path configs/utils/merge_adapters_to_base/llama.json
+python -m turbo_alignment merge_adapters_to_base --settings_path tests/fixtures/configs/utils/merge_adapters_to_base/merge.json
 ```
 
 <a name="-preprocess_multimodal_dataset"></a>
 ## Preprocess Multimodal Dataset
-- **📝 Configs Example**: [coco2014_clip.json](configs/utils/preprocess/coco2014_clip.json)
+- **📝 Configs Example**: [...coco2014_clip.json](...)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment preprocess_multimodal_dataset --settings_path configs/utils/preprocess/coco2014_clip.json
+python -m turbo_alignment preprocess_multimodal_dataset --settings_path ...
 ```
 
 
@@ -260,7 +260,7 @@ git clone https://github.com/turbo-llm/turbo-alignment.git
 <a name="-development"></a>
 ## 🌱 Development
 
-Contributions are welcome! Read the [contribution guide](https://github.com/turbo-llm/turbo-alignment/blob/main/CONTRIBUTING.md) and set up the development environment:
+Contributions are welcome! Read the [contribution guide](CONTRIBUTING.md) and set up the development environment:
 ```bash
 git clone https://github.com/turbo-llm/turbo-alignment.git
 cd turbo-alignment
@@ -285,11 +285,11 @@ See the [Installation](#-installation) section for detailed instructions.
 Guides and docs are available [here](docs/GUIDE.md).
 
 ### Where can I find tutorials?
-Tutorials are available [here](tutorials/tutorial.md).
+Tutorials are available [here](tutorials/).
 
 
 ## 📝 License
-This project is licensed, see the [LICENSE](https://github.com/turbo-llm/turbo-alignment/-/blob/main/LICENSE) file for details.
+This project is licensed, see the [LICENSE](LICENSE) file for details.
 
 
 ## References
