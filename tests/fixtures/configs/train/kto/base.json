@@ -89,7 +89,7 @@
         "eos_token": "</s>",
         "pad_token": "<pad>"
     },
-    "trainer_settings": {
+    "training_arguments": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 4,
         "per_device_eval_batch_size": 4,

@@ -16,7 +16,6 @@ from transformers.data.data_collator import (
 from turbo_alignment.cherry_picks.rag import RagCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders.model.model import load_model
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.metrics.metric import Metric
@@ -73,10 +72,7 @@ class TrainRAGStrategy(BaseTrainStrategy[RAGTrainExperimentSettings]):
 
     @staticmethod
     def _get_training_args(experiment_settings: RAGTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            **experiment_settings.trainer_settings.dict(),
-        )
+        return experiment_settings.training_arguments
 
     @staticmethod
     def _get_trainer(

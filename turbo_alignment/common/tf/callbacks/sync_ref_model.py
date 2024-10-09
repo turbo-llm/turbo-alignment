@@ -7,7 +7,13 @@ from transformers import (
     TrainingArguments,
 )
 
-from turbo_alignment.settings.pipelines.train.dpo import SyncRefModelSettings
+from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
+
+
+class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
+    sync_ref_model: bool = False
+    alpha: float = 1.0
+    sync_steps: int = 1
 
 
 class SyncRefModelCallback(TrainerCallback):

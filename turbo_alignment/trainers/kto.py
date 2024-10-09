@@ -20,7 +20,7 @@ from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
-from turbo_alignment.settings.pipelines.train.dpo import SyncRefModelSettings
+from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelSettings
 from turbo_alignment.trainers.dpo import DPOTrainer
 from turbo_alignment.trainers.utils import prepare_model
 

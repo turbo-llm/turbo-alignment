@@ -8,7 +8,6 @@ from transformers.data.data_collator import DataCollatorMixin
 from turbo_alignment.cherry_picks.multimodal import MultimodalCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders import load_model
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.dataset.multimodal import InferenceMultimodalDataset
 from turbo_alignment.dataset.multimodal.collators import DataCollatorWithModalityInputs
@@ -62,10 +61,7 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
 
     @staticmethod
     def _get_training_args(experiment_settings: MultimodalTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            **experiment_settings.trainer_settings.dict(),
-        )
+        return experiment_settings.training_arguments
 
     @staticmethod
     def _get_trainer(
