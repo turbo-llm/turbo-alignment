@@ -39,7 +39,7 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         generator = ChatGenerator(
             model=model,
             tokenizer=tokenizer,
-            transformers_settings=self._generation_config,
+            generation_config=self._generation_config,
             custom_generation_settings=self._custom_generation_settings,
             accelerator=accelerator,
             return_logits=True,
