@@ -189,5 +189,20 @@ Example:
 
 
 <a name="-ddpo-dataset"></a>
-## DDPO Dataset
-⌛️ in progress..
+### DDPO Dataset
+- `context`: `list[ChatMessage]` — This is a sequence of messages that make up the chat history.
+- `answer_w`: `ChatMessage` — The more preferable response.
+- `answer_l`: `ChatMessage` — The less preferable response.
+
+Example:
+```json
+{
+  "id": 0,
+  "source": "example", 
+  "context": [
+    {"role": "user", "content": "Can you play chess?"}
+  ],
+  "answer_w": {"role": "bot", "content": "Yes, of course"},
+  "answer_l": {"role": "bot", "content": "Get out, I don't want to talk to you!"}
+  }
+```

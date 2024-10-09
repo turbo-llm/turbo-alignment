@@ -14,7 +14,7 @@ def test_merge_adapters_to_base():
         [
             'merge_adapters_to_base',
             '--settings_path',
-            FIXTURES_PATH / 'configs/utils/merge_adapters_to_base/merge_debug.json',
+            FIXTURES_PATH / 'configs/utils/merge_adapters_to_base/merge.json',
         ],
     )
     assert result.exit_code == 0
