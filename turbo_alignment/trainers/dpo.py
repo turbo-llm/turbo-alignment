@@ -21,9 +21,12 @@ from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
-from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelCallback
+from turbo_alignment.common.tf.callbacks.sync_ref_model import (
+    SyncRefModelCallback,
+    SyncRefModelSettings,
+)
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
-from turbo_alignment.settings.pipelines.train.dpo import (
+from turbo_alignment.settings.pipelines.train.utils import (
     APODownLossSettings,
     APOZeroLossSettings,
     CPOLossSettings,
@@ -36,7 +39,6 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SigmoidLossWithMarginSettings,
     SimPOLossSettings,
     SlicHfLossSettings,
-    SyncRefModelSettings,
 )
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,

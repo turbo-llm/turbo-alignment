@@ -1,7 +1,7 @@
 from typing import Any
 
 import torch
-from transformers import PreTrainedTokenizerBase
+from transformers import GenerationConfig, PreTrainedTokenizerBase
 from vllm import LLM, SamplingParams
 
 from turbo_alignment.dataset.chat import ChatDatasetRecord
@@ -11,13 +11,12 @@ from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 
 
 class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
     def __init__(
         self,
-        transformers_settings: GeneratorTransformersSettings,
+        generation_config: GenerationConfig,
         custom_generation_settings: CustomChatGenerationSettings,
         model: LLM,
         tokenizer: PreTrainedTokenizerBase,
@@ -27,28 +26,28 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         model.set_tokenizer(tokenizer)
         super().__init__(model, tokenizer, batch=batch)
 
-        if isinstance(transformers_settings.stop_strings, list):
+        if isinstance(generation_config.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
 
-        eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
+        eos_token_id: list[int] = self._tokenizer.encode(generation_config.stop_strings, add_special_tokens=False)
 
         beam_search_params: dict[str, Any] = {
-            'best_of': transformers_settings.num_return_sequences,
+            'best_of': generation_config.num_return_sequences,
             'use_beam_search': False,
         }
-        if transformers_settings.num_beams > 1:
+        if generation_config.num_beams > 1:
             beam_search_params['use_beam_search'] = True
-            beam_search_params['best_of'] = transformers_settings.num_beams
+            beam_search_params['best_of'] = generation_config.num_beams
 
         self._sampling_params = SamplingParams(
-            n=transformers_settings.num_return_sequences,
-            repetition_penalty=transformers_settings.repetition_penalty,
-            temperature=transformers_settings.temperature,
-            top_p=transformers_settings.top_p,
-            top_k=transformers_settings.top_k,
+            n=generation_config.num_return_sequences,
+            repetition_penalty=generation_config.repetition_penalty,
+            temperature=generation_config.temperature,
+            top_p=generation_config.top_p,
+            top_k=generation_config.top_k,
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
-            max_tokens=transformers_settings.max_new_tokens,
+            max_tokens=generation_config.max_new_tokens,
             **beam_search_params,
         )
 

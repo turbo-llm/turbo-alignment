@@ -47,7 +47,7 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 generator_kwargs = {
                     'model': model,
                     'tokenizer': tokenizer,
-                    'transformers_settings': generation_settings.transformers_settings,
+                    'generation_config': generation_settings.generation_config,
                     'custom_generation_settings': generation_settings.custom_settings,
                     'batch': model_inference_settings.batch,
                 }
