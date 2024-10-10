@@ -22,7 +22,7 @@ from transformers.integrations import get_reporting_integration_callbacks
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelCallback
-from turbo_alignment.constants import DISABLE_LOSS_LABEL
+from turbo_alignment.constants import DISABLE_LOSS_LABEL, EPS
 from turbo_alignment.settings.pipelines.train.dpo import (
     APODownLossSettings,
     APOZeroLossSettings,
@@ -287,8 +287,8 @@ class ORPOLoss(DPOLossRegistry):
         precomputed_margins: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         log_odds = (policy_chosen_logps - policy_rejected_logps) - (
-            torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
-            - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+            torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - EPS))
+            - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - EPS))
         )
 
         ratio = -F.logsigmoid(log_odds)
@@ -314,10 +314,9 @@ class ASFTLoss(DPOLossRegistry):
         reference_rejected_logps: torch.FloatTensor | None,
         policy_best_decode_logps: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
-        chosen_ratio = policy_chosen_logps - (torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7)))
+        chosen_ratio = policy_chosen_logps - (torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - EPS)))
         rejected_ratio = policy_rejected_logps - (
-            torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+            torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - EPS))
         )
         sigm_diff = -F.logsigmoid(chosen_ratio) - F.logsigmoid(-rejected_ratio)
 
@@ -691,8 +690,8 @@ class DPOTrainer(Trainer):
 
         elif self.loss_type == DPOLossesType.ORPO:
             log_odds = (policy_chosen_logps - policy_rejected_logps) - (
-                torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
-                - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+                torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - EPS))
+                - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - EPS))
             )
             ratio = -F.logsigmoid(log_odds)
             or_loss = self.dpo_loss_registry.beta * ratio
@@ -705,10 +704,10 @@ class DPOTrainer(Trainer):
 
         elif self.loss_type == DPOLossesType.ASFT:
             chosen_ratio = policy_chosen_logps - (
-                torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
+                torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - EPS))
             )
             rejected_ratio = policy_rejected_logps - (
-                torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+                torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - EPS))
             )
             chosen_logsig = -F.logsigmoid(chosen_ratio)
             rejected_logsig = -F.logsigmoid(-rejected_ratio)
