@@ -314,7 +314,6 @@ class ASFTLoss(DPOLossRegistry):
         reference_rejected_logps: torch.FloatTensor | None,
         policy_best_decode_logps: torch.FloatTensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
         chosen_ratio = policy_chosen_logps - (torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7)))
         rejected_ratio = policy_rejected_logps - (
             torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
