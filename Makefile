@@ -9,7 +9,7 @@ MAX_LINE_LENGTH = 119
 
 
 tests-%:
-	WANDB_MODE=offline coverage run -m pytest -vvs --tb=native $${CI:+--junitxml=report-$(subst tests-,,$@).xml} tests/$(subst tests-,,$@)/
+	CLEARML_LOG_MODEL=0 CLEARML_OFFLINE_MODE=1 WANDB_MODE=offline coverage run -m pytest -vvs --tb=native $${CI:+--junitxml=report-$(subst tests-,,$@).xml} tests/$(subst tests-,,$@)/
 	mv .coverage .coverage.$(subst tests-,,$@)
 
 

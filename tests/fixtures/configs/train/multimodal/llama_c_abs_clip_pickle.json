@@ -103,6 +103,11 @@
       }
     },
     "tokenizer_settings": {},
+    "special_tokens_settings": {
+      "bos_token": "<s>",
+      "eos_token": "</s>",
+      "pad_token": "<pad>"
+  },
     "trainer_settings": {
       "evaluation_strategy": "epoch",
       "save_strategy": "epoch",
@@ -120,7 +125,7 @@
       "save_total_limit": 1,
       "no_cuda": true
     },
-    "wandb_settings": {
+    "logging_settings": {
       "project_name": "alignment",
       "run_name": "multimodal",
       "entity": "turbo-alignment"

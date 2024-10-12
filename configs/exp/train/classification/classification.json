@@ -86,6 +86,11 @@
         }
     },
     "tokenizer_settings": {},
+    "special_tokens_settings": {
+        "bos_token": "<s>",
+        "eos_token": "</s>",
+        "pad_token": "<pad>"
+    },
     "trainer_settings": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
@@ -107,7 +112,7 @@
         },
         "save_total_limit": 10
     },
-    "wandb_settings": {
+    "logging_settings": {
         "project_name": "alignment",
         "run_name": "classification",
         "entity": "turbo-alignment"

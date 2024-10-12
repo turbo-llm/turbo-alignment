@@ -3,13 +3,13 @@ from pathlib import Path
 from typing import Tuple
 
 import torch
-from allenai_common import Params
 from safetensors.torch import save_file
 
 from turbo_alignment.common.data.io import write_json
 from turbo_alignment.common.data.multimodal.base import BaseModalityReader
 from turbo_alignment.common.data.multimodal.registry import ModalityReaderRegistry
 from turbo_alignment.common.logging import get_project_logger
+from turbo_alignment.common.registry import Params
 from turbo_alignment.modeling.multimodal.encoders import ModalityEncoderRegistry
 from turbo_alignment.modeling.multimodal.encoders.base import BaseModalityEncoder
 from turbo_alignment.pipelines.base import BaseStrategy

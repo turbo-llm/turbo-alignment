@@ -23,7 +23,6 @@
         "random_cut": false,
         "check_max_len_enforced": true
     },
-
     "val_dataset_settings": {
         "sources": [
             {
@@ -132,17 +131,6 @@
         "transformers_settings": {},
         "check_checkpoint_is_compatible": true
     },
-
-    "value_model_settings": {
-        "model_path": "/from_s3/models/rm",
-        "model_type": "seq_cls",
-        "model_kwargs": {
-            "num_labels": 1,
-            "attn_implementation": "flash_attention_2"
-        },
-        "transformers_settings": {},
-        "check_checkpoint_is_compatible": true
-    },
     "model_settings": {
         "model_path": "/from_s3/models/policy/",
         "model_type": "causal",
@@ -152,12 +140,10 @@
         },
         "check_checkpoint_is_compatible": true
     },
-
     "tokenizer_settings": {
         "use_fast": true,
         "padding_side": "left"
     },
-
     "peft_settings": {
         "inference_mode": false,
         "r": 64,
@@ -167,8 +153,6 @@
         "init_lora_weights": true,
         "task_type": "CAUSAL_LM"
     },
-    "reinforce_class": "REINFORCETrainerRMRV",
-
     "trainer_settings": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 8,

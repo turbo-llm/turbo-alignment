@@ -4,7 +4,7 @@ from typing import Any, Generic, TypeVar
 
 import torch
 from accelerate import Accelerator
-from transformers import GenerationConfig, PreTrainedModel, PreTrainedTokenizerBase
+from transformers import GenerationConfig, PreTrainedModel, PreTrainedTokenizerBase, BatchEncoding
 
 from turbo_alignment.dataset.base import BaseDataset
 from turbo_alignment.dataset.base.models import DatasetRecord
@@ -34,11 +34,11 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
         self._batch = batch
 
     @abstractmethod
-    def _generate_from_batch(
+    def generate_from_batch(
         self,
-        records: list[dict[str, Any]],
-        original_records: list[DatasetRecordT],
         dataset_name: str,
+        records: list[dict[str, Any]],
+        original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         ...
 
@@ -64,10 +64,10 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
                 zip(records_batches, original_records_batches)
             ):
                 generations.append(
-                    self._generate_from_batch(
+                    self.generate_from_batch(
+                        dataset.source.name,
                         records_batch,
                         original_records_batch,
-                        dataset.source.name,
                     )
                 )
         else:
@@ -75,10 +75,10 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
                 list(zip(records_batches, original_records_batches)), apply_padding=True
             ) as accelerator_records:
                 generations = [
-                    self._generate_from_batch(
+                    self.generate_from_batch(
+                        dataset.source.name,
                         records_batch,
                         original_records_batch,
-                        dataset.source.name,
                     )
                     for records_batch, original_records_batch in accelerator_records
                 ][: len(records_batches)]
@@ -92,12 +92,9 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         transformers_settings: GeneratorTransformersSettings,
         custom_generation_settings: CustomChatGenerationSettings,
         tokenizer: PreTrainedTokenizerBase,
-        return_logits: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(tokenizer=tokenizer, **kwargs)
-
-        self._return_logits = return_logits
 
         self._transformers_generator_parameters = GenerationConfig(
             bos_token_id=self._tokenizer.bos_token_id,
@@ -105,28 +102,27 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         )
 
         self._custom_generation_settings = custom_generation_settings
-        self._return_logits = return_logits
 
     @abstractmethod
-    def _generate_from_single_record(
+    def generate_from_single_record(
         self,
-        record: dict[str, torch.Tensor],
-        original_record: DatasetRecordT,
         dataset_name: str,
+        record: dict[str, torch.Tensor],
+        original_record: DatasetRecordT | None = None,
     ) -> InferenceOutputT:
         ...
 
     @abstractmethod
-    def _generate_from_batch_records(
+    def generate_from_batch_records(
         self,
-        records: list[dict[str, torch.Tensor]],
-        original_records: list[DatasetRecordT],
         dataset_name: str,
+        records_batch: dict[str, torch.Tensor] | BatchEncoding,
+        original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         ...
 
-    def _generate_from_batch(
-        self, records: list[dict[str, Any]], original_records: list[DatasetRecordT], dataset_name: str
+    def generate_from_batch(
+        self, dataset_name: str, records: list[dict[str, Any]], original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         if self._custom_generation_settings.batch > 1:
             if self._transformers_generator_parameters.num_beams != 1:
@@ -135,18 +131,52 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
             self._tokenizer.padding_side = 'left'
             self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 
-            return self._generate_from_batch_records(records, original_records, dataset_name)
+            input_ids = [record['input_ids'].tolist() for record in records]
+            attention_mask = [record['attention_mask'].tolist() for record in records]
+
+            max_input_length = max(len(sample) for sample in input_ids)
+
+            records_batch = self._tokenizer.pad(
+                {
+                    'input_ids': input_ids,
+                    'attention_mask': attention_mask,
+                },
+                padding='max_length',
+                max_length=max_input_length,
+                return_tensors='pt',
+            )
+
+            return self.generate_from_batch_records(dataset_name, records_batch, original_records)
 
         return [
-            self._generate_from_single_record(record, original_record, dataset_name)
+            self.generate_from_single_record(dataset_name, record, original_record)
             for record, original_record in zip(records, original_records)
         ]
 
-    @staticmethod
-    def _postprocess(input_indices: torch.Tensor, output_indices: torch.Tensor, remove_prompt: bool) -> torch.Tensor:
+    def _postprocess(
+        self,
+        input_indices: torch.Tensor,
+        output_indices: torch.Tensor,
+        logits: torch.Tensor | None,
+        remove_prompt: bool,
+        only_answer_logits: bool,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, list[str]]:
+        processed_logits: torch.Tensor | None = None
+        processed_output_indices = output_indices.cpu()
+
+        if logits is not None :
+            processed_logits = logits.cpu()
+            if only_answer_logits:
+                processed_logits = logits[:, input_indices.shape[1] :, :].cpu()
+
         if remove_prompt:
-            return output_indices[:, input_indices.shape[1] :].cpu()
-        return output_indices.cpu()
+            processed_output_indices = output_indices[:, input_indices.shape[1] :]
+
+        answers = self._decode(token_indices=processed_output_indices)
+
+        answers_attention_mask = processed_output_indices != self._tokenizer.pad_token_id
+
+        return processed_output_indices, answers_attention_mask, processed_logits, answers
 
     def _decode(self, token_indices: torch.Tensor) -> list[str]:
         return self._tokenizer.batch_decode(

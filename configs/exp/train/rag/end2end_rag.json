@@ -112,6 +112,10 @@
     "metric_settings": []
   },
   "tokenizer_settings": {},
+  "special_tokens_settings": {
+    "bos_token": "<s>",
+    "eos_token": "</s>"
+  },
   "trainer_settings": {
     "evaluation_strategy": "steps",
     "save_strategy": "steps",
@@ -135,7 +139,7 @@
     "max_grad_norm": 0.11,
     "save_total_limit": 3
   },
-  "wandb_settings": {
+  "logging_settings": {
     "project_name": "alignment",
     "run_name": "rag",
     "entity": "biglm"

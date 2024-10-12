@@ -6,3 +6,4 @@ from .multimodal import TrainMultimodalStrategy
 from .rag import TrainRAGStrategy
 from .rm import TrainRMStrategy
 from .sft import TrainSFTStrategy
+from .reinforce import TrainREINFORCEStrategy

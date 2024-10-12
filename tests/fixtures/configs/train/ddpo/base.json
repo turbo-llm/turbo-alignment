@@ -127,6 +127,11 @@
     },
     "chat_tokenizer_settings": {},
     "rm_tokenizer_settings": {},
+    "special_tokens_settings": {
+        "bos_token": "<s>",
+        "eos_token": "</s>",
+        "pad_token": "<pad>"
+    },
     "trainer_settings": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
@@ -150,7 +155,7 @@
         "no_cuda": true,
         "max_grad_norm": 1.0
     },
-    "wandb_settings": {
+    "logging_settings": {
         "project_name": "alignment",
         "run_name": "ddpo",
         "entity": "turbo-alignment"

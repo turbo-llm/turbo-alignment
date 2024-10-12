@@ -1,7 +1,11 @@
 from pathlib import Path
 
 import torch
-import torchaudio
+# FIXME
+try:
+    import torchaudio
+except:
+    pass
 from loguru import logger
 from pytorchvideo.data.clip_sampling import ConstantClipsPerVideoSampler
 from torchvision import transforms

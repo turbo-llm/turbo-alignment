@@ -13,9 +13,11 @@ class WandbSettings(BaseSettings):
     project_name: str
     run_name: str
     entity: str
-    notes: str | None = None
     tags: list[str] = []
+    notes: str | None = None
     mode: WandbMode = WandbMode.ONLINE
+
+    __name__ = 'WandbSettings'
 
     class Config:
         env_prefix: str = 'WANDB_'

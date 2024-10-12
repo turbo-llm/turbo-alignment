@@ -11,7 +11,7 @@ from turbo_alignment.settings.generators.outputs.chat import (
 
 
 class RagGenerator(ChatGenerator):
-    def _generate_from_single_record(
+    def generate_from_single_record(
         self,
         record: dict[str, Any],
         original_record: ChatDatasetRecord,
