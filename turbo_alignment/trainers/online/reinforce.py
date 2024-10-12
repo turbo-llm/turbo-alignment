@@ -17,7 +17,7 @@ from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator
 from turbo_alignment.generators.base import ChatGeneratorBase
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.chat import ChatInferenceOutput
-from turbo_alignment.settings.online import LLMActorType, CriticType
+from turbo_alignment.settings.online import LLMActorType, CriticType, RewardProcessorType
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.common.distributed import get_global_mean, get_global_std, get_log_mean_std
@@ -44,8 +44,10 @@ class REINFORCETrainingArguments(TrainingArguments):
     temperature: float | None = None
     whiten_rewards: bool = False
 
-    actor_type: str = LLMActorType.LOCAL_TRANSFORMERS
-    critic_type: str = CriticType.LOCAL_TRANSFORMERS
+    actor_type: LLMActorType = LLMActorType.LOCAL_TRANSFORMERS
+    critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
+
+    reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
 
 
 class REINFORCETrainer(MultiGPUCherryPicksTrainer):
@@ -108,7 +110,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             only_answer_logits=True,
             return_logits=True,
         )
-        self.reward_processor = RewardProcessor(mean_baseline_coef=args.mean_baseline_coef)
+        self.reward_processor = RewardProcessor.by_name(args.reward_processor_type)(
+            mean_baseline_coef=args.mean_baseline_coef,
+            num_generations=args.num_generations,
+        )
 
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
@@ -149,37 +154,44 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self,
         model: torch.nn.Module | PreTrainedModel,
         inputs: dict[str, torch.Tensor],
-    ) -> ...:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         generator = self._get_chat_generator(model)
         generations: list[ChatInferenceOutput] = (
             generator.generate_from_batch_records(dataset_name='online', records_batch=inputs))
 
+        response_ids = torch.stack([ans.answer_token_ids for g in generations for ans in g.answers])
+        response_attention_mask = torch.stack([ans.answer_attention_mask for g in generations for ans in g.answers])
+
+        response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.float32)
+        response_tokens_mask[:, generations[0].input_token_ids.shape[0]:] = 1.
+
+        position_ids = (response_attention_mask.cumsum(-1) - 1).clamp(min=0)
+        position_ids.masked_fill_(response_attention_mask.to(torch.bool) == 0, 0)
+
         rm_inputs = {
-            'input_ids': torch.stack([ans.answer_token_ids for g in generations for ans in g.answers]),
-            'attention_mask': torch.stack([ans.answer_attention_mask for g in generations for ans in g.answers]),
+            'input_ids': response_ids,
+            'attention_mask': response_attention_mask,
+            'position_ids': position_ids,
         }
 
         critic_generator = self._get_rm_generator(self.reward_model)
         rewards = critic_generator.generate_from_batch_records(rm_inputs)
 
-        return generations, rewards
+        return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
     def get_batch_loss_metrics(
         self, 
         model: torch.nn.Module | PreTrainedModel, 
-        inputs: torch.Tensor, 
+        inputs: dict[str, torch.Tensor],
         train_eval: Literal["train", "eval"] = "train",
     ):
         with torch.no_grad():
             (
-                (
-                    query_response,
-                    attention_mask,
-                    response_tokens_mask,
-                    position_ids,
-                    rewards,
-                ),
-                gen_metrics,
+                query_response,
+                attention_mask,
+                response_tokens_mask,
+                position_ids,
+                rewards,
             ) = self.get_answers_and_rewards(
                 model=self.accelerator.unwrap_model(model),
                 inputs=inputs,
@@ -247,8 +259,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
             for k, v in rewards_metrics.items():
                 metrics[f"{train_eval}/{k}"] = v
-            for k, v in gen_metrics.items():
-                metrics[f"{train_eval}/{k}"] = v
             for k, v in baseline_metrics.items():
                 metrics[f"{train_eval}/{k}"] = v
 
@@ -288,7 +298,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             all_rewards = []
             samples_processed = 0
             for batch in dataloader:
-                (_, _, _, _, rewards), _ = self.get_answers_and_rewards(
+                _, _, _, _, rewards = self.get_answers_and_rewards(
                     model=self.accelerator.unwrap_model(model),
                     inputs=batch,
                 )

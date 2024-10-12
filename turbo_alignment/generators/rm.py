@@ -16,8 +16,8 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
 
     def generate_from_batch_records(self, records: dict[str, torch.Tensor] | BatchEncoding) -> torch.Tensor:
         with torch.no_grad():
-            rewards = self._model(input_ids=records['input_ids'], attention_mask=records['attention_mask']).logits.cpu()
-        return rewards.squeeze()
+            rewards = self._model(**records).logits.cpu()
+        return rewards#.squeeze()
 
     def generate_from_batch(
         self,
@@ -52,9 +52,18 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
 
             rewards.extend(self.generate_from_batch_records(records_batch).tolist())
 
+        outputs = []
+        for i, record in enumerate(original_records):
+            record_rewards = {answer.id: rewards[i + j] for j, answer in enumerate(record.answers)}
 
-        return self.generate_from_batch_records(
-            records=records_batch,
-            dataset_name=dataset_name,
-            original_records=original_records,
-        )
+            outputs.append(
+                RMSamplingInferenceOutput(
+                    id=record.id,
+                    answers=record.answers,
+                    dataset_name=record.dataset_name,
+                    messages=record.messages,
+                    rewards=record_rewards,
+                )
+            )
+
+        return outputs

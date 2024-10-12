@@ -13,9 +13,11 @@ class RewardProcessor(ABC, Registrable):
     def __init__(
         self,
         mean_baseline_coef: float,
+        num_generations: int,
     ) -> None:
         self.mean_reward = None
         self.mean_baseline_coef = mean_baseline_coef
+        self.num_generations = num_generations
 
     def postprocess_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
         raise NotImplementedError
@@ -56,10 +58,9 @@ class RLOORewardProcessor(RewardProcessor):
         return rewards, metrics
 
     def baseline_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
-        # FIXME: get sampling_params.n from rewards shape?
-        rewards = rewards.reshape(-1, self.sampling_params.n)
+        rewards = rewards.reshape(-1, self.num_generations)
         baseline: torch.Tensor = (rewards.sum(-1).unsqueeze(-1) - rewards) / (
-            self.sampling_params.n - 1
+            self.num_generations - 1
         )
         rloo_advantages: torch.Tensor = (rewards - baseline).flatten()
 
