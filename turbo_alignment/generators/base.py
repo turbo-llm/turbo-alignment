@@ -4,7 +4,12 @@ from typing import Any, Generic, TypeVar
 
 import torch
 from accelerate import Accelerator
-from transformers import GenerationConfig, PreTrainedModel, PreTrainedTokenizerBase, BatchEncoding
+from transformers import (
+    BatchEncoding,
+    GenerationConfig,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 
 from turbo_alignment.dataset.base import BaseDataset
 from turbo_alignment.dataset.base.models import DatasetRecord
@@ -122,7 +127,10 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         ...
 
     def generate_from_batch(
-        self, dataset_name: str, records: list[dict[str, Any]], original_records: list[DatasetRecordT] | None = None,
+        self,
+        dataset_name: str,
+        records: list[dict[str, Any]],
+        original_records: list[DatasetRecordT] | None = None,
     ) -> list[InferenceOutputT]:
         if self._custom_generation_settings.batch > 1:
             if self._transformers_generator_parameters.num_beams != 1:
@@ -164,7 +172,7 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         processed_logits: torch.Tensor | None = None
         processed_output_indices = output_indices.cpu()
 
-        if logits is not None :
+        if logits is not None:
             processed_logits = logits.cpu()
             if only_answer_logits:
                 processed_logits = logits[:, input_indices.shape[1] :, :].cpu()

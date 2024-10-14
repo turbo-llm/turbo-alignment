@@ -2,7 +2,11 @@ from typing import Any
 
 import torch
 from transformers import PreTrainedTokenizerBase
-from vllm import LLM, SamplingParams
+
+try:
+    from vllm import LLM, SamplingParams
+except ImportError:
+    raise ImportError("Install vllm first")
 
 from turbo_alignment.dataset.chat import ChatDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator

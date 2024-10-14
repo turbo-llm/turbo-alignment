@@ -1,9 +1,10 @@
+from typing import Any
+
 import torch
 
 from turbo_alignment.dataset.chat import ChatMessage
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.generators.outputs.base import BaseInferenceOutput
-from typing import Any
 
 
 class AnswerMessage(ExtraFieldsNotAllowedBaseModel):

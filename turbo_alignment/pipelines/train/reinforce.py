@@ -2,12 +2,14 @@ from typing import Callable
 
 from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
-from transformers.data.data_collator import DataCollatorMixin, DataCollatorForTokenClassification
+from transformers.data.data_collator import (
+    DataCollatorForTokenClassification,
+    DataCollatorMixin,
+)
 
-from turbo_alignment.common.tf.loaders import load_model
-from turbo_alignment.trainers.online.reinforce import REINFORCETrainer
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
+from turbo_alignment.common.tf.loaders import load_model
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
@@ -18,7 +20,10 @@ from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.reinforce import (
     REINFORCETrainExperimentSettings,
 )
-from turbo_alignment.trainers.online.reinforce import REINFORCETrainingArguments
+from turbo_alignment.trainers.online.reinforce import (
+    REINFORCETrainer,
+    REINFORCETrainingArguments,
+)
 
 logger = get_project_logger()
 
@@ -40,18 +45,14 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     ) -> ChatCherryPickCallback:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
 
-        cherry_pick_datasets = DatasetLoader[InferenceChatDataset](
-            InferenceChatDataset
-        ).load_datasets(
+        cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
             cherry_pick_settings.dataset_settings,
             tokenizer=tokenizer,
             strategy=DatasetStrategy.INFERENCE,
         )
 
         metrics = [
-            Metric.by_name(metric.type)(
-                MetricSettingsRegistry.by_name(metric.type)(**metric.parameters)
-            )
+            Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))
             for metric in cherry_pick_settings.metric_settings
         ]
 
@@ -98,21 +99,13 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             callbacks=[],
         )
 
-    def _dataset_and_collator_sanity_check(
-        self, dataset: Dataset, collator: DataCollatorMixin
-    ) -> None:
-        logger.info(f"Train sample input_ids:\n{dataset[0]}")
-        logger.info(
-            f'Train sample example:\n{self.tokenizer.decode(dataset[0]["input_ids"])}'
-        )
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
+        logger.info(f'Train sample input_ids:\n{dataset[0]}')
+        logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["input_ids"])}')
 
-    def _get_datasets(
-        self, experiment_settings: REINFORCETrainExperimentSettings
-    ) -> tuple[Dataset, Dataset]:
+    def _get_datasets(self, experiment_settings: REINFORCETrainExperimentSettings) -> tuple[Dataset, Dataset]:
         train_dataset: ConcatDataset = ConcatDataset(
-            datasets=DatasetLoader[InferenceChatDataset](
-                InferenceChatDataset
-            ).load_datasets(
+            datasets=DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
@@ -120,9 +113,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         )
 
         val_dataset: ConcatDataset = ConcatDataset(
-            datasets=DatasetLoader[InferenceChatDataset](
-                InferenceChatDataset
-            ).load_datasets(
+            datasets=DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,

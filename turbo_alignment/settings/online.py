@@ -13,4 +13,3 @@ class CriticType(str, Enum):
 
 class RewardProcessorType(str, Enum):
     RLOO = 'rloo'
-

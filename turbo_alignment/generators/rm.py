@@ -1,7 +1,7 @@
 from typing import Any
 
 import torch
-from transformers import DataCollatorWithPadding, PreTrainedTokenizerBase, BatchEncoding
+from transformers import BatchEncoding, DataCollatorWithPadding, PreTrainedTokenizerBase
 
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
@@ -17,7 +17,7 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
     def generate_from_batch_records(self, records: dict[str, torch.Tensor] | BatchEncoding) -> torch.Tensor:
         with torch.no_grad():
             rewards = self._model(**records).logits.cpu()
-        return rewards#.squeeze()
+        return rewards  # .squeeze()
 
     def generate_from_batch(
         self,
@@ -35,8 +35,8 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
 
         rewards = []
         for i in range(0, len(input_ids), self._micro_batch):
-            input_ids_batch = input_ids[i: i + self._micro_batch]
-            attn_mask_batch = attention_mask[i: i + self._micro_batch]
+            input_ids_batch = input_ids[i : i + self._micro_batch]
+            attn_mask_batch = attention_mask[i : i + self._micro_batch]
 
             max_input_length = max(len(sample) for sample in input_ids_batch)
 

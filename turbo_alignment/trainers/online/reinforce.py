@@ -9,20 +9,29 @@ import torch.utils.data
 from datasets import Dataset
 from transformers import (
     PreTrainedModel,
+    PreTrainedTokenizerBase,
     TrainerCallback,
-    TrainingArguments, PreTrainedTokenizerBase,
+    TrainingArguments,
 )
 
+from turbo_alignment.common.distributed import (
+    get_global_mean,
+    get_global_std,
+    get_log_mean_std,
+)
 from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator
 from turbo_alignment.generators.base import ChatGeneratorBase
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.chat import ChatInferenceOutput
-from turbo_alignment.settings.online import LLMActorType, CriticType, RewardProcessorType
+from turbo_alignment.settings.online import (
+    CriticType,
+    LLMActorType,
+    RewardProcessorType,
+)
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
-from turbo_alignment.common.distributed import get_global_mean, get_global_std, get_log_mean_std
-from turbo_alignment.trainers.utils import prepare_model
 from turbo_alignment.trainers.online.reward_processor import RewardProcessor
+from turbo_alignment.trainers.utils import prepare_model
 
 
 # FIXME
@@ -33,7 +42,7 @@ class REINFORCETrainingArguments(TrainingArguments):
 
     penalty_reward_value: float = 0.1
     clip_rewards_min: float = 0.1
-    clip_rewards_max: float = 1.
+    clip_rewards_max: float = 1.0
     kl_coef: float = 0.05
     mean_baseline_coef: float = 0.1
 
@@ -51,7 +60,6 @@ class REINFORCETrainingArguments(TrainingArguments):
 
 
 class REINFORCETrainer(MultiGPUCherryPicksTrainer):
-
     def __init__(
         self,
         args: REINFORCETrainingArguments,
@@ -80,9 +88,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.reward_model = reward_model
 
-        self._stored_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(
-            lambda: defaultdict(list)
-        )
+        self._stored_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
         self.kl_coef = args.kl_coef
 
         self.gen_id = 1
@@ -91,13 +97,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         # In this way, the effective number of gradient
         # updates taken into account stays the same
         effective_num_previous_samples = 1 / (1 - self.args.mean_baseline_coef)
-        self.args.mean_baseline_coef = 1 - 1 / (
-            effective_num_previous_samples * self.args.gradient_accumulation_steps
-        )
+        self.args.mean_baseline_coef = 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
 
-        stop_generation_token_id = tokenizer.encode(
-            self.args.stop_token, add_special_tokens=False
-        )
+        stop_generation_token_id = tokenizer.encode(self.args.stop_token, add_special_tokens=False)
         assert len(stop_generation_token_id) == 1, stop_generation_token_id
 
         self.generator_transformers_settings = GeneratorTransformersSettings(
@@ -156,14 +158,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         generator = self._get_chat_generator(model)
-        generations: list[ChatInferenceOutput] = (
-            generator.generate_from_batch_records(dataset_name='online', records_batch=inputs))
+        generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
+            dataset_name='online', records_batch=inputs
+        )
 
         response_ids = torch.stack([ans.answer_token_ids for g in generations for ans in g.answers])
         response_attention_mask = torch.stack([ans.answer_attention_mask for g in generations for ans in g.answers])
 
         response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.float32)
-        response_tokens_mask[:, generations[0].input_token_ids.shape[0]:] = 1.
+        response_tokens_mask[:, generations[0].input_token_ids.shape[0] :] = 1.0
 
         position_ids = (response_attention_mask.cumsum(-1) - 1).clamp(min=0)
         position_ids.masked_fill_(response_attention_mask.to(torch.bool) == 0, 0)
@@ -180,10 +183,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
     def get_batch_loss_metrics(
-        self, 
-        model: torch.nn.Module | PreTrainedModel, 
+        self,
+        model: torch.nn.Module | PreTrainedModel,
         inputs: dict[str, torch.Tensor],
-        train_eval: Literal["train", "eval"] = "train",
+        train_eval: Literal['train', 'eval'] = 'train',
     ):
         with torch.no_grad():
             (
@@ -205,9 +208,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 loss_mask=response_tokens_mask.to(torch.float32),
             )
 
-            rewards, valid_mask, rewards_metrics = self.process_rewards(
-                rewards=rewards, query_response=query_response
-            )
+            rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
 
         logprobs = self.get_logprobs(
             model=model,
@@ -221,9 +222,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             kl_term = logprobs.detach() - ref_logprobs
             regularized_rewards = rewards - self.kl_coef * kl_term
 
-            baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(
-                rewards=regularized_rewards
-            )
+            baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(rewards=regularized_rewards)
 
         loss = -baselined_reward * logprobs
 
@@ -242,32 +241,32 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     1 - valid_mask.float(),
                 ],
                 [
-                    "rewards",
-                    "regularized_rewards",
-                    "baselined_rewards",
-                    "loss",
-                    "kl_term",
-                    "logprobs",
-                    "invalid_rewards",
+                    'rewards',
+                    'regularized_rewards',
+                    'baselined_rewards',
+                    'loss',
+                    'kl_term',
+                    'logprobs',
+                    'invalid_rewards',
                 ],
             ):
                 metrics = {
                     **metrics,
                     **get_log_mean_std(tensor, name, train_eval),
                 }
-            metrics[f"{train_eval}/kl_coef"] = self.kl_coef
+            metrics[f'{train_eval}/kl_coef'] = self.kl_coef
 
             for k, v in rewards_metrics.items():
-                metrics[f"{train_eval}/{k}"] = v
+                metrics[f'{train_eval}/{k}'] = v
             for k, v in baseline_metrics.items():
-                metrics[f"{train_eval}/{k}"] = v
+                metrics[f'{train_eval}/{k}'] = v
 
         return loss.mean(), metrics
 
     def compute_loss(self, model, inputs, return_outputs: bool = False):
-        loss, metrics = self.get_batch_loss_metrics(model, inputs, "train")
+        loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
-        self.store_metrics(metrics=metrics, train_eval="train")
+        self.store_metrics(metrics=metrics, train_eval='train')
 
         return (loss, metrics) if return_outputs else loss
 
@@ -279,17 +278,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
         with torch.no_grad():
-            loss, metrics = self.get_batch_loss_metrics(model, inputs, "eval")
+            loss, metrics = self.get_batch_loss_metrics(model, inputs, 'eval')
 
-        self.store_metrics(metrics, train_eval="eval")
+        self.store_metrics(metrics, train_eval='eval')
 
         return loss.detach(), None, None
 
     @torch.no_grad()
     def reward_stats(
-        self, 
-        model: torch.nn.Module | PreTrainedModel, 
-        dataloader: torch.utils.data.DataLoader
+        self, model: torch.nn.Module | PreTrainedModel, dataloader: torch.utils.data.DataLoader
     ) -> tuple[float, float]:
         if self.args.num_samples_for_reward_stats == 0:
             norm_reward_mean = 0
@@ -305,9 +302,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 rewards, _ = self.reward_processor.postprocess_rewards(rewards=rewards)
 
                 all_rewards.append(rewards)
-                samples_processed += (
-                    len(batch["input_ids"]) * self.accelerator.num_processes
-                )
+                samples_processed += len(batch['input_ids']) * self.accelerator.num_processes
 
                 if samples_processed > self.args.num_samples_for_reward_stats:
                     break
@@ -342,9 +337,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         return logprob.sum(-1)
 
-    def fill_nonvalid_rewards(
-        self, rewards, query_response
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.args.non_eos_penalty:
             assert torch.all(query_response[:, -1] != self.tokenizer.pad_token_id), (
                 query_response[:, -1],
@@ -366,23 +359,17 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         rewards, reward_metrics = self.reward_processor.postprocess_rewards(rewards=rewards)
         rewards = rewards.squeeze(-1)
-        reward_metrics["normalizing_reward_mean"] = self.norm_reward_mean
-        reward_metrics["normalizing_reward_std"] = self.norm_reward_std
+        reward_metrics['normalizing_reward_mean'] = self.norm_reward_mean
+        reward_metrics['normalizing_reward_std'] = self.norm_reward_std
         rewards = (rewards - self.norm_reward_mean) / self.norm_reward_std
         # boundness is required: https://arxiv.org/pdf/2406.01462
-        rewards = torch.clamp(
-            rewards, self.args.clip_rewards_min, self.args.clip_rewards_max
-        )
+        rewards = torch.clamp(rewards, self.args.clip_rewards_min, self.args.clip_rewards_max)
 
-        rewards, valid_mask = self.fill_nonvalid_rewards(
-            rewards=rewards, query_response=query_response
-        )
+        rewards, valid_mask = self.fill_nonvalid_rewards(rewards=rewards, query_response=query_response)
 
         return rewards, valid_mask, reward_metrics
-    
-    def store_metrics(
-        self, metrics: Dict[str, float], train_eval: Literal["train", "eval"] = "train"
-    ) -> None:
+
+    def store_metrics(self, metrics: Dict[str, float], train_eval: Literal['train', 'eval'] = 'train') -> None:
         for key, value in metrics.items():
             self._stored_metrics[train_eval][key].append(value)
 
@@ -392,12 +379,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             for key, metrics in self._stored_metrics[main_key].items():
                 logs[key] = torch.tensor(metrics).float().cpu().mean().item()
 
-            if main_key == "train":
-                logs["train/global_step"] = int(self.state.global_step)
+            if main_key == 'train':
+                logs['train/global_step'] = int(self.state.global_step)
             else:
-                logs["eval/global_step"] = int(
-                    self.state.global_step // self.args.eval_steps
-                )
+                logs['eval/global_step'] = int(self.state.global_step // self.args.eval_steps)
 
             del self._stored_metrics[main_key]
 

@@ -48,11 +48,13 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         for i, (input_ids, attention_mask) in enumerate(zip(batched_input_ids, batched_attention_mask)):
             ans_batch_start = i * self._transformers_generator_parameters.num_return_sequences
             ans_batch_end = (i + 1) * self._transformers_generator_parameters.num_return_sequences
-            batch_answer_tokens =  postprocessed_output_indices[ans_batch_start:ans_batch_end, :]
+            batch_answer_tokens = postprocessed_output_indices[ans_batch_start:ans_batch_end, :]
             batch_answer_attention_masks = answers_attention_mask[ans_batch_start:ans_batch_end, :]
             batch_answers = answers[ans_batch_start:ans_batch_end]
 
-            for j, (answer, answer_tokens, answer_attention_mask) in enumerate(zip(batch_answers, batch_answer_tokens, batch_answer_attention_masks)):
+            for j, (answer, answer_tokens, answer_attention_mask) in enumerate(
+                zip(batch_answers, batch_answer_tokens, batch_answer_attention_masks)
+            ):
                 answer_logits = None if postprocessed_logits is None else postprocessed_logits[i + j, :, :]
 
                 outputs.append(
@@ -109,7 +111,9 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         )
 
         answer_messages = []
-        for i, (answer, answer_tokens, answer_attention_mask) in enumerate(zip(answers, postprocessed_output_indices, answers_attention_mask)):
+        for i, (answer, answer_tokens, answer_attention_mask) in enumerate(
+            zip(answers, postprocessed_output_indices, answers_attention_mask)
+        ):
             answer_logits = None if postprocessed_logits is None else postprocessed_logits[i, :, :].unsqueeze(0)
             answer_messages.append(
                 AnswerMessage(

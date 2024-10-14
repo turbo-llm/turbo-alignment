@@ -5,6 +5,7 @@ from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.dataset.pair_preferences import PairPreferenceDataset
+from turbo_alignment.generators import RMSamplingGenerator
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.settings.cherry_pick import RMCherryPickSettings
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults
@@ -28,8 +29,8 @@ class RmCherryPickCallback(CherryPickCallbackBase[PairPreferenceDataset]):
     ) -> list[MetricResults]:
         accelerator: Accelerator = kwargs.get('accelerator', None)
 
-        # FIXME
-        generator = RMPairGenerator(
+        # FIXME: convert paired dataset to sampling dataset
+        generator = RMSamplingGenerator(
             model=model,
             tokenizer=tokenizer,
             accelerator=accelerator,

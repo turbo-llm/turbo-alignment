@@ -1,12 +1,8 @@
-import os
-from typing import Dict, List
-
 import ray
 from ray.util.placement_group import placement_group
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 from turbo_alignment.common.logging import get_project_logger
-
 
 logger = get_project_logger()
 
@@ -17,9 +13,9 @@ class LLMRayActor:
         import vllm
 
         self.__version__ = vllm.__version__
-        assert self.__version__ >= "0.4.1", "OpenRLHF only supports vLLM >= 0.4.1"
+        assert self.__version__ >= '0.4.1', 'OpenRLHF only supports vLLM >= 0.4.1'
 
-        self.use_gpu_executor = kwargs["tensor_parallel_size"] == 1
+        self.use_gpu_executor = kwargs['tensor_parallel_size'] == 1
 
         # See https://github.com/vllm-project/vllm/blob/main/vllm/executor/gpu_executor.py
         if self.use_gpu_executor:
@@ -29,17 +25,17 @@ class LLMRayActor:
         else:
             # RayGPUExecutor
             # See the patch https://github.com/vllm-project/vllm/commit/479d69fad0538f04cb22bf13e76ff91cfeb8a4e5
-            kwargs["worker_use_ray"] = True
+            kwargs['worker_use_ray'] = True
 
-            if vllm.__version__ > "0.4.1":
+            if vllm.__version__ > '0.4.1':
                 RayWorkerWrapperPath = vllm.executor.ray_utils
             else:
                 RayWorkerWrapperPath = vllm.engine.ray_utils
 
             class RayWorkerWrapper(RayWorkerWrapperPath.RayWorkerWrapper):
                 def __init__(self, *args, **kwargs) -> None:
-                    kwargs["worker_module_name"] = "openrlhf.trainer.ray.vllm_worker_wrap"
-                    kwargs["worker_class_name"] = "WorkerWrap"
+                    kwargs['worker_module_name'] = 'openrlhf.trainer.ray.vllm_worker_wrap'
+                    kwargs['worker_class_name'] = 'WorkerWrap'
                     super().__init__(*args, **kwargs)
 
             RayWorkerWrapperPath.RayWorkerWrapper = RayWorkerWrapper
@@ -56,7 +52,7 @@ class LLMRayActor:
             )
         else:
             return self.llm.llm_engine.model_executor._run_workers(
-                "init_process_group", master_address, master_port, rank_offset, world_size, group_name, backend
+                'init_process_group', master_address, master_port, rank_offset, world_size, group_name, backend
             )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):
@@ -65,12 +61,12 @@ class LLMRayActor:
         if self.use_gpu_executor:
             return self.llm.llm_engine.model_executor.driver_worker.update_weight(name, dtype, shape, empty_cache)
         else:
-            return self.llm.llm_engine.model_executor._run_workers("update_weight", name, dtype, shape, empty_cache)
+            return self.llm.llm_engine.model_executor._run_workers('update_weight', name, dtype, shape, empty_cache)
 
     def stop_remote_worker_execution_loop(self):
         # Fix error for using 2 communication group
         # https://github.com/vllm-project/vllm/commit/eb6d3c264d0cd8e44dec16bca7947fbe96415ce9#diff-e1ad69e38e033accddfa5480ec808c4740eb39244d1ef51cc3407e20dde8cfd4
-        if self.__version__ > "0.4.2":
+        if self.__version__ > '0.4.2':
             self.llm.llm_engine.model_executor.stop_remote_worker_execution_loop()
 
 
@@ -89,7 +85,7 @@ def create_vllm_engines(
         scheduling_strategy = None
 
         if tensor_parallel_size > 1:
-            bundles = [{"GPU": 1, "CPU": 1}] * tensor_parallel_size
+            bundles = [{'GPU': 1, 'CPU': 1}] * tensor_parallel_size
             pg = placement_group(bundles)
             ray.get(pg.ready())
 
@@ -106,7 +102,7 @@ def create_vllm_engines(
                 pretrain,
                 trust_remote_code=True,
                 tensor_parallel_size=tensor_parallel_size,
-                dtype="bfloat16",
+                dtype='bfloat16',
                 seed=seed + i,
                 enable_prefix_caching=enable_prefix_caching,
                 max_model_len=max_model_len,
@@ -116,7 +112,7 @@ def create_vllm_engines(
     return vllm_engines
 
 
-if __name__ == "__main__":
-    llm = LLMRayActor.remote("meta-llama/Llama-2-7b-chat-hf", tensor_parallel_size=4)
-    output = ray.get(llm.generate.remote("San Franciso is a"))
-    print(f"output: {output}")
+if __name__ == '__main__':
+    llm = LLMRayActor.remote('meta-llama/Llama-2-7b-chat-hf', tensor_parallel_size=4)
+    output = ray.get(llm.generate.remote('San Franciso is a'))
+    print(f'output: {output}')

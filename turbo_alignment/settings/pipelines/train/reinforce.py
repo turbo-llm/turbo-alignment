@@ -1,7 +1,3 @@
-from typing import Literal, Optional
-
-from peft import TaskType
-
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.datasets import ChatMultiDatasetSettings
 from turbo_alignment.settings.model import (
@@ -18,7 +14,7 @@ class REINFORCETrainerSettings(TrainerSettings):
 
     penalty_reward_value: float = 0.1
     clip_rewards_min: float = 0.1
-    clip_rewards_max: float = 1.
+    clip_rewards_max: float = 1.0
     kl_coef: float = 0.05
     mean_baseline_coef: float = 0.1
 

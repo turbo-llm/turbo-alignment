@@ -26,7 +26,10 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
             )
 
             if model_inference_settings.use_vllm:
-                import vllm
+                try:
+                    import vllm
+                except ImportError as exc:
+                    raise exc
 
                 from turbo_alignment.generators.vllm_chat import VLLMChatGenerator
 

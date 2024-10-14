@@ -1,8 +1,7 @@
-import numpy as np
-from typing import Literal
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any, Literal
 
+import numpy as np
 import torch
 import torch.distributed
 from torch.distributed.distributed_c10d import (
@@ -48,15 +47,17 @@ def get_global_std(values: torch.Tensor, mean: float) -> float:
     return global_mean
 
 
-def get_log_mean_std(tensor: torch.Tensor, name: str, train_eval: Literal["train", "eval"] | None = None) -> dict[str, float]:
+def get_log_mean_std(
+    tensor: torch.Tensor, name: str, train_eval: Literal['train', 'eval'] | None = None
+) -> dict[str, float]:
     mean = get_global_mean(tensor)
     metrics = {}
     if train_eval is not None:
-        metrics[f"{train_eval}/{name}_mean"] = mean
-        metrics[f"{train_eval}/{name}_std"] = get_global_std(tensor, mean=mean)
+        metrics[f'{train_eval}/{name}_mean'] = mean
+        metrics[f'{train_eval}/{name}_std'] = get_global_std(tensor, mean=mean)
     else:
-        metrics[f"{name}_mean"] = mean
-        metrics[f"{name}_std"] = get_global_std(tensor, mean=mean)
+        metrics[f'{name}_mean'] = mean
+        metrics[f'{name}_std'] = get_global_std(tensor, mean=mean)
 
     return metrics
 
@@ -73,18 +74,18 @@ def init_process_group(
     group_name: str | None = None,
     pg_options: Any = None,
 ):
-    assert (store is None) or (init_method is None), "Cannot specify both init_method and store."
+    assert (store is None) or (init_method is None), 'Cannot specify both init_method and store.'
 
     if store is not None:
-        assert world_size > 0, "world_size must be positive if using store"
-        assert rank >= 0, "rank must be non-negative if using store"
+        assert world_size > 0, 'world_size must be positive if using store'
+        assert rank >= 0, 'rank must be non-negative if using store'
     elif init_method is None:
-        init_method = "env://"
+        init_method = 'env://'
 
     if backend:
         backend = Backend(backend)
     else:
-        backend = Backend("undefined")
+        backend = Backend('undefined')
 
     if timeout is None:
         timeout = default_pg_timeout
