@@ -72,6 +72,19 @@ def train_rm_entrypoint(
     pipelines.TrainRMStrategy().run(experiment_settings)
 
 
+@app.command(name='train_multihead', help='Run RM pipeline')
+def train_rm_entrypoint(
+    experiment_settings_path: Path = typer.Option(
+        ...,
+        '--experiment_settings_path',
+        exists=True,
+        help='Path to experiment config file',
+    )
+) -> None:
+    experiment_settings = pipeline_settings.RMTrainExperimentSettings.parse_file(experiment_settings_path)
+    pipelines.TrainMultiheadStrategy().run(experiment_settings)
+
+
 @app.command(name='train_classification', help='Train Classifier')
 def classification_training(
     experiment_settings_path: Path = typer.Option(
