@@ -1,10 +1,10 @@
 from typing import Any
 
+import wandb
 from wandb.sdk.lib.disabled import RunDisabled
 from wandb.sdk.wandb_run import Run
 
-import wandb
-from turbo_alignment.settings.weights_and_biases import WandbSettings
+from turbo_alignment.settings.logging.weights_and_biases import WandbSettings
 
 
 def create_wandb_run(parameters: WandbSettings, config: dict[str, Any] | None = None) -> Run | RunDisabled:

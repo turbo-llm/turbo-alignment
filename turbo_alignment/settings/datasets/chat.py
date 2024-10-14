@@ -25,6 +25,7 @@ class ChatDatasetSettings(BaseDatasetSettings):
     keep_end: bool | None = None
     max_tokens_count: int | None
     prompt_template: Path
+    ignore_system_prompt: bool = False
 
 
 class ChatMultiDatasetSettings(ChatDatasetSettings, MultiDatasetSettings):
