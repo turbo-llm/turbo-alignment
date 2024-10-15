@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Tuple
@@ -6,8 +7,6 @@ import h5py
 import numpy as np
 import torch
 from accelerate import Accelerator
-from turbo_alignment.common.registry import Params
-import os
 from accelerate.utils import gather_object
 from safetensors.torch import save_file
 from tqdm import tqdm

@@ -6,7 +6,6 @@ from typing import Any, overload
 
 import numpy as np
 import torch
-from turbo_alignment.common.registry import Params
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
@@ -194,16 +193,14 @@ class TrainMultimodalDataset(MultimodalDataset):
         try:
             for msg in modality_messages:
                 reader = self._modality_readers[msg.type]
-                modality_encodings.append((msg.type, reader.read(msg.content)))
+                # modality_encodings.append((msg.type, reader.read(msg.content)))
+                modality_encodings.append(reader.read(msg.content))
         except (OSError, RuntimeError, KeyError):
             return None
-
-        # record['modality_inputs'] = modality_encodings
 
         if len(modality_encodings) != modality_messages_after_truncation:
             return None
 
-        # return record
         return modality_encodings
 
     def __iter__(self):
@@ -218,6 +215,7 @@ class TrainMultimodalDataset(MultimodalDataset):
             end = min(start + per_worker, end)
         for i, sample in enumerate(self.records[start:end]):
             output = self._read_modalities(sample)
+
             if output:
                 yield sample | {'modality_inputs': output}
 

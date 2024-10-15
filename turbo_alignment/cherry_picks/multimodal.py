@@ -1,10 +1,10 @@
 from typing import Iterable
 
 import torch
-import wandb
 from PIL import Image
 from transformers import PreTrainedTokenizerBase
 
+import wandb
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.dataset.multimodal import InferenceMultimodalDataset
 from turbo_alignment.generators.multimodal import MultimodalGenerator

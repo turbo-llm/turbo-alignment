@@ -7,9 +7,9 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
     def torch_call(self, features):
         label_name = 'label' if 'label' in features[0].keys() else 'labels'
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
-        # print("😍"*10, features[0].keys())
         if 'modality_inputs' in features[0].keys():
-            modality_inputs = [feature['modality_inputs'] for feature in features]
+            print([feature['modality_inputs'] for feature in features])
+            modality_inputs = torch.stack([torch.stack(feature['modality_inputs']) for feature in features])
         else:
             modality_inputs = [None for _ in features]
 
