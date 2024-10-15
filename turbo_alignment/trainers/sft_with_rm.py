@@ -4,7 +4,7 @@ import os
 import torch
 from torch import nn
 from pathlib import Path
-from transformers import PreTrainedModel, Trainer
+from transformers import PreTrainedModel
 from transformers.trainer_pt_utils import nested_detach
 from transformers.utils import logging
 
@@ -16,7 +16,6 @@ logger = logging.get_logger(__name__)
 
 class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
     def compute_loss(self, model, inputs, return_outputs=False) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
-
         sft_logits, rewards_w, rewards_l, reward_token_pos_w = model.forward(inputs)
 
         sft_logits = sft_logits.view(-1, sft_logits.size(-1))
@@ -25,11 +24,13 @@ class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
         # print(f'INPUTS TEXT SHAPE: {sft_labels.shape}')
         # print(f'INPUTS TEXT: {sft_labels}')
 
-        sft_labels_1 = sft_labels.view(-1)[:reward_token_pos_w[0]]
-        sft_labels_2 = sft_labels.view(-1)[reward_token_pos_w[0]+1:]
+        sft_labels_1 = sft_labels.view(-1)[: reward_token_pos_w[0]]
+        sft_labels_2 = sft_labels.view(-1)[reward_token_pos_w[0] + 1 :]
         sft_labels_cat = torch.cat((sft_labels_1, sft_labels_2), dim=0)
 
-        loss = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean() + torch.nn.functional.cross_entropy(sft_logits, sft_labels_cat)
+        loss = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean() + torch.nn.functional.cross_entropy(
+            sft_logits, sft_labels_cat
+        )
         if return_outputs:
             return loss, {'rewards_w': rewards_w, 'rewards_l': rewards_l}
         return loss
@@ -41,7 +42,6 @@ class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
         prediction_loss_only: bool,
         ignore_keys: list[str] | None,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
-        
         inputs = self._prepare_inputs(inputs)
 
         if ignore_keys is None:
@@ -67,7 +67,6 @@ class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
         labels = labels.long()
 
         return loss, logits, labels
-    
 
     def _save_checkpoint(self, model, trial, metrics=None):
         logger.info('Running custom _save_checkpoint')

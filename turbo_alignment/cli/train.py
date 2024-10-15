@@ -73,7 +73,7 @@ def train_rm_entrypoint(
 
 
 @app.command(name='train_multihead', help='Run RM pipeline')
-def train_rm_entrypoint(
+def train_multihead(
     experiment_settings_path: Path = typer.Option(
         ...,
         '--experiment_settings_path',

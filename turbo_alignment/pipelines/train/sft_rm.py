@@ -4,7 +4,13 @@ import torch
 import numpy as np
 from torch import nn
 from torch.utils.data import Dataset
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainingArguments, AutoModel, AutoModelForCausalLM, GenerationMixin, AutoConfig
+from transformers import (
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+    TrainingArguments,
+    GenerationMixin,
+    AutoConfig,
+)
 from transformers.data.data_collator import DataCollatorMixin
 
 from turbo_alignment.cherry_picks.rm import MultiHeadCherryPickCallback
@@ -23,7 +29,6 @@ from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets import DatasetStrategy
 from turbo_alignment.settings.pipelines import RMTrainExperimentSettings
 from turbo_alignment.trainers.sft_with_rm import SFTwithRMTrainer
-from turbo_alignment.trainers.utils import concatenated_inputs
 
 logger = get_project_logger()
 
@@ -39,24 +44,22 @@ class MultiheadModel(PreTrainedModel, GenerationMixin):
 
         reward_token_ids = tokenizer.encode('<reward>', add_special_tokens=False)
         if len(reward_token_ids) != 1:
-            raise ValueError('<reward> token us not found in the tokenizer')
+            raise ValueError('<reward> token is not found in the tokenizer')
 
         self.reward_token_ids = reward_token_ids[0]
-    
-    def forward(self, batch):
 
+    def forward(self, batch):
         outputs_w = self.decoder(**batch['inputs_w']).last_hidden_state[0]
         outputs_l = self.decoder(**batch['inputs_l']).last_hidden_state[0]
 
-        
         reward_token_pos_w = np.where(batch['inputs_w']['input_ids'][0].cpu() == self.reward_token_ids)[0]
         reward_token_pos_l = np.where(batch['inputs_l']['input_ids'][0].cpu() == self.reward_token_ids)[0]
 
         if len(reward_token_pos_w) != 1 or len(reward_token_pos_l) != 1:
             raise ValueError('More than one <reward> token detected in replica')
 
-        outputs_w_1 = outputs_w[:reward_token_pos_w[0]]
-        outputs_w_2 = outputs_w[reward_token_pos_w[0]+1:]
+        outputs_w_1 = outputs_w[: reward_token_pos_w[0]]
+        outputs_w_2 = outputs_w[reward_token_pos_w[0] + 1 :]
         outputs_w_cat = torch.cat((outputs_w_1, outputs_w_2), dim=0)
 
         lm_logits = self.lm_head(outputs_w_cat)
@@ -64,7 +67,7 @@ class MultiheadModel(PreTrainedModel, GenerationMixin):
         rm_logits_l = self.rm_head(outputs_l[reward_token_pos_l[0]])
 
         return lm_logits, rm_logits_w, rm_logits_l, reward_token_pos_w
-    
+
 
 class TrainMultiheadStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
     @staticmethod
@@ -106,7 +109,7 @@ class TrainMultiheadStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
             remove_unused_columns=False,
             **experiment_settings.trainer_settings.dict(),
         )
-    
+
     @staticmethod
     def _load_model(
         experiment_settings: RMTrainExperimentSettings,
@@ -114,7 +117,6 @@ class TrainMultiheadStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
     ) -> nn.Module | PreTrainedModel:
         config = AutoConfig.from_pretrained(experiment_settings.model_settings.model_path)
         return MultiheadModel(config, experiment_settings.model_settings, tokenizer)
-
 
     @staticmethod
     def _get_trainer(
