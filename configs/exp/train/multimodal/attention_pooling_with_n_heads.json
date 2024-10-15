@@ -27,7 +27,7 @@
                 },
                 "audio": null
         },
-        "n_modality_embeddings": 128,
+        "n_modality_embeddings": 448,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "dataset_type": "multimodal",
@@ -63,7 +63,7 @@
                 },
                 "audio": null
             },
-        "n_modality_embeddings": 128,
+        "n_modality_embeddings": 448,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "dataset_type": "multimodal",
@@ -146,7 +146,7 @@
         "audio": null
     },
     "modality_projector_mapping": {
-        "image": "top_k_attention_pooling",
+        "image": "top_k_attention_pooling_with_n_heads",
         "audio": null
     },
     "modality_projector_initialization_mapping": {
@@ -182,7 +182,7 @@
             },
             "dataset_type": "multimodal",
             "max_tokens_count": 2000,
-            "n_modality_embeddings": 128,
+            "n_modality_embeddings": 448,
             "start_modality_token": "<MS>",
             "end_modality_token": "</MS>",
             "only_answer_loss": true,

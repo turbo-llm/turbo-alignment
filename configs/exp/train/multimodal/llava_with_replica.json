@@ -3,7 +3,7 @@
         "sources": [
             {
                 "name": "train",
-                "records_path": "/from_s3/dataset/llava_next_data_dialogs/train_chat.jsonl",
+                "records_path": "/from_s3/dataset/llava_next_data_dialogs/joined_train_chat_v2.jsonl",
                 "sample_rate": 1.0
             }
         ],
@@ -27,7 +27,7 @@
                 },
                 "audio": null
         },
-        "n_modality_embeddings": 128,
+        "n_modality_embeddings": 1,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "dataset_type": "multimodal",
@@ -39,7 +39,7 @@
         "sources": [
             {
                 "name": "test",
-                "records_path": "/from_s3/dataset/llava_next_data_dialogs/test_chat.jsonl",
+                "records_path": "/from_s3/dataset/llava_next_data_dialogs/joined_test_chat_v2.jsonl",
                 "num_samples": 5000
             }
         ],
@@ -63,7 +63,7 @@
                 },
                 "audio": null
             },
-        "n_modality_embeddings": 128,
+        "n_modality_embeddings": 1,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "dataset_type": "multimodal",
@@ -111,8 +111,8 @@
     "trainer_settings": {
         "evaluation_strategy": "steps",
         "save_strategy": "steps",
-        "eval_steps": 400,
-        "save_steps": 400,
+        "eval_steps": 250,
+        "save_steps": 250,
         "per_device_train_batch_size": 2,
         "per_device_eval_batch_size": 2,
         "gradient_accumulation_steps": 16,
@@ -146,7 +146,7 @@
         "audio": null
     },
     "modality_projector_mapping": {
-        "image": "top_k_attention_pooling",
+        "image": "llava_with_replica",
         "audio": null
     },
     "modality_projector_initialization_mapping": {
@@ -167,7 +167,7 @@
             "sources": [
                 {
                     "name": "cherry_pickls",
-                    "records_path": "/from_s3/dataset/llava_next_data_dialogs/test_chat.jsonl",
+                    "records_path": "/from_s3/dataset/llava_next_data_dialogs/joined_test_chat_v2.jsonl",
                     "num_samples": 50
                 }
             ],
@@ -182,7 +182,7 @@
             },
             "dataset_type": "multimodal",
             "max_tokens_count": 2000,
-            "n_modality_embeddings": 128,
+            "n_modality_embeddings": 1,
             "start_modality_token": "<MS>",
             "end_modality_token": "</MS>",
             "only_answer_loss": true,
