@@ -3,7 +3,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import wandb
 from clearml import Task
 from transformers import (
     TrainerCallback,
@@ -14,6 +13,7 @@ from transformers import (
 from wandb.sdk.lib.disabled import RunDisabled
 from wandb.sdk.wandb_run import Run
 
+import wandb
 from turbo_alignment.common.logging import get_project_logger
 
 logger = get_project_logger()
