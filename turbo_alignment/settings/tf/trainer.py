@@ -37,7 +37,7 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     prediction_loss_only: bool = False
     load_best_model_at_end: bool = True
     logging_first_step: bool = True
-    fsdp_config: dict[str, Any] | None = None
+    fsdp_config: dict[str, Any] | str | None = None
     fsdp: str | list[str] | None = ''
     dataloader_num_workers: int = 8
     dataloader_prefetch_factor: int | None = None

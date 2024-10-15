@@ -102,11 +102,11 @@ def enum_to_string_in_dict(conv: list[dict[str, Any]]):
 
 class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
     def __init__(
-        self,
-        source: DatasetSourceSettings,
-        settings: ChatDatasetSettings,
-        tokenizer: PreTrainedTokenizerBase,
-        read: bool = True,
+            self,
+            source: DatasetSourceSettings,
+            settings: ChatDatasetSettings,
+            tokenizer: PreTrainedTokenizerBase,
+            read: bool = True,
     ) -> None:
         super().__init__(source=source, settings=settings, tokenizer=tokenizer)
         self.settings: ChatDatasetSettings = settings
@@ -129,14 +129,15 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         loguru.logger.info("{}{}", prefix, [self.tokenizer.batch_decode([id])[0] for id in tokens.input_ids])
 
     def _encode(
-        self,
-        records: list[ChatDatasetRecord],
-        inference: bool,
-        random_cut: bool,
+            self,
+            records: list[ChatDatasetRecord],
+            inference: bool,
+            random_cut: bool,
     ) -> list[dict[str, Any] | None]:
         output = []
         for record in records:
-            conversation = Conversation(system_prompt=self.source.system_prompt, messages=record.messages)
+            conversation = Conversation(system_prompt=self.source.system_prompt, messages=record.messages,
+                                        ignore_system_prompt=self.settings.ignore_system_prompt)
             unpacked_conversation = [message.dict() for message in conversation.messages]
             unpacked_conversation = enum_to_string_in_dict(unpacked_conversation)
 
@@ -162,8 +163,8 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 last_replica_start_ind = binary_seq_str.rfind('01')
 
                 result_str = (
-                    binary_seq_str[: last_replica_start_ind + 1].replace('1', '0')
-                    + binary_seq_str[last_replica_start_ind + 1 :]
+                        binary_seq_str[: last_replica_start_ind + 1].replace('1', '0')
+                        + binary_seq_str[last_replica_start_ind + 1:]
                 )
                 assistant_masks = [i == '1' for i in result_str]
 
@@ -196,8 +197,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             max_length = max_length - (len(prefix) + len(suffix))
 
             while (
-                replica_start_indices[right_replica_ind_exclusive] - replica_start_indices[left_replica_ind_inclusive]
-                > max_length
+                    replica_start_indices[right_replica_ind_exclusive] - replica_start_indices[
+                left_replica_ind_inclusive]
+                    > max_length
             ):
                 if self.settings.keep_end:
                     left_replica_ind_inclusive += 1
@@ -208,11 +210,11 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 right_replica_ind_exclusive = random.randint(left_replica_ind_inclusive, right_replica_ind_exclusive)
 
             while right_replica_ind_exclusive > 0 and (
-                (inference and conversation.messages[right_replica_ind_exclusive - 1].role == ChatMessageRole.BOT)
-                or (
-                    not inference
-                    and conversation.messages[right_replica_ind_exclusive - 1].role == ChatMessageRole.USER
-                )
+                    (inference and conversation.messages[right_replica_ind_exclusive - 1].role == ChatMessageRole.BOT)
+                    or (
+                            not inference
+                            and conversation.messages[right_replica_ind_exclusive - 1].role == ChatMessageRole.USER
+                    )
             ):
                 right_replica_ind_exclusive -= 1
 
@@ -243,11 +245,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
     @staticmethod
     @overload
-    def _read_records(records: Path) -> list[ChatDatasetRecord]: ...
+    def _read_records(records: Path) -> list[ChatDatasetRecord]:
+        ...
 
     @staticmethod
     @overload
-    def _read_records(records: list[dict]) -> list[ChatDatasetRecord]: ...
+    def _read_records(records: list[dict]) -> list[ChatDatasetRecord]:
+        ...
 
     @staticmethod
     def _read_records(records) -> list[ChatDatasetRecord]:
@@ -267,12 +271,12 @@ class TrainChatDataset(ChatDataset):
 @ChatDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
 class InferenceChatDataset(ChatDataset):
     def __init__(
-        self,
-        source: DatasetSourceSettings,
-        settings: ChatDatasetSettings,
-        tokenizer: PreTrainedTokenizerBase,
-        read: bool = True,
-        random_cut: bool = False,
+            self,
+            source: DatasetSourceSettings,
+            settings: ChatDatasetSettings,
+            tokenizer: PreTrainedTokenizerBase,
+            read: bool = True,
+            random_cut: bool = False,
     ) -> None:
         self._random_cut = random_cut
 
