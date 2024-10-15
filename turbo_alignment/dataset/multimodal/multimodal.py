@@ -6,11 +6,7 @@ from typing import Any, overload
 
 import numpy as np
 import torch
-<<<<<<< HEAD
-from allenai_common import Params
-=======
 from turbo_alignment.common.registry import Params
->>>>>>> 1167a3408adc49898aa4b00c6235adbfceabf9d1
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
