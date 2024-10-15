@@ -1,7 +1,6 @@
 from enum import Enum
 
-from allenai_common import Registrable
-
+from turbo_alignment.common.registry import Registrable
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.datasets.chat import ChatPromptTemplate
 from turbo_alignment.settings.metric import MetricType

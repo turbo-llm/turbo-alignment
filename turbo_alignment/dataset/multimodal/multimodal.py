@@ -6,12 +6,17 @@ from typing import Any, overload
 
 import numpy as np
 import torch
+<<<<<<< HEAD
 from allenai_common import Params
+=======
+from turbo_alignment.common.registry import Params
+>>>>>>> 1167a3408adc49898aa4b00c6235adbfceabf9d1
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
 from turbo_alignment.common.data.multimodal.registry import ModalityReaderRegistry
 from turbo_alignment.common.logging import get_project_logger
+from turbo_alignment.common.registry import Params
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.dataset.base import AlignmentDataset, AlignmentIterableDataset
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset, TrainChatDataset

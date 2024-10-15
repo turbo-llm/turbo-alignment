@@ -5,7 +5,10 @@ from typing import Tuple
 import h5py
 import numpy as np
 import torch
-from allenai_common import Params
+from accelerate import Accelerator
+from turbo_alignment.common.registry import Params
+import os
+from accelerate.utils import gather_object
 from safetensors.torch import save_file
 from tqdm import tqdm
 
@@ -13,6 +16,7 @@ from turbo_alignment.common.data.io import write_json
 from turbo_alignment.common.data.multimodal.base import BaseModalityReader
 from turbo_alignment.common.data.multimodal.registry import ModalityReaderRegistry
 from turbo_alignment.common.logging import get_project_logger
+from turbo_alignment.common.registry import Params
 from turbo_alignment.modeling.multimodal.encoders import ModalityEncoderRegistry
 from turbo_alignment.modeling.multimodal.encoders.base import BaseModalityEncoder
 from turbo_alignment.pipelines.base import BaseStrategy

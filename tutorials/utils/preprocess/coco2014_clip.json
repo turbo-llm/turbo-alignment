@@ -1,0 +1,14 @@
+{
+    "reader_settings": {
+        "reader_type": "clip",
+        "reader_path": "/from_s3/clip"
+    },
+    "encoder_settings": {
+        "modality_encoder_type": "clip",
+        "encoder_path": "/from_s3/clip"
+    },
+    "modality": "image",
+    "dataset_path": "/app/llava_next_data/llava_next_data_images",
+    "batch_size": 512,
+    "output_file_path": "/app/output/"
+}

@@ -27,7 +27,7 @@
                 },
                 "audio": null
         },
-        "n_modality_embeddings": 64,
+        "n_modality_embeddings": 128,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "dataset_type": "multimodal",
@@ -63,7 +63,11 @@
                 },
                 "audio": null
             },
+<<<<<<< HEAD
         "n_modality_embeddings": 64,
+=======
+        "n_modality_embeddings": 128,
+>>>>>>> 1167a3408adc49898aa4b00c6235adbfceabf9d1
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "dataset_type": "multimodal",
@@ -182,7 +186,11 @@
             },
             "dataset_type": "multimodal",
             "max_tokens_count": 2000,
+<<<<<<< HEAD
             "n_modality_embeddings": 64,
+=======
+            "n_modality_embeddings": 128,
+>>>>>>> 1167a3408adc49898aa4b00c6235adbfceabf9d1
             "start_modality_token": "<MS>",
             "end_modality_token": "</MS>",
             "only_answer_loss": true,

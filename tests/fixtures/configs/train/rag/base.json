@@ -145,7 +145,7 @@
     "no_cuda": true,
     "save_total_limit": 1
   },
-  "wandb_settings": {
+  "logging_settings": {
     "project_name": "alignment",
     "run_name": "rag",
     "entity": "turbo-alignment"

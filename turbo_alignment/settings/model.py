@@ -13,6 +13,12 @@ class ModelType(str, Enum):
     ENC = 'encoder'
 
 
+class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
+    use_rope: bool = True
+    use_cross_entropy: bool = True
+    use_geglu: bool = True
+
+
 class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
     model_path: Path
     model_type: ModelType
@@ -22,6 +28,8 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
     transformers_settings: ModelTransformersSettings
 
     embeddings_initialization_strategy: dict[str, str] | None = None
+
+    liger_kernels_settings: LigerKernelSettings | None = None
 
 
 class PreTrainedAdaptersModelSettings(PreTrainedModelSettings):

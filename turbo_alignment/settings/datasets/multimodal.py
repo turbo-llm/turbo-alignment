@@ -29,6 +29,7 @@ class MultimodalDatasetSettings(BaseDatasetSettings):
     random_cut: bool = False
     keep_end: bool | None = None
     only_last_replica_loss: bool = False
+    ignore_system_prompt: bool = False
 
 
 class MultimodalMultiDatasetSettings(MultimodalDatasetSettings, MultiDatasetSettings):
