@@ -1,7 +1,6 @@
 import abc
 
-from allenai_common import Registrable
-
+from turbo_alignment.common.registry import Registrable
 from turbo_alignment.metrics.registry import MetricSettings
 from turbo_alignment.settings.metric import MetricResults
 

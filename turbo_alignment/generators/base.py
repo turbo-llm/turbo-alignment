@@ -105,7 +105,6 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         )
 
         self._custom_generation_settings = custom_generation_settings
-        self._return_logits = return_logits
 
     @abstractmethod
     def _generate_from_single_record(
