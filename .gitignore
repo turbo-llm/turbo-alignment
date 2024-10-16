@@ -120,5 +120,6 @@ default_tb/
 .history
 .vscode
 
+data/
 bin/
 presets/

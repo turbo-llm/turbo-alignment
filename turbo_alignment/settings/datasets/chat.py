@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
@@ -19,12 +20,11 @@ class ChatDatasetSettings(BaseDatasetSettings):
 
     # FIXME: this settings are strange for inference dataset
     only_last_replica_loss: bool = False
-    only_answer_loss: bool = True
     random_cut: bool = False  # TODO: not common property for train/inference
 
     keep_end: bool | None = None
     max_tokens_count: int | None
-    prompt_template: ChatPromptTemplate
+    prompt_template: Path
     ignore_system_prompt: bool = False
 
 

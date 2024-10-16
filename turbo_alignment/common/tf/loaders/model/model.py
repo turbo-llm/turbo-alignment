@@ -1,5 +1,5 @@
 import torch
-from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
+from peft import PeftModel, get_peft_model, prepare_model_for_kbit_training
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 
@@ -61,7 +61,7 @@ def load_model(
     )
 
     if model_settings.transformers_settings.load_in_8bit:
-        model = prepare_model_for_int8_training(model)
+        model = prepare_model_for_kbit_training(model)
 
     model.resize_token_embeddings(len(tokenizer))
 
