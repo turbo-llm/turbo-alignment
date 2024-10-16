@@ -137,18 +137,18 @@ python -m turbo_alignment train_kto --experiment_settings_path tutorials/kto/kto
 <a name="-sft-rag-train"></a>
 ### SFT-RAG
 - **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [sft_with_retrieval_utility...](...)
+- **📝 Configs Example**: [sft_retrieval_utility.json](tests/fixtures/configs/train/sft/sft_retrieval_utility.json)
 - **🖥️ CLI launch command**: 
 ```bash
-python -m turbo_alignment train_sft --experiment_settings_path ...
+python -m turbo_alignment train_sft --experiment_settings_path tests/fixtures/configs/train/sft/sft_retrieval_utility.json
 ```
 <a name="-e2e-rag-train"></a>
 ### End2End-RAG
 - **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [end2end_rag...](...)
+- **📝 Configs Example**: [end2end.json](tests/fixtures/configs/train/rag/end2end.json)
 - **🖥️ CLI launch command**:
 ```bash
-python -m turbo_alignment train_rag --experiment_settings_path ...
+python -m turbo_alignment train_rag --experiment_settings_path tests/fixtures/configs/train/rag/end2end.json
 ```
 
 <a name="-inference"></a>
@@ -156,37 +156,37 @@ python -m turbo_alignment train_rag --experiment_settings_path ...
 <a name="-chat-inference"></a>
 ## Chat Inference
 - **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [...sft.json](...)
+- **📝 Configs Example**: [base.json](tests/fixtures/configs/inference/sft/base.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_chat --inference_settings_path ...
+python -m turbo_alignment inference_chat --inference_settings_path tests/fixtures/configs/inference/sft/base.json
 ```
 
 <a name="-classification-inference"></a>
 ## Classification Inference
 - **📚 Dataset type** prepare your dataset  in the `ClassificationDataset`, examples available [here](docs/dataset_example.md#-classification-dataset) format.
-- **📝 Configs Example**: [...classification_inference.json](...)
+- **📝 Configs Example**: [classification_inference.json](tests/fixtures/configs/inference/classification/base.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_classification --inference_settings_path ...
+python -m turbo_alignment inference_classification --inference_settings_path tests/fixtures/configs/inference/classification/base.json
 ```
 
 <a name="-multimodal-inference"></a>
 ## Multimodal Inference
 - **📚 Dataset type** prepare your dataset  in the `MultimodalDataset`, examples available [here](docs/dataset_example.md#-multimodal-dataset) format.
-- **📝 Configs Example**: [...mlp.json](...)
+- **📝 Configs Example**: [llama_llava_clip_pickle.json](tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_multimodal --inference_settings_path ...
+python -m turbo_alignment inference_multimodal --inference_settings_path tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json
 ```
 
 <a name="-rag-inference"></a>
 ## RAG Inference
 - **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [...rag_inference.json](...)
+- **📝 Configs Example**: [rag_inference.json](tests/fixtures/configs/inference/rag/base.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment inference_rag --inference_settings_path ...
+python -m turbo_alignment inference_rag --inference_settings_path tests/fixtures/configs/inference/rag/base.json
 ```
 
 <a name="-sampling"></a>
@@ -230,10 +230,10 @@ python -m turbo_alignment merge_adapters_to_base --settings_path tests/fixtures/
 
 <a name="-preprocess_multimodal_dataset"></a>
 ## Preprocess Multimodal Dataset
-- **📝 Configs Example**: [...coco2014_clip.json](...)
+- **📝 Configs Example**: [coco2014_clip.json](tutorials/utils/preprocess/coco2014_clip.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment preprocess_multimodal_dataset --settings_path ...
+python -m turbo_alignment preprocess_multimodal_dataset --settings_path tutorials/utils/preprocess/coco2014_clip.json
 ```
 
 

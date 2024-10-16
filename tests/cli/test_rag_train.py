@@ -13,7 +13,7 @@ runner = CliRunner()
 @pytest.mark.parametrize(
     'config_path',
     [
-        FIXTURES_PATH / 'configs/train/rag/base.json',
+        FIXTURES_PATH / 'configs/train/rag/end2end.json',
     ],
 )
 def test_rag_train(config_path: Path):
