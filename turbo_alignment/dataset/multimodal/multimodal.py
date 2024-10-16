@@ -1,10 +1,11 @@
+import gc
+import math
 from abc import ABC
 from pathlib import Path
 from typing import Any, overload
 
 import numpy as np
 import torch
-from safetensors._safetensors_rust import SafetensorError
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.data.multimodal import BaseModalityReader
@@ -12,7 +13,7 @@ from turbo_alignment.common.data.multimodal.registry import ModalityReaderRegist
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.registry import Params
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
-from turbo_alignment.dataset.base import AlignmentDataset
+from turbo_alignment.dataset.base import AlignmentDataset, AlignmentIterableDataset
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset, TrainChatDataset
 from turbo_alignment.dataset.chat.models import ChatDatasetRecord, ChatMessage
 from turbo_alignment.dataset.multimodal.models import (
@@ -29,7 +30,7 @@ VERBOSE_EVERY = 1000
 logger = get_project_logger()
 
 
-class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
+class MultimodalDataset(AlignmentIterableDataset[MultimodalDatasetRecord], ABC):
     def __init__(self, tokenizer, source, settings):
         super().__init__(tokenizer=tokenizer, source=source, settings=settings)
 
@@ -82,7 +83,13 @@ class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
     @staticmethod
     def _read_records(records) -> list[MultimodalDatasetRecord]:
         if isinstance(records, Path):
-            return [MultimodalDatasetRecord(**record) for record in read_jsonl(records)]
+            total_records = []
+            for record in read_jsonl(records):
+                try:
+                    total_records.append(MultimodalDatasetRecord(**record))
+                except Exception as E:
+                    print(record, E)
+            return total_records
         if isinstance(records, list):
             return [MultimodalDatasetRecord(**record) for record in records]
         raise NotImplementedError
@@ -117,32 +124,11 @@ class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
 
         return ChatDatasetRecord(id=record.id, messages=converted_messages)
 
-    def _read_modalities(
-        self, record: MultimodalDatasetRecord, modality_messages_after_truncation: int
-    ) -> list[tuple[Modality, torch.Tensor]]:
-        modality_messages: list[MultimodalFileMessage] = [
-            m for m in record.messages if isinstance(m, MultimodalFileMessage)
-        ]
-
-        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
-
-        if self._truncate_top:
-            modality_messages = modality_messages[messages_to_delete:]
-        else:
-            modality_messages = modality_messages[:modality_messages_after_truncation]
-
-        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
-        for msg in modality_messages:
-            reader = self._modality_readers[msg.type]
-            modality_encodings.append((msg.type, reader.read(msg.content)))
-        return modality_encodings
-
 
 @MultimodalDatasetTypeRegistry.register(DatasetStrategy.TRAIN)
 class TrainMultimodalDataset(MultimodalDataset):
     def __init__(self, tokenizer, source, settings) -> None:
         """
-
         :param n_modality_embeddings: сколько токенов выделяем под одно сообщение с нетекстовой модальностью
         :param modality_token_mapping: modality -> token
         :param start_modality_token: начало блока с токенами, которые относятся к нетекстовой модальности
@@ -170,20 +156,6 @@ class TrainMultimodalDataset(MultimodalDataset):
                 outputs.append(None)
                 continue
 
-            modality_messages_after_truncation = int(
-                (tokenized_record['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
-            )
-
-            try:
-                encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            except (OSError, RuntimeError, SafetensorError):
-                outputs.append(None)
-                continue
-
-            if len(encoded_modalities) != modality_messages_after_truncation:
-                outputs.append(None)
-                continue
-
             modality_tokens_mask = torch.isin(
                 tokenized_record['input_ids'],
                 torch.tensor([self._get_token_id(token) for token in self._modality_token_mapping.values()]),
@@ -194,12 +166,58 @@ class TrainMultimodalDataset(MultimodalDataset):
             outputs.append(
                 {
                     **tokenized_record,
-                    'modality_inputs': encoded_modalities,
+                    'messages': record.messages,
                     'modality_tokens_mask': modality_tokens_mask,
                 }
             )
 
         return outputs
+
+    def _read_modalities(self, record):
+        modality_messages_after_truncation = int(
+            (self.records[0]['input_ids'] == self._get_token_id(self._start_modality_token)).sum()
+        )
+
+        modality_messages: list[MultimodalFileMessage] = [
+            m for m in record['messages'] if isinstance(m, MultimodalFileMessage)
+        ]
+
+        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+
+        if self._truncate_top:
+            modality_messages = modality_messages[messages_to_delete:]
+        else:
+            modality_messages = modality_messages[:modality_messages_after_truncation]
+
+        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        try:
+            for msg in modality_messages:
+                reader = self._modality_readers[msg.type]
+                # modality_encodings.append((msg.type, reader.read(msg.content)))
+                modality_encodings.append(reader.read(msg.content))
+        except (OSError, RuntimeError, KeyError):
+            return None
+
+        if len(modality_encodings) != modality_messages_after_truncation:
+            return None
+
+        return modality_encodings
+
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+
+        start = 0
+        end = len(self.records) - 1
+        if worker_info:
+            per_worker = int(math.ceil(len(self.records) / float(worker_info.num_workers)))
+            worker_id = worker_info.id
+            start = start + worker_id * per_worker
+            end = min(start + per_worker, end)
+        for i, sample in enumerate(self.records[start:end]):
+            output = self._read_modalities(sample)
+
+            if output:
+                yield sample | {'modality_inputs': output}
 
 
 @MultimodalDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
@@ -218,6 +236,27 @@ class InferenceMultimodalDataset(MultimodalDataset):
         )
         self._read()
 
+    def _read_modalities(
+        self, record: MultimodalDatasetRecord, modality_messages_after_truncation: int
+    ) -> list[tuple[Modality, torch.Tensor]]:
+        modality_messages: list[MultimodalFileMessage] = [
+            m for m in record.messages if isinstance(m, MultimodalFileMessage)
+        ]
+
+        messages_to_delete = len(modality_messages) - modality_messages_after_truncation
+
+        if self._truncate_top:
+            modality_messages = modality_messages[messages_to_delete:]
+        else:
+            modality_messages = modality_messages[:modality_messages_after_truncation]
+
+        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        for msg in modality_messages:
+            reader = self._modality_readers[msg.type]
+            print('inference reader')
+            modality_encodings.append((msg.type, reader.read(msg.content)))
+        return modality_encodings
+
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
         chat_records = [self._convert_to_chat(r) for r in records]
         tokenized_chat_records = self._chat_dataset.convert_records(chat_records)
@@ -235,7 +274,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
 
             try:
                 encoded_modalities = self._read_modalities(record, modality_messages_after_truncation)
-            except (OSError, RuntimeError, SafetensorError):
+            except (OSError, RuntimeError, KeyError):
                 outputs.append(None)
                 continue
 

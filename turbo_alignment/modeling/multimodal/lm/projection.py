@@ -71,37 +71,47 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
             )  # returns mask with ids of spans from 1 to N
             modality_spans = find_objects(span_mask)  # returns list of tuples with start index and end index
 
+            print(len(sample_modality_inputs), len(modality_spans))
+            # exit()
+
             assert len(modality_spans) == len(sample_modality_inputs)
 
-            grouped_modality_encoder_inputs: dict[Modality, list[tuple[int, torch.Tensor]]] = defaultdict(list)
+            # grouped_modality_encoder_inputs: dict[Modality, list[tuple[int, torch.Tensor]]] = defaultdict(list)
+            grouped_modality_encoder_inputs = []
 
             # Prepare modality batches
             for index, modality_object in enumerate(sample_modality_inputs):
-                modality, inputs = modality_object
-                grouped_modality_encoder_inputs[modality].append((index, inputs))
+                # modality, inputs = modality_object
+                # grouped_modality_encoder_inputs[modality].append((index, inputs))
+                inputs = modality_object
+                grouped_modality_encoder_inputs.append((index, inputs))
 
             sorted_modality_embeddings: torch.Tensor = torch.full(
                 (len(sample_modality_inputs), self.n_modality_embs, self.language_model_dim), torch.nan
             ).to(self.language_model.device)
 
             # Encode modalities and insert into input embeds
-            for modality, modality_encoder_inputs_with_indices in grouped_modality_encoder_inputs.items():
-                modality_encoder_input_indexes, modality_encoder_inputs = zip(*modality_encoder_inputs_with_indices)
+            # for modality, modality_encoder_inputs_with_indices in grouped_modality_encoder_inputs.items():
+            # for modality_encoder_inputs_with_indices in grouped_modality_encoder_inputs:
+            modality_encoder_inputs_with_indices = grouped_modality_encoder_inputs
+            modality = Modality.IMAGE
+            modality_encoder_input_indexes, modality_encoder_inputs = zip(*modality_encoder_inputs_with_indices)
+            # modality_encoder_input_indexes, modality_encoder_inputs = modality_encoder_inputs_with_indices
 
-                if self.language_model.dtype == torch.float32:
-                    encoded_modality_object_batch = self.encoders[modality].encode(
-                        torch.stack(modality_encoder_inputs, dim=0).to(self.language_model.device)
-                    )
-                else:
-                    encoded_modality_object_batch = self.encoders[modality].encode(
-                        torch.stack(modality_encoder_inputs, dim=0).to(self.language_model.device).bfloat16()
-                    )
-
-                modality_encoder_embeddings = self.modality_adapters[modality](encoded_modality_object_batch)
-
-                sorted_modality_embeddings[modality_encoder_input_indexes, :] = modality_encoder_embeddings.to(
-                    sorted_modality_embeddings.dtype
+            if self.language_model.dtype == torch.float32:
+                encoded_modality_object_batch = self.encoders[modality].encode(
+                    torch.stack(modality_encoder_inputs, dim=0).to(self.language_model.device)
                 )
+            else:
+                encoded_modality_object_batch = self.encoders[modality].encode(
+                    torch.stack(modality_encoder_inputs, dim=0).to(self.language_model.device).bfloat16()
+                )
+
+            modality_encoder_embeddings = self.modality_adapters[modality](encoded_modality_object_batch)
+
+            sorted_modality_embeddings[modality_encoder_input_indexes, :] = modality_encoder_embeddings.to(
+                sorted_modality_embeddings.dtype
+            )
 
             substituted_sample_lm_input_embeds = sample_lm_input_embeds.clone()
             for i, modality_span in enumerate(modality_spans):
