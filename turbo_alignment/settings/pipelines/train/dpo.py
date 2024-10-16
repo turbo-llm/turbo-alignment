@@ -24,6 +24,7 @@ class DPOLossesType(str, Enum):
     SIMPO = 'simpo'
     APO_ZERO = 'apo_zero'
     APO_DOWN = 'apo_down'
+    ASFT = 'asft'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -60,7 +61,6 @@ class CPOLossSettings(DPOLossSettings):
 
 class SlicHfLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.SLIC_HF]
-    beta: float = 1.0
     delta: float = 1.0
     lam: float = 0.1
     norm: bool = False
@@ -68,13 +68,15 @@ class SlicHfLossSettings(DPOLossSettings):
 
 class SimPOLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.SIMPO]
-    beta: float = 0.1
     gamma: float = 0.1
 
 
 class ORPOLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.ORPO]
-    beta: float = 0.1
+
+
+class ASFTLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.ASFT]
 
 
 class APOZeroLossSettings(DPOLossSettings):
@@ -99,6 +101,7 @@ class DPOTrainerSettings(TrainerSettings):
         | KTOLossSettings
         | CPOLossSettings
         | ORPOLossSettings
+        | ASFTLossSettings
         | SimPOLossSettings
         | SlicHfLossSettings
         | SigmoidLossWithMarginSettings
