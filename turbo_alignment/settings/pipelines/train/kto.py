@@ -1,3 +1,8 @@
+from typing import Any
+
+from pydantic import field_validator
+
+from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.datasets.kto import KTOMultiDatasetSettings
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
@@ -10,4 +15,8 @@ class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
 
     cherry_pick_settings: ChatCherryPickSettings
 
-    # training_arguments: KTOTrainingArguments
+    training_arguments: KTOTrainingArguments
+
+    @field_validator('training_arguments', mode='before')
+    def create_training_arguments(cls, values: dict[str, Any]) -> KTOTrainingArguments:
+        return KTOTrainingArguments(**values, output_dir=TRAINER_LOGS_FOLDER, report_to=[])

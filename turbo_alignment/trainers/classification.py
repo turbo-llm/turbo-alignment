@@ -60,7 +60,7 @@ def auto_class_weights(dataset: Dataset) -> list[float]:
 class ClassificationTrainer(MultiGPUCherryPicksTrainer):
     def __init__(self, **kwargs) -> None:
         args = kwargs.get('args')
-        self.loss_settings = args.loss_settings
+        self.loss_settings = args.loss_settings  # type: ignore[union-attr]
         super().__init__(
             compute_metrics=compute_clf_metrics,
             **kwargs,

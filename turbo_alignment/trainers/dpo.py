@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
 import torch
@@ -414,12 +414,8 @@ class DPOTrainingArguments(TrainingArguments):
         | SigmoidLossWithMarginSettings
         | APOZeroLossSettings
         | APODownLossSettings
-    ) = field(
-        default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
-    )  # type: ignore[call-overload]
-    sync_ref_settings: SyncRefModelSettings = field(  # type: ignore[call-overload]
-        default_factory=SyncRefModelSettings()
-    )
+    ) = SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
+    sync_ref_settings: SyncRefModelSettings = SyncRefModelSettings()
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False

@@ -46,9 +46,11 @@
         "model_type": "causal",
     "transformers_settings": {},
     "peft_settings": {
-        "task_type": "CAUSAL_LM",
         "name": "PROMPT_TUNING",
-        "num_virtual_tokens": 32
+        "config": {
+            "task_type": "CAUSAL_LM",
+            "num_virtual_tokens": 32
+        }
     },
     "embeddings_initialization_strategy": {
       "<RS>": "<s>",

@@ -4,7 +4,6 @@ from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 
 from turbo_alignment.common.tf.loaders.model.registry import (
-    PeftConfigRegistry,
     TransformersAutoModelRegistry,
 )
 from turbo_alignment.modeling.liger_kernels import apply_liger_kernel_to_gemma2
@@ -18,12 +17,7 @@ from turbo_alignment.settings.tf.peft import PEFT_TYPE
 
 
 def _prepare_model_for_peft(model: PreTrainedModel, peft_settings: PEFT_TYPE) -> PeftModel:
-    peft_params = peft_settings.dict()
-    peft_params.pop('name')
-
-    peft_config = PeftConfigRegistry.by_name(peft_settings.name)(**peft_params)
-
-    return get_peft_model(model, peft_config)
+    return get_peft_model(model, peft_settings.config)
 
 
 def _load_pretrained_adapters(

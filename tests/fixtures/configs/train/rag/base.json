@@ -54,16 +54,18 @@
         "<system>": "system"
       },
       "peft_settings": {
-        "r": 16,
-        "lora_alpha": 16,
-        "lora_dropout": 0.05,
-        "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj"],
-        "task_type": "CAUSAL_LM",
-        "modules_to_save": [
-          "embed_tokens",
-          "lm_head"
-        ],
-        "name": "LORA"
+            "name": "LORA",
+            "config": {
+                "r": 8,
+                "lora_alpha": 16,
+                "lora_dropout": 0.05,
+                "target_modules": [
+                    "q_proj",
+                    "v_proj"
+                ],
+                "task_type": "CAUSAL_LM",
+                "modules_to_save": ["embed_tokens", "lm_head"]
+            }
       }
     },
     "question_encoder_settings": {

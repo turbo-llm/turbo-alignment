@@ -76,19 +76,18 @@
       "model_type": "causal",
       "transformers_settings": {},
       "peft_settings": {
-        "r": 16,
-        "lora_alpha": 16,
-        "lora_dropout": 0.05,
-        "target_modules": [
-          "q_proj",
-          "k_proj"
-        ],
-        "task_type": "CAUSAL_LM",
-        "modules_to_save": [
-          "embed_tokens",
-          "lm_head"
-        ],
-        "name": "LORA"
+          "name": "LORA",
+          "config": {
+              "r": 8,
+              "lora_alpha": 16,
+              "lora_dropout": 0.05,
+              "target_modules": [
+                  "q_proj",
+                  "v_proj"
+              ],
+              "task_type": "CAUSAL_LM",
+              "modules_to_save": ["embed_tokens", "lm_head"]
+          }
       },
       "embeddings_initialization_strategy": {
         "<RS>": "bot",
