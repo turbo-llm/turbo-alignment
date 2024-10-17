@@ -69,7 +69,7 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
             beta=experiment_settings.beta,
             use_ref_model=experiment_settings.use_ref_model,
             forward_kl=experiment_settings.forward_kl,
-            **experiment_settings.trainer_settings.dict(),
+            **experiment_settings.training_arguments.dict(),
         )
 
     @staticmethod
@@ -94,7 +94,7 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         data_collator: Callable,
         rm_model: PreTrainedModel = None,
     ) -> DDPOTrainer:
-        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+        model.config.use_cache = not experiment_settings.training_arguments.gradient_checkpointing
 
         extra_args = {'rm': rm_model}
 

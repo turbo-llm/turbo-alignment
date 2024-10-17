@@ -3,11 +3,11 @@ from tempfile import TemporaryDirectory
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelSettings
 from turbo_alignment.dataset.pair_preferences import PairPreferenceDataCollator
-from turbo_alignment.settings.pipelines.train.dpo import (
+from turbo_alignment.settings.pipelines.train.utils import (
     DPOLossesType,
     SigmoidLossSettings,
-    SyncRefModelSettings,
 )
 from turbo_alignment.trainers.dpo import DPOTrainer, DPOTrainingArguments
 

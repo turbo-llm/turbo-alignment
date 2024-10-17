@@ -7,7 +7,6 @@ from transformers.data.data_collator import DataCollatorMixin
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders.model.model import load_model
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.kto.collators import KTODataCollator
 from turbo_alignment.dataset.loader import DatasetLoader
@@ -55,12 +54,10 @@ class TrainKTOStrategy(BaseTrainStrategy[KTOTrainExperimentSettings]):
 
     @staticmethod
     def _get_training_args(experiment_settings: KTOTrainExperimentSettings) -> KTOTrainingArguments:
-        return KTOTrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            label_names=[],
-            remove_unused_columns=False,
-            **experiment_settings.trainer_settings.dict(),
-        )
+        training_arguments = experiment_settings.training_arguments
+        training_arguments.label_names = []
+        training_arguments.remove_unused_columns = False
+        return training_arguments
 
     @staticmethod
     def _get_trainer(
@@ -72,10 +69,10 @@ class TrainKTOStrategy(BaseTrainStrategy[KTOTrainExperimentSettings]):
         val_dataset: Dataset,
         data_collator: Callable,
     ):
-        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+        model.config.use_cache = not experiment_settings.training_arguments.gradient_checkpointing
 
         extra_args = {}
-        if experiment_settings.trainer_settings.use_ref_model:
+        if experiment_settings.training_arguments.use_ref_model:
             ref_model = load_model(experiment_settings.model_settings, tokenizer)
             for _, param in ref_model.named_parameters():
                 param.requires_grad = False
