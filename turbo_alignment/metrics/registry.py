@@ -31,7 +31,7 @@ class DistinctnessSettings(MetricSettings):
 
 @MetricSettingsRegistry.register(MetricType.DIVERSITY)
 class DiversitySettings(MetricSettings):
-    ...
+    top_k: int | None = None
 
 
 @MetricSettingsRegistry.register(MetricType.LENGTH)
