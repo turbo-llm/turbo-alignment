@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults, MetricType
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 
 @Metric.register(MetricType.DIST_N)
@@ -9,13 +10,15 @@ class DistinctnessMetric(Metric):
     def compute(self, **kwargs) -> list[MetricResults]:
         predictions: list[list[str]] = kwargs.get('predictions', None)
         dataset_name: str = kwargs.get('dataset_name', '')
+        tokenizer: PreTrainedTokenizerBase = kwargs.get("tokenizer", None)
+        vocab_size: int = tokenizer.vocab_size
 
         if predictions is None:
             raise ValueError('predictions should not be None')
 
         dist_n = defaultdict(list)
         for prompt_answers in predictions:
-            ans_dist_n = self.distinctness(prompt_answers)
+            ans_dist_n = self.distinctness(prompt_answers, vocab_size)
             for label, value in ans_dist_n.items():
                 dist_n[label].append(value)
 
@@ -31,21 +34,32 @@ class DistinctnessMetric(Metric):
         ]
 
     @staticmethod
-    def distinctness(answers: list[str]) -> dict[str, float]:
-        unigrams, bigrams, trigrams = set(), set(), set()
-        total_words = 0
+    def distinctness(answers: list[str], vocab_size: int) -> dict[str, float]:
+        ngram_sets = [set() for _ in range(5)]
+        total_ngrams = [0] * 5
 
         for answer in answers:
             words = answer.split(' ')
-            total_words += len(words)
-            unigrams.update(words)
-            for i in range(len(words) - 1):
-                bigrams.add(words[i] + '_' + words[i + 1])
-            for i in range(len(words) - 2):
-                trigrams.add(words[i] + '_' + words[i + 1] + '_' + words[i + 2])
+            ngram_sets[0].update(words)
+            total_ngrams[0] += len(words)
 
-        return {
-            'dist_1': len(unigrams) / total_words,
-            'dist_2': len(bigrams) / total_words,
-            'dist_3': len(trigrams) / total_words,
-        }
+            for n in range(1, 5):
+                ngrams = ['_'.join(words[i : i + n + 1]) for i in range(len(words) - n)]
+                ngram_sets[n].update(ngrams)
+                total_ngrams[n] += len(ngrams)
+
+        result = dict()
+        for n in range(5):
+            result[f'dist_{n+1}'] = len(ngram_sets[n]) / total_ngrams[n] if total_ngrams[n] > 0 else 0
+            try:
+                result[f'ead_dist_{n+1}'] = (
+                    len(ngram_sets[n]) / (vocab_size * (1 - ((vocab_size - 1) / vocab_size) ** total_ngrams[n]))
+                    if total_ngrams[n] > 0
+                    else 0
+                )
+            except ZeroDivisionError:
+                result[f'ead_dist_{n+1}'] = 0
+
+        result['dist_mean'] = sum(result[f'dist_{n+1}'] for n in range(5)) / 5
+        result['ead_dist_mean'] = sum(result[f'ead_dist_{n+1}'] for n in range(5)) / 5
+        return result

@@ -15,6 +15,7 @@ class DiversityMetric(Metric):
         tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
         predictions: list[list[str]] = kwargs.get('predictions', None)
         dataset_name: str = kwargs.get('dataset_name', '')
+        top_k: int = kwargs.get('top_k', None)
 
         if predictions is None:
             raise ValueError('predictions should not be None')
@@ -25,7 +26,7 @@ class DiversityMetric(Metric):
         element_wise_diversity_scores = [
             ElementWiseScores(
                 label=dataset_name + '@@' + 'diversity',
-                values=[self.average_token_entropy(answer_group, tokenizer) for answer_group in predictions],
+                values=[self.average_token_entropy(answer_group, tokenizer, top_k) for answer_group in predictions],
             )
         ]
 
@@ -34,15 +35,15 @@ class DiversityMetric(Metric):
             for need_average in self._settings.need_average
         ]
 
-    def average_token_entropy(self, answer_group: list[str], tokenizer: PreTrainedTokenizerBase) -> float:
-        entropies = [self.token_entropy(answer, tokenizer) for answer in answer_group]
+    def average_token_entropy(self, answer_group: list[str], tokenizer: PreTrainedTokenizerBase, top_k: int) -> float:
+        entropies = [self.token_entropy(answer, tokenizer, top_k) for answer in answer_group]
         if entropies:
             return sum(entropies) / len(entropies)
 
         return np.nan
 
     @staticmethod
-    def token_entropy(sample: str, tokenizer: PreTrainedTokenizerBase) -> float:
+    def token_entropy(sample: str, tokenizer: PreTrainedTokenizerBase, top_k: int = None) -> float:
         stats: dict[int, Any] = defaultdict(int)
         num_tokens = 0
         tokens = tokenizer.encode(sample)
@@ -54,4 +55,9 @@ class DiversityMetric(Metric):
         for k in stats.keys():
             stats[k] /= num_tokens
 
-        return entropy(list(stats.values()))
+        if top_k is None:
+            top_k_stats = list(stats.values())
+        else:
+            top_k_stats = sorted(stats.values(), reverse=True)[:top_k]
+
+        return entropy(top_k_stats)
