@@ -1,8 +1,8 @@
 from collections import defaultdict
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults, MetricType
-from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 
 @Metric.register(MetricType.DIST_N)
@@ -48,7 +48,7 @@ class DistinctnessMetric(Metric):
                 ngram_sets[n].update(ngrams)
                 total_ngrams[n] += len(ngrams)
 
-        result = dict()
+        result = {}
         for n in range(5):
             result[f'dist_{n+1}'] = len(ngram_sets[n]) / total_ngrams[n] if total_ngrams[n] > 0 else 0
             try:
