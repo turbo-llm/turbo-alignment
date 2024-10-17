@@ -16,6 +16,7 @@ class DPOLossesType(str, Enum):
     SIMPO = 'simpo'
     APO_ZERO = 'apo_zero'
     APO_DOWN = 'apo_down'
+    ASFT = 'asft'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -64,6 +65,10 @@ class SimPOLossSettings(DPOLossSettings):
 
 class ORPOLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.ORPO]
+
+
+class ASFTLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.APO_DOWN]
 
 
 class APOZeroLossSettings(DPOLossSettings):
