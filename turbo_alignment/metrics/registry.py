@@ -29,7 +29,7 @@ class MetricSettings(ExtraFieldsNotAllowedBaseModel):
 class DistinctnessSettings(MetricSettings):
     ngram: int = 5
 
-    @field_validator('ngram', mode="before")
+    @field_validator('ngram', mode='before')
     def check_ngram(cls, value: int):
         if value <= 0:
             raise ValueError('ngram should be greater that 0')
