@@ -41,7 +41,7 @@ class DistinctnessMetric(Metric):
     @staticmethod
     def distinctness(answers: list[str], vocab_size: int, ngram: int) -> dict[str, float]:
         ngram_sets: list[set] = [set() for _ in range(ngram)]
-        total_ngrams = [0] * ngram
+        total_ngrams: list[int] = [0] * ngram
 
         for answer in answers:
             words = answer.split(' ')
