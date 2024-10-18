@@ -83,7 +83,7 @@ class RougeSettings(MetricSettings):
 class SelfBleuSettings(MetricSettings):
     ngram: int = 3
 
-    @field_validator('ngram', mode="before")
+    @field_validator('ngram', mode='before')
     def check_ngram(cls, value: int) -> int:
         if value <= 0:
             raise ValueError('ngram should be greater that 0')
