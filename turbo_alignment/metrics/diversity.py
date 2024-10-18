@@ -64,9 +64,8 @@ class DiversityMetric(Metric):
         for k in stats.keys():
             stats[k] /= num_tokens
 
-        if top_k is None:
-            top_k_stats = list(stats.values())
-        else:
-            top_k_stats = sorted(stats.values(), reverse=True)[:top_k]
+        top_k_stats = list(stats.values())
+        if top_k is not None:
+            top_k_stats = sorted(top_k_stats, reverse=True)[:top_k]
 
         return entropy(top_k_stats)
