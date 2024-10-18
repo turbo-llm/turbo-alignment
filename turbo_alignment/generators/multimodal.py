@@ -1,5 +1,5 @@
 import torch
-from transformers import PreTrainedTokenizerBase
+from transformers import GenerationConfig, PreTrainedTokenizerBase
 
 from turbo_alignment.dataset.multimodal.models import MultimodalDatasetRecord
 from turbo_alignment.generators.base import ChatGeneratorBase
@@ -8,19 +8,18 @@ from turbo_alignment.settings.generators.outputs.chat import AnswerMessage
 from turbo_alignment.settings.generators.outputs.multimodal import (
     MultimodalInferenceOutput,
 )
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 
 
 class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalInferenceOutput]):
     def __init__(
         self,
-        transformers_settings: GeneratorTransformersSettings,
+        generation_config: GenerationConfig,
         custom_generation_settings: CustomChatGenerationSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
     ) -> None:
         super().__init__(
-            transformers_settings=transformers_settings,
+            generation_config=generation_config,
             custom_generation_settings=custom_generation_settings,
             tokenizer=tokenizer,
             **kwargs,
@@ -51,7 +50,7 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
             tokenizer=self._tokenizer,
-            generation_config=self._transformers_generator_parameters,
+            generation_config=self._generation_config,
         )
 
         answers = self._decode(token_indices=output_indices)

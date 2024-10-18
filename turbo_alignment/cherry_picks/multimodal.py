@@ -22,7 +22,7 @@ class MultimodalCherryPickCallback(CherryPickCallbackBase[InferenceMultimodalDat
     ) -> None:
         super().__init__(cherry_pick_settings=cherry_pick_settings, datasets=datasets, metrics=metrics)
         self._custom_generation_settings = cherry_pick_settings.custom_generation_settings
-        self._generator_transformers_settings = cherry_pick_settings.generator_transformers_settings
+        self._generation_config = cherry_pick_settings.generation_config
 
     def _get_dataset_metrics(
         self,
@@ -34,7 +34,7 @@ class MultimodalCherryPickCallback(CherryPickCallbackBase[InferenceMultimodalDat
         generator = MultimodalGenerator(
             model=model,
             tokenizer=tokenizer,
-            transformers_settings=self._generator_transformers_settings,
+            generation_config=self._generation_config,
             custom_generation_settings=self._custom_generation_settings,
         )
 

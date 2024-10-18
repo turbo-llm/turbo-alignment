@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -13,13 +12,6 @@ class S3HandlerParameters(BaseSettings):
     bucket: str
     aws_access_key_id: str
     aws_secret_access_key: str
-
-    @field_validator('bucket')
-    def bucket_name_biglm_is_not_allowed(cls, values: str) -> str:
-        if values == 'biglm':
-            raise S3HandlerParametersWrongBucketException('Usage of biglm bucket is not allowed')
-
-        return values
 
     class Config:
         env_file: str = '.env'

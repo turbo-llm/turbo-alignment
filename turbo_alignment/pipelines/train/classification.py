@@ -6,7 +6,6 @@ from transformers.data.data_collator import DataCollatorMixin, DataCollatorWithP
 
 from turbo_alignment.cherry_picks.classification import ClassificationCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.classification.classification import ClassificationDataset
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.metrics.metric import Metric
@@ -18,6 +17,7 @@ from turbo_alignment.settings.datasets.classification import (
 )
 from turbo_alignment.settings.pipelines.train.classification import (
     ClassificationTrainExperimentSettings,
+    ClassificationTrainingArguments,
 )
 from turbo_alignment.trainers.classification import (
     ClassificationTrainer,
@@ -63,13 +63,13 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         )
 
     @staticmethod
-    def _get_training_args(experiment_settings: ClassificationTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            label_names=['labels'],
-            remove_unused_columns=False,
-            **experiment_settings.trainer_settings.dict(exclude={'loss_settings'}),
-        )
+    def _get_training_args(
+        experiment_settings: ClassificationTrainExperimentSettings,
+    ) -> ClassificationTrainingArguments:
+        training_arguments = experiment_settings.training_arguments
+        training_arguments.label_names = (['labels'],)
+        training_arguments.remove_unused_columns = False
+        return training_arguments
 
     @staticmethod
     def _get_trainer(
@@ -80,10 +80,10 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         train_dataset: Dataset,
         val_dataset: Dataset,
         data_collator: DataCollatorMixin,
-    ):
-        if experiment_settings.trainer_settings.loss_settings.alpha == 'auto':
-            experiment_settings.trainer_settings.loss_settings.alpha = auto_class_weights(train_dataset)
-            logger.info(f'Auto computed class weights: {experiment_settings.trainer_settings.loss_settings.alpha}')
+    ) -> ClassificationTrainer:
+        if training_args.loss_settings['alpha'] == 'auto':
+            training_args.loss_settings['alpha'] = auto_class_weights(train_dataset)
+            logger.info(f'Auto computed class weights: {training_args.loss_settings["alpha"]}')
 
         return ClassificationTrainer(
             model=model,
@@ -93,7 +93,6 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
             eval_dataset=val_dataset,
             data_collator=data_collator,
             callbacks=[],
-            loss_settings=experiment_settings.trainer_settings.loss_settings,
         )
 
     def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
