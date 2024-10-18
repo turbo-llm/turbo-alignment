@@ -189,19 +189,20 @@ class TrainMultimodalDataset(MultimodalDataset):
         else:
             modality_messages = modality_messages[:modality_messages_after_truncation]
 
-        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        # modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        modality_encodings = []
         try:
             for msg in modality_messages:
                 reader = self._modality_readers[msg.type]
                 # modality_encodings.append((msg.type, reader.read(msg.content)))
-                modality_encodings.append(reader.read(msg.content).contiguous())
+                modality_encodings.append(reader.read(msg.content))
         except (OSError, RuntimeError, KeyError):
             return None
 
         if len(modality_encodings) != modality_messages_after_truncation:
             return None
 
-        return modality_encodings
+        return torch.stack(modality_encodings)
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -216,7 +217,7 @@ class TrainMultimodalDataset(MultimodalDataset):
         for i, sample in enumerate(self.records[start:end]):
             output = self._read_modalities(sample)
 
-            if output:
+            if output is not None:
                 yield sample | {'modality_inputs': output}
 
 
@@ -250,13 +251,14 @@ class InferenceMultimodalDataset(MultimodalDataset):
         else:
             modality_messages = modality_messages[:modality_messages_after_truncation]
 
-        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        # modality_encodings: list[tuple[Modality, torch.Tensor]] = []
+        modality_encodings = []
         for msg in modality_messages:
             reader = self._modality_readers[msg.type]
             print('inference reader')
             # modality_encodings.append((msg.type, reader.read(msg.content)))
             modality_encodings.append(reader.read(msg.content))
-        return modality_encodings
+        return torch.stack(modality_encodings)
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
         chat_records = [self._convert_to_chat(r) for r in records]
