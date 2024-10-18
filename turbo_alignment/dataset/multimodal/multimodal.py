@@ -254,7 +254,8 @@ class InferenceMultimodalDataset(MultimodalDataset):
         for msg in modality_messages:
             reader = self._modality_readers[msg.type]
             print('inference reader')
-            modality_encodings.append((msg.type, reader.read(msg.content)))
+            # modality_encodings.append((msg.type, reader.read(msg.content)))
+            modality_encodings.append(reader.read(msg.content))
         return modality_encodings
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:

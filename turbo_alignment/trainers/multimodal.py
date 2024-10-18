@@ -53,7 +53,7 @@ class MultimodalTrainer(MultiGPUCherryPicksTrainer):
         (output_dir / 'adapter').mkdir(parents=True, exist_ok=True)
         (output_dir / 'tokenizer').mkdir(parents=True, exist_ok=True)
 
-        if isinstance(model, torch.nn.DataParallel):
+        if isinstance(model, torch.nn.DataParallel) or isinstance(model, torch.nn.parallel.DistributedDataParallel):
             torch.save(
                 model.module.modality_adapters.state_dict(), output_dir / 'projections' / 'modality_adapters.pt'
             )
