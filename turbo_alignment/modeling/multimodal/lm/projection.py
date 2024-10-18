@@ -71,7 +71,7 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
             )  # returns mask with ids of spans from 1 to N
             modality_spans = find_objects(span_mask)  # returns list of tuples with start index and end index
 
-            print(len(sample_modality_inputs), len(modality_spans))
+            # print(len(sample_modality_inputs), len(modality_spans))
             # exit()
 
             assert len(modality_spans) == len(sample_modality_inputs)
