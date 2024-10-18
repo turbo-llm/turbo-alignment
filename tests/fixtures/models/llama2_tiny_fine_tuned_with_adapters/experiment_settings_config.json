@@ -51,7 +51,7 @@
     },
     "log_path": "train_output",
     "seed": 42,
-    "wandb_settings": {
+    "logging_settings": {
         "project_name": "alignment",
         "run_name": "fine_tune_llama",
         "entity": "vladislavkruglikov",

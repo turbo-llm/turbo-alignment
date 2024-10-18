@@ -110,7 +110,7 @@
         "gradient_checkpointing": true,
         "save_only_model": true
       },
-      "wandb_settings": {
+      "logging_settings": {
             "project_name": "alignment",
             "run_name": "rm",
             "entity": "turbo-alignment"
