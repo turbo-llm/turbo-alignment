@@ -6,16 +6,20 @@ from scipy.stats import entropy
 from transformers import PreTrainedTokenizerBase
 
 from turbo_alignment.metrics.metric import Metric
+from turbo_alignment.metrics.registry import DiversitySettings
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults, MetricType
 
 
 @Metric.register(MetricType.DIVERSITY)
 class DiversityMetric(Metric):
+    def __init__(self, settings: DiversitySettings) -> None:
+        super().__init__(settings=settings)
+        self._settings: DiversitySettings = settings
+
     def compute(self, **kwargs) -> list[MetricResults]:
         tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
         predictions: list[list[str]] = kwargs.get('predictions', None)
         dataset_name: str = kwargs.get('dataset_name', '')
-        top_k: int = kwargs.get('top_k', None)
 
         if predictions is None:
             raise ValueError('predictions should not be None')
@@ -26,7 +30,10 @@ class DiversityMetric(Metric):
         element_wise_diversity_scores = [
             ElementWiseScores(
                 label=dataset_name + '@@' + 'diversity',
-                values=[self.average_token_entropy(answer_group, tokenizer, top_k) for answer_group in predictions],
+                values=[
+                    self.average_token_entropy(answer_group, tokenizer, self._settings.top_k)
+                    for answer_group in predictions
+                ],
             )
         ]
 
@@ -43,7 +50,7 @@ class DiversityMetric(Metric):
         return np.nan
 
     @staticmethod
-    def token_entropy(sample: str, tokenizer: PreTrainedTokenizerBase, top_k: int = None) -> float:
+    def token_entropy(sample: str, tokenizer: PreTrainedTokenizerBase, top_k: int | None) -> float:
         stats: dict[int, Any] = defaultdict(int)
         num_tokens = 0
         tokens = tokenizer.encode(sample)
