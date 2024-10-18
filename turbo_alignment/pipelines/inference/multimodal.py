@@ -40,6 +40,7 @@ class MultimodalInferenceStrategy(MultimodalMixin, BaseInferenceStrategy[Multimo
             peft=True,
         )
         model.modality_adapters.load_state_dict(torch.load(inference_settings.model_settings.projections_path))
+        for param in model.parameters(): param.data = param.data.contiguous()
 
         return model
 

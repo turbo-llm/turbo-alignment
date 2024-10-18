@@ -83,7 +83,7 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
             for index, modality_object in enumerate(sample_modality_inputs):
                 # modality, inputs = modality_object
                 # grouped_modality_encoder_inputs[modality].append((index, inputs))
-                inputs = modality_object
+                inputs = modality_object.contiguous()
                 grouped_modality_encoder_inputs.append((index, inputs))
 
             sorted_modality_embeddings: torch.Tensor = torch.full(
@@ -126,12 +126,12 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
     def forward(
         self,
         input_ids: torch.LongTensor,
-        modality_inputs: list[list[tuple[Modality, torch.Tensor]]],
+        modality_inputs,
         attention_mask: torch.LongTensor,
         modality_tokens_mask: torch.Tensor,
         labels: torch.LongTensor | None = None,
     ) -> ModelOutput:
-        multimodal_lm_input_embeds = self.convert_inputs_to_embeds(input_ids, modality_inputs, modality_tokens_mask)
+        multimodal_lm_input_embeds = self.convert_inputs_to_embeds(input_ids, modality_inputs.contiguous(), modality_tokens_mask)
         return self.language_model(
             inputs_embeds=multimodal_lm_input_embeds, labels=labels, attention_mask=attention_mask
         )

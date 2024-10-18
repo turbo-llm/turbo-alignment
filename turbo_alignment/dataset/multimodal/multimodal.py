@@ -194,7 +194,7 @@ class TrainMultimodalDataset(MultimodalDataset):
             for msg in modality_messages:
                 reader = self._modality_readers[msg.type]
                 # modality_encodings.append((msg.type, reader.read(msg.content)))
-                modality_encodings.append(reader.read(msg.content))
+                modality_encodings.append(reader.read(msg.content).contiguous())
         except (OSError, RuntimeError, KeyError):
             return None
 

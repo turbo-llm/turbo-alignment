@@ -10,7 +10,7 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
         if 'modality_inputs' in features[0].keys():
             # print([feature['modality_inputs'] for feature in features])
             modality_inputs = torch.stack(
-                [torch.stack(feature['modality_inputs']) for feature in features]
+                [torch.stack(feature['modality_inputs']).contiguous() for feature in features]
             ).contiguous()
         else:
             modality_inputs = [None for _ in features]
