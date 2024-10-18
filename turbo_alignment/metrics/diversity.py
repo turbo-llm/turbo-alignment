@@ -42,7 +42,9 @@ class DiversityMetric(Metric):
             for need_average in self._settings.need_average
         ]
 
-    def average_token_entropy(self, answer_group: list[str], tokenizer: PreTrainedTokenizerBase, top_k: int) -> float:
+    def average_token_entropy(
+        self, answer_group: list[str], tokenizer: PreTrainedTokenizerBase, top_k: int | None
+    ) -> float:
         entropies = [self.token_entropy(answer, tokenizer, top_k) for answer in answer_group]
         if entropies:
             return sum(entropies) / len(entropies)
