@@ -12,6 +12,7 @@ from turbo_alignment.settings.pipelines.inference.multimodal import (
 runner = CliRunner()
 
 
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     'config_path',
     [

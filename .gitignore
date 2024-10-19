@@ -119,3 +119,6 @@ default_tb/
 .checkpoints/.history
 .history
 .vscode
+
+bin/
+presets/

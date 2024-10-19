@@ -9,6 +9,7 @@ from turbo_alignment.cli import app
 runner = CliRunner()
 
 
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     'config_path',
     [

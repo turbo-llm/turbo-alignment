@@ -1,4 +1,3 @@
-from allenai_common import Registrable
 from peft import (
     LoraConfig,
     PeftType,
@@ -12,6 +11,7 @@ from transformers import (
     AutoModelForSequenceClassification,
 )
 
+from turbo_alignment.common.registry import Registrable
 from turbo_alignment.settings.model import ModelType
 
 
