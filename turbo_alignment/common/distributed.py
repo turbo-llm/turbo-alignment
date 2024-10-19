@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 import numpy as np
 import torch
+import os
 import torch.distributed
 from torch.distributed.distributed_c10d import (
     Backend,
@@ -15,9 +16,17 @@ from torch.distributed.distributed_c10d import (
 )
 
 
+world_size = int(os.getenv("WORLD_SIZE", "1"))
+
+
 def get_global_mean(values: torch.Tensor) -> float:
     # Calculate the mean reward for the current process
     local_sum = values.sum().item()
+
+    print("WORLD SIZE 😼: ", world_size)
+    if world_size == 1:
+        return values.mean().item()
+
     num_rewards = torch.tensor(len(values), device=values.device)
 
     # Create a tensor to hold the global mean reward
@@ -32,8 +41,12 @@ def get_global_mean(values: torch.Tensor) -> float:
 
 
 def get_global_std(values: torch.Tensor, mean: float) -> float:
-    # Calculate the mean reward for the current process
     local_sum = ((values - mean) ** 2).sum().item()
+
+    if world_size == 1:
+        return local_sum
+
+    # Calculate the mean reward for the current process
     num_rewards = torch.tensor(len(values), device=values.device)
 
     # Create a tensor to hold the global mean reward

@@ -13,7 +13,7 @@ class RewardProcessor(ABC, Registrable):
         mean_baseline_coef: float,
         num_generations: int,
     ) -> None:
-        self.mean_reward = None
+        self.mean_reward: float | None = None
         self.mean_baseline_coef = mean_baseline_coef
         self.num_generations = num_generations
 
@@ -36,7 +36,7 @@ class RewardProcessor(ABC, Registrable):
         global_mean_reward: float = get_global_mean(rewards)
 
         if self.mean_reward is None:
-            self.mean_reward: float = global_mean_reward
+            self.mean_reward = global_mean_reward
         else:
             self.mean_reward = (
                 self.mean_baseline_coef * self.mean_reward + (1 - self.mean_baseline_coef) * global_mean_reward

@@ -1,5 +1,6 @@
 from typing import Annotated
 
+import torch
 from pydantic import Field
 
 from turbo_alignment.dataset.base.models import DatasetRecord
@@ -18,3 +19,7 @@ class MultimodalInferenceOutput(BaseInferenceOutput, DatasetRecord):
     ]
     label: str | None = None
     answers: list[AnswerMessage]
+    input_token_ids: torch.Tensor | None = None
+
+    class Config:
+        arbitrary_types_allowed = True

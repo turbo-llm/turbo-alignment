@@ -5,8 +5,8 @@ from transformers import PreTrainedTokenizerBase
 
 try:
     from vllm import LLM, SamplingParams
-except ImportError:
-    raise ImportError("Install vllm first")
+except ImportError as exc:
+    raise exc
 
 from turbo_alignment.dataset.chat import ChatDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
@@ -58,7 +58,10 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         self._custom_generation_settings = custom_generation_settings
 
     def generate_from_batch(
-        self, records: list[dict[str, Any]], original_records: list[ChatDatasetRecord], dataset_name: str
+        self,
+        dataset_name: str,
+        records: list[dict[str, Any]],
+        original_records: list[ChatDatasetRecord] | None = None,
     ) -> list[ChatInferenceOutput]:
         input_ids = [record['input_ids'].tolist() for record in records]
         request_outputs = self._model.generate(

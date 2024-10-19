@@ -1,28 +1,35 @@
-from typing import Any
-
 import torch
+from transformers import BatchEncoding
 
 from turbo_alignment.dataset.chat.models import ChatDatasetRecord
-from turbo_alignment.generators.chat import ChatGenerator
+from turbo_alignment.generators.chat import ChatGeneratorBase
 from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     RagInferenceOutput,
 )
 
 
-class RagGenerator(ChatGenerator):
+class RagGenerator(ChatGeneratorBase[ChatDatasetRecord, RagInferenceOutput]):
+    def generate_from_batch_records(
+        self,
+        dataset_name: str,
+        records_batch: dict[str, torch.Tensor] | BatchEncoding,
+        original_records: list[ChatDatasetRecord] | None = None,
+    ) -> list[RagInferenceOutput]:
+        raise ValueError('You can not use batch generation with RAG generator')
+
     def generate_from_single_record(
         self,
-        record: dict[str, Any],
-        original_record: ChatDatasetRecord,
         dataset_name: str,
+        record: dict[str, torch.Tensor],
+        original_record: ChatDatasetRecord | None = None,
     ) -> RagInferenceOutput:
         input_ids = torch.unsqueeze(record['input_ids'], 0).to(self.device)
 
         answer_indices, document_indices, doc_scores = self._model.generate(
             inputs=input_ids,
             generation_config=self._transformers_generator_parameters,
-            tokenizer=self._tokenizer.current_tokenizer,
+            tokenizer=self._tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
         )
 

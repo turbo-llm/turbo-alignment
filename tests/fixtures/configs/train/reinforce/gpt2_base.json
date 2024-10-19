@@ -102,7 +102,7 @@
     ]
   },
   "reward_model_settings": {
-    "model_path": "tests/fixtures/models/llama2_tiny",
+    "model_path": "gpt2",
     "model_type": "seq_cls",
     "model_kwargs": {
       "num_labels": 1
@@ -110,13 +110,13 @@
     "transformers_settings": {}
   },
   "model_settings": {
-    "model_path": "tests/fixtures/models/llama2_tiny",
+    "model_path": "gpt2",
     "model_type": "causal",
     "transformers_settings": {},
     "embeddings_initialization_strategy": {
-      "<|start_header_id|>": "<s>",
-      "<|end_header_id|>": "</s>",
-      "<|eot_id|>": "</s>"
+      "<|start_header_id|>": "<|endoftext|>",
+      "<|end_header_id|>": "<|endoftext|>",
+      "<|eot_id|>": "<|endoftext|>"
     }
   },
   "tokenizer_settings": {
@@ -126,9 +126,9 @@
   },
   "trainer_settings": {
     "evaluation_strategy": "steps",
-    "per_device_train_batch_size": 8,
-    "per_device_eval_batch_size": 8,
-    "gradient_accumulation_steps": 10,
+    "per_device_train_batch_size": 1,
+    "per_device_eval_batch_size": 1,
+    "gradient_accumulation_steps": 1,
     "adam_beta1": 0.9,
     "adam_beta2": 0.95,
     "adam_epsilon": 0.00001,
@@ -157,13 +157,13 @@
     "whiten_rewards": false,
     "kl_coef": 0.05,
     "mean_baseline_coef": 0.95,
-    "num_samples_for_reward_stats": 1000,
+    "num_samples_for_reward_stats": 10,
     "no_cuda": true
   },
   "special_tokens_settings": {
-    "bos_token": "<s>",
-    "eos_token": "</s>",
-    "pad_token": "<unk>"
+    "bos_token": "<|endoftext|>",
+    "eos_token": "<|endoftext|>",
+    "pad_token": "<|endoftext|>"
   },
   "logging_settings": {
     "project_name": "alignment",

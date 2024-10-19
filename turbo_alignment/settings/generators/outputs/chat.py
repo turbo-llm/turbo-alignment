@@ -20,8 +20,9 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
 
 
 class ChatInferenceOutput(BaseInferenceOutput):
-    input_token_ids: torch.Tensor
-    input_attention_mask: torch.Tensor
+    id: str | None = None
+    input_token_ids: torch.Tensor | None = None
+    input_attention_mask: torch.Tensor | None = None
     answers: list[AnswerMessage]
     messages: list[ChatMessage] | None
     label: str | None = None

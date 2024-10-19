@@ -11,7 +11,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
     TrainerCallback,
-    TrainingArguments,
+    TrainingArguments, GenerationConfig,
 )
 
 from turbo_alignment.common.distributed import (
@@ -46,7 +46,7 @@ class REINFORCETrainingArguments(TrainingArguments):
     kl_coef: float = 0.05
     mean_baseline_coef: float = 0.1
 
-    num_generations: int = 1
+    num_generations: int = 3
     num_samples_for_reward_stats: int = 0
 
     non_eos_penalty: bool = True
@@ -99,12 +99,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         effective_num_previous_samples = 1 / (1 - self.args.mean_baseline_coef)
         self.args.mean_baseline_coef = 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
 
-        stop_generation_token_id = tokenizer.encode(self.args.stop_token, add_special_tokens=False)
-        assert len(stop_generation_token_id) == 1, stop_generation_token_id
+        self.stop_generation_token_id = tokenizer.encode(args.stop_token, add_special_tokens=False)
+        assert len(self.stop_generation_token_id) == 1, self.stop_generation_token_id
 
         self.generator_transformers_settings = GeneratorTransformersSettings(
             temperature=args.temperature,
             max_length=args.max_tokens_count,
+            num_return_sequences=args.num_generations,
+            num_beams=args.num_generations,
+            do_sample=True,
         )
         self.generator_custom_settings = CustomChatGenerationSettings(
             batch=self.args.per_device_train_batch_size,
@@ -158,6 +161,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         generator = self._get_chat_generator(model)
+
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
             dataset_name='online', records_batch=inputs
         )

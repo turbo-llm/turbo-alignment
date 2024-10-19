@@ -84,14 +84,24 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         data_collator: Callable,
     ):
         # TODO: different tokenizer for reward model
+
+        ref_model = load_model(experiment_settings.model_settings, tokenizer)
+        for _, param in ref_model.named_parameters():
+            param.requires_grad = False
+
+        ref_model.eval()
+
         reward_model = load_model(experiment_settings.reward_model_settings, tokenizer)
         for _, param in reward_model.named_parameters():
             param.requires_grad = False
+
+        reward_model.eval()
 
         return REINFORCETrainer(
             args=training_args,
             tokenizer=tokenizer,
             policy=model,
+            ref_model=ref_model,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             data_collator=data_collator,
