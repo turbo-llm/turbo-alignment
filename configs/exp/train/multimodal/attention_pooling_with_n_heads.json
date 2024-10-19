@@ -40,7 +40,7 @@
             {
                 "name": "test",
                 "records_path": "/from_s3/dataset/llava_next_data_dialogs/test_chat.jsonl",
-                "num_samples": 5000
+                "num_samples": 10000
             }
         ],
         "prompt_template": {
@@ -126,12 +126,12 @@
         "optim": "adamw_torch",
         "save_total_limit": 5,
         "load_best_model_at_end": false,
-        "deepspeed": "configs/exp/deepspeed/stage2.json",
+        "deepspeed": "/app/tutorials/deepspeed_configs/stage2.json",
         "dispatch_batches": false,
         "dataloader_num_workers": 16,
         "dataloader_pin_memory": false
     },
-    "wandb_settings": {
+    "logging_settings": {
         "project_name": "rykov",
         "run_name": "multimodal",
         "entity": "rykov"
