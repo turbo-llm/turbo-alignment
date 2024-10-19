@@ -23,7 +23,7 @@ from turbo_alignment.settings.datasets import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.multimodal import (
     MultimodalTrainExperimentSettings,
 )
-from turbo_alignment.trainers.multimodal import TrainerCustomSave
+from turbo_alignment.trainers.multimodal import MultimodalTrainer
 
 logger = get_project_logger()
 
@@ -78,7 +78,7 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
         data_collator: DataCollatorMixin,
         **_kwargs,
     ):
-        return TrainerCustomSave(
+        return MultimodalTrainer(
             model=model,
             args=training_args,
             train_dataset=train_dataset,
