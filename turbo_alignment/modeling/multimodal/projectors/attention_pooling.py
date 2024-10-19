@@ -174,7 +174,10 @@ class TopKAttentionPoolingWithNHeadsMultiModalProjector(torch.nn.Module):
         projected_features[:, top_indices[:, self.top_k :].squeeze(0)] = 0  # set zero for unselected tokens
         projected_features = projected_features[(projected_features != 0).any(dim=-1)]  # remove zero vectors
 
+        # print(self.top_k, projected_features.shape)
+        # exit()
         return projected_features.unsqueeze(0)
+        # return projected_features
 
 
 @MultiModalProjectorRegistry.register(ModalityProjectorType.THRESHOLD_SELECTOR)

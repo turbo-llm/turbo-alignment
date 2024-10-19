@@ -189,19 +189,20 @@ class TrainMultimodalDataset(MultimodalDataset):
         else:
             modality_messages = modality_messages[:modality_messages_after_truncation]
 
-        # modality_encodings: list[tuple[Modality, torch.Tensor]] = []
-        modality_encodings = []
+        modality_encodings: list[tuple[Modality, torch.Tensor]] = []
         try:
             for msg in modality_messages:
                 reader = self._modality_readers[msg.type]
-                # modality_encodings.append((msg.type, reader.read(msg.content)))
-                modality_encodings.append(reader.read(msg.content))
+                modality_encodings.append((msg.type, reader.read(msg.content)))
         except (OSError, RuntimeError, KeyError):
             return None
+
+        # record['modality_inputs'] = modality_encodings
 
         if len(modality_encodings) != modality_messages_after_truncation:
             return None
 
+        # return record
         return modality_encodings
 
     def __iter__(self):
@@ -216,8 +217,7 @@ class TrainMultimodalDataset(MultimodalDataset):
             end = min(start + per_worker, end)
         for i, sample in enumerate(self.records[start:end]):
             output = self._read_modalities(sample)
-
-            if output is not None:
+            if output:
                 yield sample | {'modality_inputs': output}
 
 
@@ -256,8 +256,8 @@ class InferenceMultimodalDataset(MultimodalDataset):
         for msg in modality_messages:
             reader = self._modality_readers[msg.type]
             print('inference reader')
-            # modality_encodings.append((msg.type, reader.read(msg.content)))
-            modality_encodings.append(reader.read(msg.content))
+            modality_encodings.append((msg.type, reader.read(msg.content)))
+            # modality_encodings.append(reader.read(msg.content))
         return modality_encodings
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
