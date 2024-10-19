@@ -23,7 +23,6 @@ def get_global_mean(values: torch.Tensor) -> float:
     # Calculate the mean reward for the current process
     local_sum = values.sum().item()
 
-    print("WORLD SIZE 😼: ", world_size)
     if world_size == 1:
         return values.mean().item()
 

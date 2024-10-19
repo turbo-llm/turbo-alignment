@@ -343,11 +343,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
     def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.args.non_eos_penalty:
-            assert torch.all(query_response[:, -1] != self.tokenizer.pad_token_id), (
-                query_response[:, -1],
-                self.tokenizer.pad_token_id,
-            )
-
             invalid_mask = query_response[:, -1] != self.stop_generation_token_id[0]
             rewards[invalid_mask] = self.args.penalty_reward_value
 
