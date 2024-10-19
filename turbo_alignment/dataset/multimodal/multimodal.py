@@ -202,7 +202,7 @@ class TrainMultimodalDataset(MultimodalDataset):
         if len(modality_encodings) != modality_messages_after_truncation:
             return None
 
-        return torch.stack(modality_encodings)
+        return modality_encodings
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -258,7 +258,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
             print('inference reader')
             # modality_encodings.append((msg.type, reader.read(msg.content)))
             modality_encodings.append(reader.read(msg.content))
-        return torch.stack(modality_encodings)
+        return modality_encodings
 
     def convert_records(self, records: list[MultimodalDatasetRecord]) -> list[dict[str, Any] | None]:
         chat_records = [self._convert_to_chat(r) for r in records]

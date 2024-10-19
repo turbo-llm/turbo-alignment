@@ -9,9 +9,7 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
         if 'modality_inputs' in features[0].keys():
             # print([feature['modality_inputs'] for feature in features])
-            modality_inputs = torch.stack(
-                [feature['modality_inputs'] for feature in features]
-            ).contiguous()
+            modality_inputs = torch.stack([torch.stack(feature['modality_inputs']) for feature in features])
         else:
             modality_inputs = [None for _ in features]
 
@@ -56,7 +54,8 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
                 )
                 for feature in features
             ]
-        ).contiguous()
+        )
+        del features
 
         if labels is None:
             return batch
@@ -65,6 +64,6 @@ class DataCollatorWithModalityInputs(DataCollatorForTokenClassification):
             label.tolist() + [self.label_pad_token_id] * (sequence_length - len(label)) for label in labels
         ]
 
-        batch[label_name] = torch.tensor(batch[label_name], dtype=torch.int64).contiguous()
+        batch[label_name] = torch.tensor(batch[label_name], dtype=torch.int64)
 
         return batch
