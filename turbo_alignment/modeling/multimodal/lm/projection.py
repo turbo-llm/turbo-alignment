@@ -87,8 +87,6 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
             # Encode modalities and insert into input embeds
             for modality, modality_encoder_inputs_with_indices in grouped_modality_encoder_inputs.items():
                 modality_encoder_input_indexes, modality_encoder_inputs = zip(*modality_encoder_inputs_with_indices)
-                # print(modality_encoder_input_indexes)
-                # exit()
 
                 if self.language_model.dtype == torch.float32:
                     encoded_modality_object_batch = self.encoders[modality].encode(
@@ -100,9 +98,6 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
                     )
 
                 modality_encoder_embeddings = self.modality_adapters[modality](encoded_modality_object_batch)
-
-                # print(sorted_modality_embeddings[modality_encoder_input_indexes, :].shape, sorted_modality_embeddings.shape, modality_encoder_embeddings.shape)
-                # exit()
 
                 sorted_modality_embeddings[modality_encoder_input_indexes, :] = modality_encoder_embeddings.to(
                     sorted_modality_embeddings.dtype
@@ -121,7 +116,7 @@ Please, set n_modality_embs to {self.encoders[modality].n_modality_embs} in conf
     def forward(
         self,
         input_ids: torch.LongTensor,
-        modality_inputs,
+        modality_inputs: list[list[tuple[Modality, torch.Tensor]]],
         attention_mask: torch.LongTensor,
         modality_tokens_mask: torch.Tensor,
         labels: torch.LongTensor | None = None,
