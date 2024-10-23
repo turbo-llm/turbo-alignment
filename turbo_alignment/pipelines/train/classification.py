@@ -1,7 +1,7 @@
 from typing import Callable, cast
 
 from torch.utils.data import Dataset
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainingArguments
+from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import DataCollatorMixin, DataCollatorWithPadding
 
 from turbo_alignment.cherry_picks.classification import ClassificationCherryPickCallback
@@ -63,17 +63,8 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         )
 
     @staticmethod
-    def _get_training_args(
-        experiment_settings: ClassificationTrainExperimentSettings,
-    ) -> ClassificationTrainingArguments:
-        training_arguments = experiment_settings.training_arguments
-        training_arguments.label_names = (['labels'],)
-        training_arguments.remove_unused_columns = False
-        return training_arguments
-
-    @staticmethod
     def _get_trainer(
-        training_args: TrainingArguments,
+        training_args: ClassificationTrainingArguments,
         experiment_settings: ClassificationTrainExperimentSettings,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
@@ -81,9 +72,9 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         val_dataset: Dataset,
         data_collator: DataCollatorMixin,
     ) -> ClassificationTrainer:
-        if training_args.loss_settings['alpha'] == 'auto':
-            training_args.loss_settings['alpha'] = auto_class_weights(train_dataset)
-            logger.info(f'Auto computed class weights: {training_args.loss_settings["alpha"]}')
+        if training_args.loss_settings.alpha == 'auto':
+            training_args.loss_settings.alpha = auto_class_weights(train_dataset)
+            logger.info(f'Auto computed class weights: {training_args.loss_settings.alpha}')
 
         return ClassificationTrainer(
             model=model,

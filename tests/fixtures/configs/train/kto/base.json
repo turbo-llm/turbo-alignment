@@ -111,6 +111,7 @@
         "no_cuda": true
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "kto",
         "entity": "turbo-alignment"

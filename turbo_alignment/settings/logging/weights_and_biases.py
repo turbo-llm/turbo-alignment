@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic_settings import BaseSettings
+from turbo_alignment.settings.logging.common import LoggingSettings, LoggingType
 
 
 class WandbMode(str, Enum):
@@ -9,7 +9,8 @@ class WandbMode(str, Enum):
     DISABLED: str = 'disabled'
 
 
-class WandbSettings(BaseSettings):
+class WandbSettings(LoggingSettings):
+    logging_type: LoggingType = LoggingType.WANDB
     project_name: str
     run_name: str
     entity: str

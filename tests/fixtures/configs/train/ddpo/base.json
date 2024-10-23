@@ -156,6 +156,7 @@
         "max_grad_norm": 1.0
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "ddpo",
         "entity": "turbo-alignment"

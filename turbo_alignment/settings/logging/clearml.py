@@ -1,7 +1,8 @@
-from pydantic_settings import BaseSettings
+from turbo_alignment.settings.logging.common import LoggingSettings, LoggingType
 
 
-class ClearMLSettings(BaseSettings):
+class ClearMLSettings(LoggingSettings):
+    logging_type: LoggingType = LoggingType.CLEARML
     project_name: str
     task_name: str
     tags: list[str] = []

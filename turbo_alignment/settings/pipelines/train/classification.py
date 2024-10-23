@@ -36,4 +36,14 @@ class ClassificationTrainExperimentSettings(BaseTrainExperimentSettings):
 
     @field_validator('training_arguments', mode='before')
     def create_training_arguments(cls, values: dict[str, Any]) -> ClassificationTrainingArguments:
-        return ClassificationTrainingArguments(**values, output_dir=TRAINER_LOGS_FOLDER, report_to=[])
+        loss_settings = values.pop('loss_settings', {})
+        return ClassificationTrainingArguments(
+            **values,
+            output_dir=TRAINER_LOGS_FOLDER,
+            report_to=[],
+            remove_unused_columns=False,
+            label_names=['labels'],
+            loss_settings=ClassificationLossSettings(
+                **loss_settings,
+            ),
+        )

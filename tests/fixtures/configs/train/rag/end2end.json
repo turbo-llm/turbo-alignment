@@ -148,6 +148,7 @@
     "save_total_limit": 1
   },
   "logging_settings": {
+    "logging_type": "wandb",
     "project_name": "alignment",
     "run_name": "rag",
     "entity": "turbo-alignment"

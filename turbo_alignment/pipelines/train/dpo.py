@@ -53,13 +53,6 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         )
 
     @staticmethod
-    def _get_training_args(experiment_settings: DPOTrainExperimentSettings) -> DPOTrainingArguments:
-        training_arguments = experiment_settings.training_arguments
-        training_arguments.label_names = []
-        training_arguments.remove_unused_columns = False
-        return training_arguments
-
-    @staticmethod
     def _get_trainer(
         training_args: DPOTrainingArguments,
         experiment_settings: DPOTrainExperimentSettings,

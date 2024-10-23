@@ -54,10 +54,6 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
         )
 
     @staticmethod
-    def _get_training_args(experiment_settings: SftTrainExperimentSettings) -> TrainingArguments:
-        return experiment_settings.training_arguments
-
-    @staticmethod
     def _get_trainer(
         training_args: TrainingArguments,
         experiment_settings: SftTrainExperimentSettings,

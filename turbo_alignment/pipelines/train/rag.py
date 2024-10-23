@@ -71,10 +71,6 @@ class TrainRAGStrategy(BaseTrainStrategy[RAGTrainExperimentSettings]):
         return list(embeddings_initialization_strategy.keys()) if embeddings_initialization_strategy else []
 
     @staticmethod
-    def _get_training_args(experiment_settings: RAGTrainExperimentSettings) -> TrainingArguments:
-        return experiment_settings.training_arguments
-
-    @staticmethod
     def _get_trainer(
         training_args: TrainingArguments,
         experiment_settings: RAGTrainExperimentSettings,

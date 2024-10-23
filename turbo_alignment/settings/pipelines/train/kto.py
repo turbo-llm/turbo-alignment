@@ -19,4 +19,6 @@ class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
 
     @field_validator('training_arguments', mode='before')
     def create_training_arguments(cls, values: dict[str, Any]) -> KTOTrainingArguments:
-        return KTOTrainingArguments(**values, output_dir=TRAINER_LOGS_FOLDER, report_to=[])
+        return KTOTrainingArguments(
+            **values, output_dir=TRAINER_LOGS_FOLDER, report_to=[], label_names=[], remove_unused_columns=False
+        )

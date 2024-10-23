@@ -60,10 +60,6 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
         )
 
     @staticmethod
-    def _get_training_args(experiment_settings: MultimodalTrainExperimentSettings) -> TrainingArguments:
-        return experiment_settings.training_arguments
-
-    @staticmethod
     def _get_trainer(
         training_args: TrainingArguments,
         experiment_settings: MultimodalTrainExperimentSettings,

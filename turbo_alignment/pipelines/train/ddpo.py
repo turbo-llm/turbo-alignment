@@ -12,7 +12,6 @@ from turbo_alignment.common.tf.callbacks import EvaluateFirstStepCallback
 from turbo_alignment.common.tf.loaders.model import load_model
 from turbo_alignment.common.tf.loaders.tokenizer import load_tokenizer
 from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.ddpo.collators import DDPODataCollator
 from turbo_alignment.dataset.ddpo.ddpo import load_ddpo_datasets as load_datasets
@@ -61,18 +60,6 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         )
 
     @staticmethod
-    def _get_training_args(experiment_settings: DDPOTrainExperimentSettings) -> DDPOTrainingArguments:
-        return DDPOTrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            label_names=[],
-            remove_unused_columns=False,
-            beta=experiment_settings.beta,
-            use_ref_model=experiment_settings.use_ref_model,
-            forward_kl=experiment_settings.forward_kl,
-            **experiment_settings.training_arguments.dict(),
-        )
-
-    @staticmethod
     def _get_data_collator(
         experiment_settings: DDPOTrainExperimentSettings, tokenizer: PreTrainedTokenizerBase, **kwargs
     ) -> Callable:
@@ -110,8 +97,6 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         )
 
     def run(self, experiment_settings: DDPOTrainExperimentSettings) -> None:
-        training_args = self._get_training_args(experiment_settings)
-
         self.tokenizer = load_tokenizer(
             experiment_settings.tokenizer_settings,
             experiment_settings.model_settings,
@@ -170,7 +155,7 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         )
 
         self.trainer = self._get_trainer(
-            training_args=training_args,
+            training_args=experiment_settings.training_arguments,
             experiment_settings=experiment_settings,
             model=self.model,
             tokenizer=self.tokenizer,
