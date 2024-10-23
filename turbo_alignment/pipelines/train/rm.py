@@ -6,7 +6,6 @@ from transformers.data.data_collator import DataCollatorMixin
 
 from turbo_alignment.cherry_picks.rm import RmCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.dataset.pair_preferences import (
     PairPreferenceDataCollator,
@@ -53,15 +52,6 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
             cherry_pick_settings=cherry_pick_settings,
             datasets=cherry_pick_datasets,
             metrics=metrics,
-        )
-
-    @staticmethod
-    def _get_training_args(experiment_settings: RMTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            label_names=[],
-            remove_unused_columns=False,
-            **experiment_settings.trainer_settings.dict(),
         )
 
     @staticmethod
