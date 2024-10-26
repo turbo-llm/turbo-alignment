@@ -24,10 +24,10 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
         accelerator: Accelerator | None = None,
         batch: int = 1,
     ) -> None:
-        if accelerator is not None:
-            self._model = accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
-        else:
-            self._model = model
+        # if accelerator is not None:
+            # self._model = accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
+        # else:
+        self._model = model
 
         self._tokenizer = tokenizer
         self._accelerator = accelerator

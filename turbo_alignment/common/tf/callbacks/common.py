@@ -89,5 +89,4 @@ class MetricsCallbackHandler(CallbackHandler):
                 }
 
                 self.call_event('on_log', args, state, control, logs=table)
-
         return control
