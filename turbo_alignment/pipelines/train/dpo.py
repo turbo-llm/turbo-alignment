@@ -59,7 +59,9 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,
-            **experiment_settings.trainer_settings.dict(),
+            **experiment_settings.trainer_settings.dict(
+                exclude={'gradient_checkpointing_kwargs', 'gradient_checkpointing'},
+            ),
         )
 
     @staticmethod
@@ -72,7 +74,8 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         val_dataset: Dataset,
         data_collator: Callable,
     ):
-        model.config.use_cache = not training_args.gradient_checkpointing
+        if experiment_settings.trainer_settings.gradient_checkpointing:
+            model.gradient_checkpointing_enable({'use_reentrant': True})
 
         extra_args = {}
         if experiment_settings.trainer_settings.use_ref_model:
