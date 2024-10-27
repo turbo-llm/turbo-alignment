@@ -68,7 +68,9 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=['labels'],
             remove_unused_columns=False,
-            **experiment_settings.trainer_settings.dict(exclude={'loss_settings'}),
+            **experiment_settings.trainer_settings.dict(
+                exclude={'loss_settings', 'gradient_checkpointing_kwargs', 'gradient_checkpointing'},
+            ),
         )
 
     @staticmethod
@@ -81,6 +83,9 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         val_dataset: Dataset,
         data_collator: DataCollatorMixin,
     ):
+        if experiment_settings.trainer_settings.gradient_checkpointing:
+            model.gradient_checkpointing_enable({'use_reentrant': True})
+
         if experiment_settings.trainer_settings.loss_settings.alpha == 'auto':
             experiment_settings.trainer_settings.loss_settings.alpha = auto_class_weights(train_dataset)
             logger.info(f'Auto computed class weights: {experiment_settings.trainer_settings.loss_settings.alpha}')

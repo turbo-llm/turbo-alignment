@@ -61,7 +61,9 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,
-            **experiment_settings.trainer_settings.dict(),
+            **experiment_settings.trainer_settings.dict(
+                exclude={'gradient_checkpointing_kwargs', 'gradient_checkpointing'},
+            ),
         )
 
     @staticmethod
@@ -74,7 +76,10 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
         val_dataset: Dataset,
         data_collator: DataCollatorMixin,
         **_kwargs,
-    ):
+    ) -> RMTrainer:
+        if experiment_settings.trainer_settings.gradient_checkpointing:
+            model.gradient_checkpointing_enable({'use_reentrant': True})
+
         return RMTrainer(
             model=model,
             tokenizer=tokenizer,

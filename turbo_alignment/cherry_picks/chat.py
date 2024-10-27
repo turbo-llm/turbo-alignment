@@ -36,6 +36,9 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         ref_model: dict = kwargs.get('ref_model', None)
         sft_model: dict = kwargs.get('sft_model', None)
 
+        if model.is_gradient_checkpointing:
+            model.config.use_cache = False
+
         generator = ChatGenerator(
             model=model,
             tokenizer=tokenizer,
@@ -44,6 +47,8 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
             accelerator=accelerator,
             return_logits=True,
         )
+
+        model.config.use_cache = True
 
         batch_size = self._generator_transformers_settings.num_return_sequences
 

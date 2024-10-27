@@ -58,7 +58,9 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
     def _get_training_args(experiment_settings: SftTrainExperimentSettings) -> TrainingArguments:
         return TrainingArguments(
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            **experiment_settings.trainer_settings.dict(),
+            **experiment_settings.trainer_settings.dict(
+                exclude={'gradient_checkpointing_kwargs', 'gradient_checkpointing'},
+            ),
         )
 
     @staticmethod
@@ -72,7 +74,8 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
         data_collator: DataCollatorMixin,
         **_kwargs,
     ) -> MultiGPUCherryPicksTrainer:
-        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+        if experiment_settings.trainer_settings.gradient_checkpointing:
+            model.gradient_checkpointing_enable({'use_reentrant': True})
 
         return MultiGPUCherryPicksTrainer(
             model=model,
