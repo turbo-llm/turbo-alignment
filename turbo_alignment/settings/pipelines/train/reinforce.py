@@ -18,7 +18,7 @@ class REINFORCETrainerSettings(TrainerSettings):
     kl_coef: float = 0.05
     mean_baseline_coef: float = 0.1
 
-    num_generations: int = 1
+    num_generations: int = 3
     num_samples_for_reward_stats: int = 0
 
     non_eos_penalty: bool = True
