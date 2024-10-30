@@ -127,9 +127,9 @@
         "save_total_limit": 5,
         "load_best_model_at_end": false,
         "deepspeed": "configs/exp/deepspeed/stage2.json",
-        "dispatch_batches": false,
         "dataloader_num_workers": 16,
-        "dataloader_pin_memory": false
+        "dataloader_pin_memory": false,
+        "dispatch_batches": false
     },
     "wandb_settings": {
         "project_name": "rykov",
