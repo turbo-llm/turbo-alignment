@@ -28,6 +28,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     APOZeroLossSettings,
     CPOLossSettings,
     DPOLossesType,
+    ASFTLossSettings,
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
@@ -299,6 +300,34 @@ class ORPOLoss(DPOLossRegistry):
         return losses, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.ASFT)
+class ASFTLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor | None,
+        reference_rejected_logps: torch.FloatTensor | None,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_ratio = policy_chosen_logps - (torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7)))
+        rejected_ratio = policy_rejected_logps - (
+            torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+        )
+        sigm_diff = -F.logsigmoid(chosen_ratio) - F.logsigmoid(-rejected_ratio)
+
+        losses = -policy_chosen_logps + self.beta * sigm_diff
+
+        chosen_rewards = self.beta * policy_chosen_logps.detach()
+        rejected_rewards = self.beta * policy_rejected_logps.detach()
+
+        return losses, chosen_rewards, rejected_rewards
+
+
 @DPOLossRegistry.register(DPOLossesType.SIGMOID_WITH_MARGIN)
 class SigmoidLossWithMargin(DPOLossRegistry):
     def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
@@ -407,6 +436,7 @@ class DPOTrainingArguments(TrainingArguments):
         | KTOLossSettings
         | CPOLossSettings
         | ORPOLossSettings
+        | ASFTLossSettings
         | SimPOLossSettings
         | SlicHfLossSettings
         | SigmoidLossWithMarginSettings
@@ -450,7 +480,10 @@ class DPOTrainer(Trainer):
         if hasattr(args, 'loss_settings'):
             self.loss_type = args.loss_settings['loss_type']  # type: ignore[index]
 
-            if self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO) and not args.average_log_prob:
+            if (
+                self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO, DPOLossesType.ASFT)
+                and not args.average_log_prob
+            ):
                 raise ValueError(f'You should normalize logits by length when using {self.loss_type}')
 
             loss_args = args.loss_settings
@@ -470,7 +503,11 @@ class DPOTrainer(Trainer):
             **kwargs,
         )
 
-        if hasattr(args, 'loss_settings') and self.loss_type in (DPOLossesType.SIMPO, DPOLossesType.ORPO):
+        if hasattr(args, 'loss_settings') and self.loss_type in (
+            DPOLossesType.SIMPO,
+            DPOLossesType.ORPO,
+            DPOLossesType.ASFT,
+        ):
             logger.info(f'You can turn off ref_model when using {self.loss_type} for memory saving')
 
         self.ref_model = ref_model
@@ -595,7 +632,11 @@ class DPOTrainer(Trainer):
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
-        if self.args.use_ref_model or self.loss_type not in (DPOLossesType.SIMPO, DPOLossesType.ORPO):
+        if self.args.use_ref_model or self.loss_type not in (
+            DPOLossesType.SIMPO,
+            DPOLossesType.ORPO,
+            DPOLossesType.ASFT,
+        ):
             reference_chosen_logps, reference_rejected_logps = self._get_logps(self.ref_model, batch)
 
         losses, chosen_rewards, rejected_rewards = self.dpo_loss(
@@ -660,6 +701,24 @@ class DPOTrainer(Trainer):
             metrics[f'{prefix}orpo/or_loss'] = or_loss.detach().cpu().mean().item()
             metrics[f'{prefix}orpo/ratio'] = (ratio).detach().cpu().mean().item()
             metrics[f'{prefix}orpo/log_odds'] = (log_odds).detach().cpu().mean().item()
+
+        elif self.loss_type == DPOLossesType.ASFT:
+            chosen_ratio = policy_chosen_logps - (
+                torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
+            )
+            rejected_ratio = policy_rejected_logps - (
+                torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
+            )
+            chosen_logsig = -F.logsigmoid(chosen_ratio)
+            rejected_logsig = -F.logsigmoid(-rejected_ratio)
+
+            asft_loss = self.dpo_loss_registry.beta * (chosen_logsig + rejected_logsig)
+            nll_loss = -policy_chosen_logps
+
+            metrics[f'{prefix}asft/nll_loss'] = nll_loss.detach().cpu().mean().item()
+            metrics[f'{prefix}asft/asft_loss'] = asft_loss.detach().cpu().mean().item()
+            metrics[f'{prefix}asft/chosen_logsig'] = chosen_logsig.detach().cpu().mean().item()
+            metrics[f'{prefix}asft/rejected_logsig'] = rejected_logsig.detach().cpu().mean().item()
 
         if self.sft_model is not None:
             sft_chosen_logps, sft_rejected_logps = self._get_logps(self.sft_model, batch)

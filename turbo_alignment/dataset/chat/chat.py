@@ -258,7 +258,14 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         inference: bool,
         random_cut: bool,
     ) -> list[dict[str, Any] | None]:
-        conversations = [Conversation(system_prompt=self.source.system_prompt, messages=r.messages) for r in records]
+        conversations = [
+            Conversation(
+                system_prompt=self.source.system_prompt,
+                messages=r.messages,
+                ignore_system_prompt=self.settings.ignore_system_prompt,
+            )
+            for r in records
+        ]
 
         logger.info(f'Tokenizing dataset {self.source.name}')
         tokenized_replicas = self.__tokenize([m.content for c in conversations for m in c.messages])

@@ -1,6 +1,3 @@
-import json
-import random
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -9,15 +6,13 @@ from datasets import load_dataset
 from turbo_alignment.common.data.io import write_jsonl
 from turbo_alignment.dataset.chat.models import ChatMessageRole
 from turbo_alignment.dataset.multimodal.models import (
-    MultimodalChatMessage,
     MultimodalDatasetRecord,
     MultimodalImageMessage,
     MultimodalTextMessage,
 )
-from turbo_alignment.settings.modality import Modality
 
 
-def convert_to_multimodal_record(row):
+def convert_to_multimodal_record(row: dict[str, Any]) -> MultimodalDatasetRecord:
     return MultimodalDatasetRecord(
         id=row['id'],
         messages=[

@@ -43,9 +43,7 @@ Basic settings to load the model.
 
 **model_kwargs**  -- the place to specify something like "attn_implementation": "flash_attention_2" <br>
 **model_type** -- For classification/RM "seq_cls" is needed, for most others "causal" is suitable<br>
-**adapter_path** -- for vLLM-inference, it's necessary to merge the model in advance using <br>
-
-merge config for vLLM [here](configs/utils/convert_to_base/llama.json)
+**adapter_path** -- path to trained LORA-adapter if needed <br>
 
 ### Tokenizer Settings
 Basic settings to load the tokenizer <br>
@@ -68,19 +66,20 @@ Basic settings to load the tokenizer <br>
         "transformers_settings": {
             "num_beams": 3,
             "max_new_tokens": 500,
+            "stop_strings": ["<|eot_id|>", "<|end_of_text|>"],
             "repetition_penalty": 1.02
         },
         "custom_settings": {
-            "generation_eos_token": "</RS>", "skip_special_tokens": false
+            "skip_special_tokens": false
         }
     }
 ]
 ```
-**generation_eos_token** -- varies between models, or you might have trained your own
+**stop_strings** -- varies between models, or you might have trained your own. You can use one/multiple tokens or strings.
 
 ### Dataset Settings
 **sources** -- the name and path of the dataset. You can choose **num_samples** or **sample_rate** to control how much of the dataset to use <br>
-**chat_settings** -- how your messages will be processed for input into the llm
+**chat_settings** -- how your messages will be processed for input into the LLM
 ```json
 "dataset_settings": {
     "sources": [
@@ -91,12 +90,12 @@ Basic settings to load the tokenizer <br>
     ],
     "prompt_template": {
         "role_tag_mapping": {
-            "bot": "<bot>",
-            "system": "<system>",
-            "user": "<user>"
+            "bot": "assistant",
+            "user": "user",
+            "system": "system"
         },
-        "prefix_template": "<RS>{role}",
-        "suffix_template": "</RS>"
+        "prefix_template": "<|start_header_id|>{role}<|end_header_id|>\n\n",
+        "suffix_template": "<|eot_id|>"
     },
     "dataset_type": "chat",
     "max_tokens_count": 150
@@ -110,23 +109,23 @@ Basic settings to load the tokenizer <br>
 
 ### Default Generation inference
 
-- Let's look at the model+adapter ([default inference](configs/exp/inference/generation/default_llama_adapter.json))
+- Let's look at the model+adapter ([default inference](../tests/fixtures/configs/inference/sft/base.json))
 
 - Make sure that in **role_tag_mapping** you have all roles from your dataset, and they correspond to the tokens from your model.
 
 ###  vLLM Generation inference 
 Suppose you want to use vLLM: for speeding up inference or CUDA_OUT_OF_MEMORY_ERROR👹:
 
-- Then this config is suitable: [vllm inference](configs/exp/inference/generation/vllm.json)
-- In fact, only 2 minor changes: <br>
+- Then this config is suitable: [vllm inference](../tests/fixtures/configs/inference/sft/vllm_base.json)
+- In fact, only 2 minor changes can requires: <br>
  (a) add **use_vllm: true** <br>
- (b) specify the path directly to the model, adapter loading will not work. [merge config](configs/utils/convert_to_base/llama.json)
+ (b) add **tensor_parallel_size: ...** if you want to split your model into multiple cards
 
 ### Troubleshooting:
 - If the sizes of the dictionary in the base_model/adapter do not match, pay attention to `special_tokens_setter`, you might have duplicate special tokens after train.
 
 ### Classification inference:
-Don't forget to specify that your model is for classification😏   [classification inference ](configs/exp/inference/classification/classification_inference.json)
+Don't forget to specify that your model is for classification😏   [classification inference ](../tests/fixtures/configs/inference/classification/base.json)
 
 
 ```json
@@ -147,7 +146,7 @@ Don't forget to specify that your model is for classification😏   [classificat
 Prepare a dataset where for each query you pre-find suitable passages → form them into **"dataset_type": "chat"* and launch just like in [Default Generation inference](#-default-generation-inference).
 #### Online RAG inference
 You can load your encoder and index, and perform passage retrieval online:
-For this, check this config: [rag_inference](configs/exp/inference/rag/rag_inference.json)
+For this, check this config: [rag_inference](../tests/fixtures/configs/inference/rag/base.json)
 if you're dealing with RAG, this part should already be familiar to you.
 
 ```json
@@ -176,17 +175,16 @@ similiar as inference_dataset but
 Pay attention to **"only_answer_loss": true**:
 This parameter means the model will calculate the error only on the last message from dataset[’messages’]. In most cases, you want the last message to be from the role: **bot**, otherwise, you're training the model to mimic the user! 😏
 ```json
-"keep_start": "bool", 
 "keep_end": "bool"
 ```
- **CUT**: if keep_start -> [:max_tokens_count] elif keep_end -> [-max_tokens_count:]; <br>
+ **CUT**: if keep_end=False -> [:max_tokens_count] elif keep_end=True -> [-max_tokens_count:]; <br>
  cuts off the last fully entered message in the dialogue. <br>
 
 Only for cherry_pick_settings: <br>
 if **random_cut = True**, then the end is chosen as a random bot message from messages.
 
 ### LORA Adapter train
-Check out this config: [LORA Adapter](configs/exp/train/sft/sft.json)
+Check out this config: [LORA Adapter](../tests/fixtures/configs/train/sft/base.json)
 
 
 ### P-tuning train 
@@ -211,7 +209,7 @@ We prepare the dataset in advance with separators **<doc_sep>** initialized simp
 - Train/Watch 👀
 
 ### LLM for classification
-[classification train](configs/exp/train/classification/classification.json)
+[classification train](../tests/fixtures/configs/train/classification/base.json)
 
 ```json
 {
@@ -231,18 +229,19 @@ We prepare the dataset in advance with separators **<doc_sep>** initialized simp
 
 
 ### end-2-end-rag 
-- Check this out if you're inspired by an article and want to train both the encoder and the generator at once: [end2end_rag](configs/exp/train/rag/end2end_rag.json)
+- Check this out if you're inspired by an article and want to train both the encoder and the generator at once: [end2end_rag](../tests/fixtures/configs/train/rag/base.json)
 - Just fill in the appropriate settings **"question_encoder_settings", "retrieval_settings", "index_settings".**
 - **"dataset_type": "chat"**
 
 ### Reward Model
-Preferences are everything → prepare the pair_preference dataset→ run config [RM](configs/exp/train/rm/rm.json)
+Preferences are everything → prepare the pair_preference dataset→ run config [RM](../tests/fixtures/configs/train/rm/base.json)
 ```json
 {
     "add_labels": false,
     "dataset_type": "pair_preferences",
     "model_settings": {
-        "model_type": "seq_cls"
+        "model_type": "seq_cls",
+        "num_labels": 1,
     }
 }
 ```
@@ -255,18 +254,18 @@ In turbo-alignment, you can train your own Vision Language Models (VLMs), such a
 ## Multimodal Architecture
 The architecture of VLM contains only three parts: a multimodal encoder that encode images into some representation, a projector that maps representations from encoders to language model tokens, and a language model. During training, we completely freeze the encoders and train only the projector with the language model. Currently only the `image` modality is supported, but we will add `audio` support in the future.
 
-The encoders are stored in `turbo_alignment/modeling/multimodal/encoders`. The encoder class takes multimodal features (pixel values in the case of images) and encodes them using the encoder model. To add a new image encoder, simply create a new file in `turbo_alignment/modeling/multimodal/encoders/image` and write a class that inherits from `BaseImageEncoder`. Note that your class should contain the method `def encode(self, inputs: torch.Tensor) -> torch.Tensor:` and some properties like `emb_dim` (dimension of each encoded patch), `device` and `n_modality_embs` (the number of patches your encoder returns). Take [CLIP encoder](turbo_alignment/modeling/multimodal/encoders/image/clip.py) as an example.
+The encoders are stored in `turbo_alignment/modeling/multimodal/encoders`. The encoder class takes multimodal features (pixel values in the case of images) and encodes them using the encoder model. To add a new image encoder, simply create a new file in `turbo_alignment/modeling/multimodal/encoders/image` and write a class that inherits from `BaseImageEncoder`. Note that your class should contain the method `def encode(self, inputs: torch.Tensor) -> torch.Tensor:` and some properties like `emb_dim` (dimension of each encoded patch), `device` and `n_modality_embs` (the number of patches your encoder returns). Take [CLIP encoder](../turbo_alignment/modeling/multimodal/encoders/image/clip.py) as an example.
 
-Readers are stored in `turbo_alignment/common/data/multimodal`. Each encoder has its own reader. That's because encoder models like CLIP are trained with its specific processor (reader in our pipeline). To add a new image reader, create a class by inheriting from `BaseImageReader` and implement the method `def read(self, path: str) -> torch.Tensor:`. See our [CLIP reader](turbo_alignment/common/data/multimodal/image/clip.py).
+Readers are stored in `turbo_alignment/common/data/multimodal`. Each encoder has its own reader. That's because encoder models like CLIP are trained with its specific processor (reader in our pipeline). To add a new image reader, create a class by inheriting from `BaseImageReader` and implement the method `def read(self, path: str) -> torch.Tensor:`. See our [CLIP reader](../turbo_alignment/common/data/multimodal/image/clip.py).
 
-All projectors are stored in `turbo_alignment/modeling/multimodal/projectors`. Basically, Projector is a class that takes multimodal features (i.e., encoded image or audio) and performs some operations on them to adapt to the language model. For example, it can simply map each patch of the coded image to a dimension of the language model's tokens, like MLP from LLaVA, or perform some convolutions, like C-Abstractor from HoneyBee. If you want to contribute and add a new projector to our pipeline, see the [LLaVA MLP](turbo_alignment/modeling/multimodal/projectors/llava.py) projector implementation as an example.
+All projectors are stored in `turbo_alignment/modeling/multimodal/projectors`. Basically, Projector is a class that takes multimodal features (i.e., encoded image or audio) and performs some operations on them to adapt to the language model. For example, it can simply map each patch of the coded image to a dimension of the language model's tokens, like MLP from LLaVA, or perform some convolutions, like C-Abstractor from HoneyBee. If you want to contribute and add a new projector to our pipeline, see the [LLaVA MLP](../turbo_alignment/modeling/multimodal/projectors/llava.py) projector implementation as an example.
 
 
 
 ## Multimodal Training Pipeline
 
 ### Config
-An example of a multimodal config can be found here: ([llama_llava_base_clip.json](tests/fixtures/configs/train/multimodal/llama_llava_base_clip.json)). This test configuration shows how to train a VLM with CLIP as image encoder and LLaMA as LM with MLP projector.
+An example of a multimodal config can be found here: ([llama_llava_base_clip.json](../tests/fixtures/configs/train/multimodal/llama_llava_base_clip.json)). This test configuration shows how to train a VLM with CLIP as image encoder and LLaMA as LM with MLP projector.
 
 
 #### Dataset Settings:
@@ -351,7 +350,7 @@ python -m turbo_alignment train_multimodal --experiment_settings_path tests/fixt
 ## Multimodal Inference
 
 ### Config
-Now we will consider an configuration file for inference: ([llama_llava_clip_pickle.json](tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json))
+Now we will consider an configuration file for inference: ([llama_llava_clip_pickle.json](../tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json))
 Unlike SFT Inference pipeline, multimodal one takes `projections_path` (path to the trained projectors) and `n_modality_embeddings`. Both of them are in `model_settings`, for example:
 ```json
 "model_settings": {
@@ -406,7 +405,7 @@ python -m turbo_alignment inference_multimodal --experiment_settings_path tests/
 ## How to speed up multimodal pipeline with dataset preprocessing
 To speed up the training process, you can consider preprocessing your data. Without preprocessed data, the multimodal training pipeline will read images with your reader before training, and encode them on each iteration of the training loop. 
 
-To start preprocessing, all you need is a directory with images and a valid preprocessing config. For our example, we will use the test config [images.json](tests/fixtures/configs/utils/preprocess/images.json).
+To start preprocessing, all you need is a directory with images and a valid preprocessing config. For our example, we will use the test config [images.json](../tests/fixtures/configs/utils/preprocess/images.json).
 
 The config contains information about the modality, modality reader, modality encoder, path to data with images, and output path. You can set the output path to be the same as the input path. 
 

@@ -50,10 +50,10 @@
       "generator_transformers_settings": {
         "num_beams": 3,
         "max_new_tokens": 16,
-        "repetition_penalty": 1.1
+        "repetition_penalty": 1.1,
+        "stop_strings": "</RS>"
       },
       "custom_generation_settings": {
-        "generation_eos_token": "</RS>",
         "skip_special_tokens": false
       },
       "dataset_settings": {

@@ -2,11 +2,8 @@ from typing import Any
 
 import torch
 from transformers import PreTrainedTokenizerBase
-
-try:
-    from vllm import LLM, SamplingParams
-except ImportError as exc:
-    raise exc
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 
 from turbo_alignment.dataset.chat import ChatDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
@@ -26,6 +23,8 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         model: LLM,
         tokenizer: PreTrainedTokenizerBase,
         batch: int,
+        return_logits: bool = False,
+        lora_request: LoRARequest | None = None,
     ):
         model.set_tokenizer(tokenizer)
         super().__init__(model, tokenizer, batch=batch)
@@ -54,6 +53,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             max_tokens=transformers_settings.max_new_tokens,
             **beam_search_params,
         )
+        self._lora_request = lora_request
 
         self._custom_generation_settings = custom_generation_settings
 
@@ -68,6 +68,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             prompts=None,
             prompt_token_ids=input_ids,
             sampling_params=self._sampling_params,
+            lora_request=self._lora_request,
         )
 
         outputs = []

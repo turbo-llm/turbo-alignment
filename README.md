@@ -93,76 +93,148 @@ Examples of datasets are available [here](docs/dataset_example.md).
 <a name="-sft-train"></a>
 ## Supervised Fine-Tuning
 - **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [sft.json](configs/exp/train/sft/sft.json)
+- **📝 Configs Example**: [sft.json](tutorials/sft/sft.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_sft --experiment_settings_path configs/exp/train/sft/sft.json
+python -m turbo_alignment train_sft --experiment_settings_path tutorials/sft/sft.json
 ```
 <a name="-preftune-train"></a>
 ## Preference Tuning
 <a name="-rm-train"></a>
 ### Reward Modeling
 - **📚 Dataset type** prepare your dataset  in the `PairPreferencesDataset` format, examples available [here](docs/dataset_example.md#-pair-preferences)
-- **📝 Configs Example**: [rm.json](configs/exp/train/rm/rm.json)
+- **📝 Configs Example**: [rm.json](tutorials/rm/rm.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_rm --experiment_settings_path configs/exp/train/rm/rm.json
+python -m turbo_alignment train_rm --experiment_settings_path tutorials/rm/rm.json
 ```
 
 <a name="-dpo-train"></a>
 ### DPO, IPO, CPO, KTO (Paired)
 - **📚 Dataset type** prepare your dataset in the `PairPreferencesDataset` format, examples available [here](docs/dataset_example.md#pair-preferences)
-- **📝 Configs Example**: [dpo.json](configs/exp/train/dpo/dpo.json)
+- **📝 Configs Example**: [dpo.json](tutorials/dpo/dpo.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_dpo --experiment_settings_path configs/exp/train/dpo/dpo.json
+python -m turbo_alignment train_dpo --experiment_settings_path tutorials/dpo/dpo.json
 ```
 
 <a name="-kto-train"></a>
 ### KTO (Unpaired)
 - **📚 Dataset type** prepare your dataset in the `KTODataset` format, examples available [here](docs/dataset_example.md#-kto-dataset)
-- **📝 Configs Examples**: [kto.json](configs/exp/train/kto/kto.json)
+- **📝 Configs Examples**: [kto.json](tutorials/kto/kto.json)
 - **🖥️ CLI launch command**
 ```bash
-python -m turbo_alignment train_kto --experiment_settings_path configs/exp/train/kto/kto.json
+python -m turbo_alignment train_kto --experiment_settings_path tutorials/kto/kto.json
 ```
 
 <a name="-multimodal-train"></a>
-⌛️ in progress..
-## Multimodal Tasks 
-To start multimodal training, you should:
-- **Prepare the multimodal dataset**. See examples [here](docs/dataset_example.md#-multimodel-dataset).
-- **Preprocess the data (OPTIONAL)**. If you plan to run many experiments on the same dataset, you should preprocess it. The preprocessing stage includes reading `pixel_values` from images, encoding them with the specified encoder, and saving them in safetensors format. Later, during training, the pipeline will skip the stage of reading and encoding images and only extract prepared encodings from the safetensors files.
-- **Suitable config**: [llava.json](tests/fixtures/configs/train/multimodal/llama_llava_base_clip.json),[c_abs.json](tests/fixtures/configs/train/multimodal/llama_c_abs_clip_pickle.json)
+## Multimodal train
+⌛️  in progress..
+
 
 <a name="-rag-train"></a>
-⌛️ in progress..
-## RAG
-To launch RAG:
-- **Choose a base encoder**, create a document index.
-- For **end-to-end**:
-  - **Train both** the retriever and the generator.
-  - **Prepare the data** in `"dataset_type": "chat"` **with query -> response.**
-  - **Suitable config**: [end2end_rag](configs/exp/train/rag/end2end_rag.json)
-
-- For **sft-rag**:
-  - **Train only** generator
-  - **Prepare the data** in `"dataset_type": "chat"` with **query+retrieved_documents -> response.**
-  - **Suitable config**: [sft_with_retrieval_utility](configs/exp/train/sft/llama/sft_with_retrieval_utility.json)
-
+## RAG (Retrieval-Augmented Generation) 
+<a name="-sft-rag-train"></a>
+### SFT-RAG
+- **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [sft_retrieval_utility.json](tests/fixtures/configs/train/sft/sft_retrieval_utility.json)
+- **🖥️ CLI launch command**: 
+```bash
+python -m turbo_alignment train_sft --experiment_settings_path tests/fixtures/configs/train/sft/sft_retrieval_utility.json
+```
+<a name="-e2e-rag-train"></a>
+### End2End-RAG
+- **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [end2end.json](tests/fixtures/configs/train/rag/end2end.json)
+- **🖥️ CLI launch command**:
+```bash
+python -m turbo_alignment train_rag --experiment_settings_path tests/fixtures/configs/train/rag/end2end.json
+```
 
 <a name="-inference"></a>
 # Inference
-⌛️ in progress..
+<a name="-chat-inference"></a>
+## Chat Inference
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [base.json](tests/fixtures/configs/inference/sft/base.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_chat --inference_settings_path tests/fixtures/configs/inference/sft/base.json
+```
 
+<a name="-classification-inference"></a>
+## Classification Inference
+- **📚 Dataset type** prepare your dataset  in the `ClassificationDataset`, examples available [here](docs/dataset_example.md#-classification-dataset) format.
+- **📝 Configs Example**: [classification_inference.json](tests/fixtures/configs/inference/classification/base.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_classification --inference_settings_path tests/fixtures/configs/inference/classification/base.json
+```
+
+<a name="-multimodal-inference"></a>
+## Multimodal Inference
+- **📚 Dataset type** prepare your dataset  in the `MultimodalDataset`, examples available [here](docs/dataset_example.md#-multimodal-dataset) format.
+- **📝 Configs Example**: [llama_llava_clip_pickle.json](tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_multimodal --inference_settings_path tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json
+```
+
+<a name="-rag-inference"></a>
+## RAG Inference
+- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
+- **📝 Configs Example**: [rag_inference.json](tests/fixtures/configs/inference/rag/base.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment inference_rag --inference_settings_path tests/fixtures/configs/inference/rag/base.json
+```
 
 <a name="-sampling"></a>
 # Sampling
-⌛️ in progress..
+<a name="-random-sampling"></a>
+## Random Sampling
+- **📚 Dataset type** prepare your dataset  in the `SamplingRMDataset`, examples available [here](docs/dataset_example.md#-sampling-dataset) format.
+- **📝 Configs Example**: [random.json](tests/fixtures/configs/sampling/base.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment random_sample --experiment_settings_path tests/fixtures/configs/sampling/base.json
+```
+
+<a name="-rso-sampling"></a>
+## RSO Sampling
+- **📚 Dataset type** prepare your dataset  in the `SamplingRMDataset`, examples available [here](docs/dataset_example.md#-sampling-dataset) format.
+- **📝 Configs Example**: [rso.json](tests/fixtures/configs/sampling/rso.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment rso_sample --experiment_settings_path tests/fixtures/configs/sampling/rso.json
+```
+
+<a name="-rm-sampling"></a>
+## Reward Model Sampling
+- **📚 Dataset type** prepare your dataset  in the `SamplingRMDataset`, examples available [here](docs/dataset_example.md#-sampling-dataset) format.
+- **📝 Configs Example**: [rm.json](tests/fixtures/configs/sampling/rm.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment rm_sample --experiment_settings_path tests/fixtures/configs/sampling/rm.json
+```
 
 <a name="-common"></a>
 # Common
-⌛️ in progress..
+<a name="-merge_adapters_to_base"></a>
+## Merge Adapters to base model
+- **📝 Configs Example**: [merge.json](tests/fixtures/configs/utils/merge_adapters_to_base/merge.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment merge_adapters_to_base --settings_path tests/fixtures/configs/utils/merge_adapters_to_base/merge.json
+```
+
+<a name="-preprocess_multimodal_dataset"></a>
+## Preprocess Multimodal Dataset
+- **📝 Configs Example**: [coco2014_clip.json](tutorials/utils/preprocess/coco2014_clip.json)
+- **🖥️ CLI launch command**
+```bash
+python -m turbo_alignment preprocess_multimodal_dataset --settings_path tutorials/utils/preprocess/coco2014_clip.json
+```
 
 
 <a name="-installation"></a>
@@ -188,7 +260,7 @@ git clone https://github.com/turbo-llm/turbo-alignment.git
 <a name="-development"></a>
 ## 🌱 Development
 
-Contributions are welcome! Read the [contribution guide](https://github.com/turbo-llm/turbo-alignment/blob/main/CONTRIBUTING.md) and set up the development environment:
+Contributions are welcome! Read the [contribution guide](CONTRIBUTING.md) and set up the development environment:
 ```bash
 git clone https://github.com/turbo-llm/turbo-alignment.git
 cd turbo-alignment
@@ -213,8 +285,17 @@ See the [Installation](#-installation) section for detailed instructions.
 Guides and docs are available [here](docs/GUIDE.md).
 
 ### Where can I find tutorials?
-Tutorials are available [here](tutorials/tutorial.md).
+Tutorials are available [here](tutorials/).
 
 
 ## 📝 License
-This project is licensed, see the [LICENSE](https://github.com/turbo-llm/turbo-alignment/-/blob/main/LICENSE) file for details.
+This project is licensed, see the [LICENSE](LICENSE) file for details.
+
+
+## References
+
+- DPO Trainer implementation inspired by Leandro von Werra et al. (2020) TRL: Transformer Reinforcement Learning. GitHub repository, GitHub. Available at: [https://github.com/huggingface/trl](https://github.com/huggingface/trl).
+
+- Registry implementation inspired by Matt Gardner, Joel Grus, Mark Neumann, Oyvind Tafjord, Pradeep Dasigi, Nelson F. Liu, Matthew Peters, Michael Schmitz, and Luke S. Zettlemoyer. 2017. AllenNLP: A Deep Semantic Natural Language Processing Platform. Available at: [arXiv:1803.07640](https://arxiv.org/abs/1803.07640).
+
+- Liger Kernels implementation inspired by Hsu, Pin-Lun, Dai, Yun, Kothapalli, Vignesh, Song, Qingquan, Tang, Shao, and Zhu, Siyu, 2024. Liger-Kernel: Efficient Triton Kernels for LLM Training. Available at: [https://github.com/linkedin/Liger-Kernel](https://github.com/linkedin/Liger-Kernel).

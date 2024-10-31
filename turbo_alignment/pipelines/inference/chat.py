@@ -8,6 +8,7 @@ from turbo_alignment.common.tf.loaders import load_model, load_tokenizer
 from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.generators.chat import ChatGenerator
 from turbo_alignment.pipelines.inference.base import BaseInferenceStrategy
+from turbo_alignment.settings.model import PreTrainedAdaptersModelSettings
 from turbo_alignment.settings.pipelines.inference.chat import (
     ChatInferenceExperimentSettings,
 )
@@ -26,18 +27,25 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
             )
 
             if model_inference_settings.use_vllm:
-                try:
-                    import vllm
-                except ImportError as exc:
-                    raise exc
+                import vllm
+                from vllm.lora.request import LoRARequest
 
                 from turbo_alignment.generators.vllm_chat import VLLMChatGenerator
+
+                lora_request: LoRARequest | None = None
+                enable_lora: bool = False
+
+                if isinstance(model_inference_settings.model_settings, PreTrainedAdaptersModelSettings):
+                    lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
+                    enable_lora = True
 
                 model = vllm.LLM(
                     model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
                     dtype='bfloat16',
                     tensor_parallel_size=model_inference_settings.tensor_parallel_size,
+                    enable_lora=enable_lora,
                 )
+
             else:
                 model = load_model(model_inference_settings.model_settings, tokenizer)
                 model = (
@@ -60,7 +68,10 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                         accelerator=accelerator,
                     )
                     if not model_inference_settings.use_vllm
-                    else VLLMChatGenerator(**generator_kwargs)
+                    else VLLMChatGenerator(
+                        **generator_kwargs,
+                        lora_request=lora_request,
+                    )
                 )
 
                 parameters_to_save = {

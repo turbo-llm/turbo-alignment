@@ -36,7 +36,7 @@ class DDPOTrainingArguments(TrainingArguments):
 
 class DDPOTrainer(DPOTrainer):
     """
-    Inspired by NLP Research
+    Inspired by T-Bank NLP Research
 
     """
 
