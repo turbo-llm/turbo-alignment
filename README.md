@@ -1,5 +1,5 @@
 # 🚀 Turbo-Alignment
-> Library for industrial alignment.
+> Library for industrial alignment
 
 
 ## Table of Contents
