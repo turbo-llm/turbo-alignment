@@ -6,7 +6,11 @@ from turbo_alignment.settings.model import (
 )
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.tf.trainer import TrainerSettings
-
+from turbo_alignment.settings.online import (
+    CriticType,
+    LLMActorType,
+    RewardProcessorType,
+)
 
 class REINFORCETrainerSettings(TrainerSettings):
     max_tokens_count: int = 1024
@@ -24,6 +28,11 @@ class REINFORCETrainerSettings(TrainerSettings):
     non_eos_penalty: bool = True
     temperature: float | None = None
     whiten_rewards: bool = False
+
+    actor_type: LLMActorType = LLMActorType.LOCAL_TRANSFORMERS
+    critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
+
+    reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
 
 
 class REINFORCETrainExperimentSettings(BaseTrainExperimentSettings):

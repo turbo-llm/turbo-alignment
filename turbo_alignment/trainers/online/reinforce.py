@@ -226,6 +226,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             kl_term = logprobs.detach() - ref_logprobs
             regularized_rewards = rewards - self.kl_coef * kl_term
 
+            print(f"{regularized_rewards.shape=}", flush=True)
             baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(rewards=regularized_rewards)
 
         loss = -baselined_reward * logprobs
