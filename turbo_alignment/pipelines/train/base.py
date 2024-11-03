@@ -85,11 +85,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
         return load_model(experiment_settings.model_settings, tokenizer)
 
     @staticmethod
-    @abstractmethod
-    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArguments:
-        ...
-
-    @staticmethod
     def _load_tokenizer(experiment_settings: ExperimentSettingsT) -> PreTrainedTokenizerBase:
         return load_tokenizer(experiment_settings.tokenizer_settings, experiment_settings.model_settings)
 
@@ -134,8 +129,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             )
 
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
-        training_args = self._get_training_args(experiment_settings)
-
         self.tokenizer = self._load_tokenizer(experiment_settings)
 
         logger.info('Tokenizer is loaded!')
@@ -173,7 +166,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
 
         self.trainer = self._get_trainer(
-            training_args,
+            experiment_settings.training_arguments,
             experiment_settings,
             self.model,
             self.tokenizer,
