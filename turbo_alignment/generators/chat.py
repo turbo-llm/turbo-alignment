@@ -1,5 +1,4 @@
 from typing import Any
-
 import torch
 from transformers import BatchEncoding
 
@@ -9,6 +8,47 @@ from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
+
+class vLLMChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
+    def __init__(self, vllm_engines, transformers_settings, custom_generation_settings, tokenizer, **kwargs):
+        super().__init__(transformers_settings, custom_generation_settings, tokenizer, **kwargs)
+        self.vllm_engines = vllm_engines
+
+    def generate_from_batch_records(self,
+        dataset_name: str,
+        records_batch: dict[str, torch.Tensor] | BatchEncoding,
+        original_records: list[ChatDatasetRecord] | None = None,
+        ) -> list[ChatInferenceOutput]:
+        import ray
+        from vllm import SamplingParams
+
+        #TODO TODO_RLOO: samplingParams from custom_generation_settings
+        sampling_params = SamplingParams(
+            temperature=1.0,
+            top_p=1.0,
+            top_k=-1,
+            max_tokens=1024,
+            min_tokens=1,
+            skip_special_tokens=False,
+        )
+        
+        rank = torch.distributed.get_rank()
+        if rank == 0:
+            #TODO: TODO_RLOO only one engine utilized for generation
+
+            llm = self.vllm_engines[rank % len(self.vllm_engines)]
+
+            result = ray.get(llm.generate.remote(sampling_params=sampling_params, prompt_token_ids=records_batch))
+
+            print(result)
+
+    def generate_from_single_record(
+        self,
+        dataset_name: str,
+        record: dict[str, Any],
+        original_record: ChatDatasetRecord | None = None,
+    ) -> ChatInferenceOutput:
+        raise NotImplementedError()
 
 
 class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):

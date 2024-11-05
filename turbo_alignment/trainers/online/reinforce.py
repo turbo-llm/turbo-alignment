@@ -18,21 +18,28 @@ from turbo_alignment.common.distributed import (
     get_global_mean,
     get_global_std,
     get_log_mean_std,
+    _init_process_group
 )
-from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator
+from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator, vLLMChatGenerator, RayRMSamplingGenerator
 from turbo_alignment.generators.base import ChatGeneratorBase
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.chat import ChatInferenceOutput
 from turbo_alignment.settings.online import (
     CriticType,
-    LLMActorType,
+    vLLMActorType,
+    HFActorType,
     RewardProcessorType,
 )
+
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.trainers.online.reward_processor import RewardProcessor
 from turbo_alignment.trainers.utils import prepare_model
 
+import deepspeed
+import ray
+import socket
+from deepspeed.runtime.engine import DeepSpeedEngine
 
 # FIXME
 @dataclass
@@ -53,15 +60,15 @@ class REINFORCETrainingArguments(TrainingArguments):
     temperature: float | None = None
     whiten_rewards: bool = False
 
-    actor_type: LLMActorType = LLMActorType.LOCAL_TRANSFORMERS
+    actor_type: (vLLMActorType| HFActorType)
     critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
 
     reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
 
-
 class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     def __init__(
         self,
+        vllm_engines: list,
         args: REINFORCETrainingArguments,
         tokenizer: PreTrainedTokenizerBase,
         policy: PreTrainedModel | torch.nn.Module,
@@ -82,9 +89,57 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             **kwargs,
         )
 
+        self.vllm_engines = vllm_engines
+        # TODO: TODO_RLOO take from settings
+        self.zero_stage = 2 
+
+        if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
+            master_address = ray._private.services.get_node_ip_address()
+            with socket.socket() as sock:
+                sock.bind(("", 0))
+                master_port = sock.getsockname()[1]
+
+            # TODO_RLOO assert tp_size same for all engines
+            world_size = len(self.vllm_engines) * self.vllm_engines[0].tensor_parallel_size + 1
+
+            backend = "nccl"
+            # https://github.com/OpenRLHF/OpenRLHF/issues/313
+            import vllm
+
+            if vllm.__version__ > "0.4.2" and os.getenv("NCCL_P2P_DISABLE", "0") == "0":
+                backend = "gloo"
+                print(
+                    "Warning: using --vllm_sync_backend=gloo for vLLM version > 0.4.2 (or export NCCL_P2P_DISABLE=1)"
+                )
+
+            refs = [
+                engine.init_process_group.remote(
+                    master_address,
+                    master_port,
+                    i * self.vllm_tensor_parallel_size + 1,
+                    world_size,
+                    "rloo",
+                    backend=backend,
+                )
+                for i, engine in enumerate(self.vllm_engines)
+            ]
+            self._model_update_group = _init_process_group(
+                backend=backend,
+                init_method=f"tcp://{master_address}:{master_port}",
+                world_size=world_size,
+                rank=0,
+                group_name="rloo",
+            )
+
+            ray.get(refs)
+
+        torch.distributed.barrier()
+
         self.ref_model = ref_model
-        if self.ref_model is not None:
-            self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+
+        # TODO: TODO_RLOO watch later
+        # if self.ref_model is not None:
+        #     self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
 
         self.reward_model = reward_model
 
@@ -123,7 +178,30 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
+    
+    def _broadcast_to_vllm(self, model: DeepSpeedEngine):
+        # avoid OOM
+        torch.cuda.empty_cache()
+        model = model.module
+        count, num_params = 0, len(list(model.named_parameters()))
+        for name, param in model.named_parameters():
+            count += 1  # empty_cache at last param
 
+            # Fire all vllm engines for broadcast
+            if torch.distributed.get_rank() == 0:
+                shape = param.shape if self.zero_stage != 3 else param.ds_shape
+                refs = [
+                    engine.update_weight.remote(name, dtype=param.dtype, shape=shape, empty_cache=count == num_params)
+                    for engine in self.vllm_engines
+                ]
+
+            # For ZeRO-3, allgather sharded parameter and broadcast to all vllm engines by rank 0
+            with deepspeed.zero.GatheredParameters([param], enabled=self.zero_stage == 3):
+                if torch.distributed.get_rank() == 0:
+                    torch.distributed.broadcast(param.data, 0, group=self._model_update_group)
+                    ray.get(refs)
+                    print('broadcasted successfully', flush=True)
+    
     # FIXME: some base class instead of RMSamplingGenerator (join with ChatGeneratorBase?)
     def _get_rm_generator(self, reward_model: torch.nn.Module | PreTrainedModel) -> RMSamplingGenerator:
         match self.args.critic_type:
@@ -133,15 +211,23 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     tokenizer=self.tokenizer,
                     accelerator=self.accelerator,
                 )
+            case CriticType.RAY_TRANSFORMERS:
+                generator = RayRMSamplingGenerator(
+                    model=reward_model,
+                    tokenizer=self.tokenizer,
+                    accelerator=self.accelerator,
+                )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
                 generator = ...
             case _:
                 raise ValueError(f'Critic {self.args.critic_type} is not supported')
         return generator
 
+    #TODO_RLOO why every time generates new object?
     def _get_chat_generator(self, model: torch.nn.Module | PreTrainedModel) -> ChatGeneratorBase:
+        # TODO fix actortypes bacause it is enum
         match self.args.actor_type:
-            case LLMActorType.LOCAL_TRANSFORMERS:
+            case HFActorType:
                 generator = ChatGenerator(
                     model=model,
                     tokenizer=self.tokenizer,
@@ -149,8 +235,14 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     custom_generation_settings=self.generator_custom_settings,
                     accelerator=self.accelerator,
                 )
-            case LLMActorType.DISTRIBUTED_VLLM:
-                generator = ...
+            case vLLMActorType:
+                generator = vLLMChatGenerator(
+                    model=model,
+                    tokenizer=self.tokenizer,
+                    transformers_settings=self.generator_transformers_settings,
+                    custom_generation_settings=self.generator_custom_settings,
+                    accelerator=self.accelerator
+                )
             case _:
                 raise ValueError(f'LLM Actor {self.args.actor_type} is not supported')
         return generator
@@ -162,6 +254,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         generator = self._get_chat_generator(model)
 
+        self._broadcast_to_vllm(model)
+        torch.distributed.barrier()
+        
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
             dataset_name='online', records_batch=inputs
         )

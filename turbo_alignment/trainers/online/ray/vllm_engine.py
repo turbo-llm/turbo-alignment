@@ -16,6 +16,7 @@ class LLMRayActor:
         assert self.__version__ >= '0.4.1', 'OpenRLHF only supports vLLM >= 0.4.1'
 
         self.use_gpu_executor = kwargs['tensor_parallel_size'] == 1
+        self.tensor_parallel_size = kwargs['tensor_parallel_size']
 
         # See https://github.com/vllm-project/vllm/blob/main/vllm/executor/gpu_executor.py
         if self.use_gpu_executor:

@@ -8,6 +8,10 @@ from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.settings.generators.outputs.rm import RMSamplingInferenceOutput
 
 
+class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
+    def __init__(self):
+        raise NotImplementedError()
+
 class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, **kwargs):
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer)

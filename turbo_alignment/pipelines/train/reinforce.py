@@ -7,6 +7,8 @@ from transformers.data.data_collator import (
     DataCollatorMixin,
 )
 
+from turbo_alignment.settings.s3 import ExperimentMetadata
+from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders import load_model
@@ -20,15 +22,46 @@ from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.reinforce import (
     REINFORCETrainExperimentSettings,
 )
+from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
 from turbo_alignment.trainers.online.reinforce import (
     REINFORCETrainer,
     REINFORCETrainingArguments,
 )
+from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
+from typing import TypeVar
+import ray
+import os
+from pathlib import Path
+
+ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
 
 logger = get_project_logger()
 
+@ray.remote(num_gpus=1)
+class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], DistributedTorchRayActor):
+    def __init__(self, world_size, rank, local_rank, master_addr, master_port):
+        super().__init__(world_size=world_size, rank=rank, local_rank=local_rank, master_addr=master_addr, master_port=master_port)
+        self.node_id = ray.get_runtime_context().get_node_id()
+        self.local_rank = ray.get_gpu_ids()
+    
+    def init_model_from_pretrained(self):
+        self._setup_distributed()
+        
+    #     self.ds_config = get_train_ds_config(offload=False)
+    #     self.ds_config["train_micro_batch_size_per_gpu"] = 1
 
-class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]):
+    #     self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda')
+    #     self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
+    #     print(f"PolicyModel initialized on Node {self.node_id}, Local Rank {self.local_rank}")
+    #     print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
+
+    # def tokenize(self, text: str):
+    #     return self.tokenizer(text, return_tensors='pt')
+    
+    # def generate(self, text: str):
+    #     tokenized_input = self.tokenize(text).to('cuda')
+    #     return self.model(**tokenized_input)
+
     @staticmethod
     def _get_data_collator(
         experiment_settings: REINFORCETrainExperimentSettings,
@@ -73,10 +106,13 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             **experiment_settings.trainer_settings.dict(),
         )
 
+    # TODO: TODO_RLOO delete reference and reward model
     @staticmethod
     def _get_trainer(
         training_args: REINFORCETrainingArguments,
         experiment_settings: REINFORCETrainExperimentSettings,
+        ref_model,
+        reward_model,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         train_dataset: Dataset,
@@ -85,17 +121,19 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     ):
         # TODO: different tokenizer for reward model
 
-        ref_model = load_model(experiment_settings.model_settings, tokenizer)
-        for _, param in ref_model.named_parameters():
-            param.requires_grad = False
+        # TODO: TODO_RLOO load reference and reward model here
 
-        ref_model.eval()
+        # ref_model = load_model(experiment_settings.model_settings, tokenizer)
+        # for _, param in ref_model.named_parameters():
+        #     param.requires_grad = False
 
-        reward_model = load_model(experiment_settings.reward_model_settings, tokenizer)
-        for _, param in reward_model.named_parameters():
-            param.requires_grad = False
+        # ref_model.eval()
 
-        reward_model.eval()
+        # reward_model = load_model(experiment_settings.reward_model_settings, tokenizer)
+        # for _, param in reward_model.named_parameters():
+        #     param.requires_grad = False
+
+        # reward_model.eval()
 
         return REINFORCETrainer(
             args=training_args,
@@ -130,3 +168,75 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             )
         )
         return train_dataset, val_dataset
+    
+    #TODO TODO_RLOO get rid off vllm_engines, reference_model, reward_model if possible
+    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reference_model, reward_model) -> None:
+        training_args = self._get_training_args(experiment_settings)
+
+        print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
+        self.tokenizer = self._load_tokenizer(experiment_settings)
+
+        logger.info('Tokenizer is loaded!')
+
+        additional_special_tokens = self._get_additional_special_tokens(experiment_settings)
+        logger.info(f'Special tokens: {additional_special_tokens}')
+        special_tokens_setter = SpecialTokensSetter(self.tokenizer, experiment_settings.special_tokens_settings)
+        special_tokens_setter.set_all()
+        special_tokens_setter.set_custom_tokens(additional_special_tokens)
+
+        logger.info('Special tokens added!')
+
+        self.model = self._load_model(experiment_settings, self.tokenizer)
+
+        special_tokens_setter.setup_model_config(self.model)
+
+        logger.info('Model is loaded!')
+
+        train_dataset: ConcatDataset = ConcatDataset(
+            datasets=DatasetLoader().load_datasets(
+                experiment_settings.train_dataset_settings,
+                tokenizer=self.tokenizer,
+                strategy=DatasetStrategy.TRAIN,
+            )
+        )
+
+        val_dataset: ConcatDataset = ConcatDataset(
+            datasets=DatasetLoader().load_datasets(
+                experiment_settings.val_dataset_settings,
+                tokenizer=self.tokenizer,
+                strategy=DatasetStrategy.TRAIN,
+            )
+        )
+
+        data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
+
+        self.trainer = self._get_trainer(
+            training_args,
+            experiment_settings,
+            reference_model,
+            reward_model,
+            self.model,
+            self.tokenizer,
+            train_dataset,
+            val_dataset,
+            data_collator,
+        )
+
+        if self.trainer.accelerator.is_main_process:
+            self._dataset_and_collator_sanity_check(train_dataset, data_collator)
+
+        self._add_trainer_callbacks(experiment_settings)
+
+        os.makedirs(self.trainer.args.output_dir, exist_ok=True)
+        self._save_experiment_config(
+            experiment_settings, self.trainer.model, Path(self.trainer.args.output_dir) / 'experiment.config'
+        )
+
+        experiment_metadata = ExperimentMetadata()
+        self._save_experiment_metadata(
+            experiment_metadata, Path(self.trainer.args.output_dir) / 'experiment_metadata.json'
+        )
+
+        self.trainer.train()
+
+        self.trainer.save_model()
