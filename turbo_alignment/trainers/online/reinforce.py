@@ -26,8 +26,9 @@ from turbo_alignment.settings.generators.chat import CustomChatGenerationSetting
 from turbo_alignment.settings.generators.outputs.chat import ChatInferenceOutput
 from turbo_alignment.settings.online import (
     CriticType,
-    vLLMActorType,
-    HFActorType,
+    vLLMActorSettings,
+    HFActorSettings,
+    ActorType,
     RewardProcessorType,
 )
 
@@ -60,7 +61,8 @@ class REINFORCETrainingArguments(TrainingArguments):
     temperature: float | None = None
     whiten_rewards: bool = False
 
-    actor_type: (vLLMActorType| HFActorType)
+    actor_settings: vLLMActorSettings | HFActorSettings
+
     critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
 
     reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
@@ -90,7 +92,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         )
 
         self.vllm_engines = vllm_engines
-        # TODO: TODO_RLOO take from settings
+        # TODO: TODO_RLOO take from accelerator
         self.zero_stage = 2 
 
         if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
@@ -134,14 +136,20 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             ray.get(refs)
 
         torch.distributed.barrier()
+        
+        
 
         self.ref_model = ref_model
+        # TODO: delete later
+        self.ref_model.eval()
 
         # TODO: TODO_RLOO watch later
         # if self.ref_model is not None:
         #     self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
 
         self.reward_model = reward_model
+        # TODO: delete later
+        self.ref_model.eval()
 
         self._stored_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
         self.kl_coef = args.kl_coef
@@ -223,11 +231,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 raise ValueError(f'Critic {self.args.critic_type} is not supported')
         return generator
 
-    #TODO_RLOO why every time generates new object?
+    #TODO_RLOO why every time generates new object? Since the model weights are changing, recreate new object and 
     def _get_chat_generator(self, model: torch.nn.Module | PreTrainedModel) -> ChatGeneratorBase:
-        # TODO fix actortypes bacause it is enum
         match self.args.actor_type:
-            case HFActorType:
+            case ActorType.LOCAL_TRANSFORMERS:
                 generator = ChatGenerator(
                     model=model,
                     tokenizer=self.tokenizer,
@@ -235,9 +242,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     custom_generation_settings=self.generator_custom_settings,
                     accelerator=self.accelerator,
                 )
-            case vLLMActorType:
+            case ActorType.DISTRIBUTED_VLLM:
                 generator = vLLMChatGenerator(
-                    model=model,
+                    vllm_engines=self.vllm_engines,
                     tokenizer=self.tokenizer,
                     transformers_settings=self.generator_transformers_settings,
                     custom_generation_settings=self.generator_custom_settings,
@@ -253,6 +260,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         generator = self._get_chat_generator(model)
+
+        # TODO: move to generator
 
         self._broadcast_to_vllm(model)
         torch.distributed.barrier()
@@ -422,12 +431,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         position_ids: torch.Tensor,
         loss_mask: torch.Tensor,
     ):
-        logits = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            use_cache=False,
-        ).logits[:, :-1]
+        logits = ray.get(model.forward.remote(
+            {'input_ids': input_ids,
+            'attention_mask': attention_mask,
+            'position_ids': position_ids,
+            'use_cache': False,}
+        )).logits[:, :-1]
         logits /= self.args.temperature
 
         all_logprob = F.log_softmax(logits, dim=-1)

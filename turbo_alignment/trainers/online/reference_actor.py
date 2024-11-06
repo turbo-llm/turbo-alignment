@@ -22,3 +22,6 @@ class ReferenceModel(DistributedTorchRayActor):
     def generate(self, text: str):
         tokenized_input = self.tokenize(text).to('cuda')
         return self.model(**tokenized_input)
+    
+    def forward(self, x):
+        return self.model(**x)

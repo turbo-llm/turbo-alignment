@@ -109,6 +109,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     # TODO: TODO_RLOO delete reference and reward model
     @staticmethod
     def _get_trainer(
+        vllm_engines,
         training_args: REINFORCETrainingArguments,
         experiment_settings: REINFORCETrainExperimentSettings,
         ref_model,
@@ -136,6 +137,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         # reward_model.eval()
 
         return REINFORCETrainer(
+            vllm_engines=vllm_engines,
             args=training_args,
             tokenizer=tokenizer,
             policy=model,
@@ -169,7 +171,12 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         )
         return train_dataset, val_dataset
     
-    #TODO TODO_RLOO get rid off vllm_engines, reference_model, reward_model if possible
+    #TODO 
+    '''
+    TODO_RLOO 
+    get rid off vllm_engines, reference_model, reward_model if possible
+    only get_trainer affected
+    '''
     def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reference_model, reward_model) -> None:
         training_args = self._get_training_args(experiment_settings)
 
@@ -211,6 +218,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
 
         self.trainer = self._get_trainer(
+            vllm_engines,
             training_args,
             experiment_settings,
             reference_model,
