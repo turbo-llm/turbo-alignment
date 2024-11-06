@@ -61,7 +61,7 @@ class REINFORCETrainingArguments(TrainingArguments):
     temperature: float | None = None
     whiten_rewards: bool = False
 
-    actor_settings: vLLMActorSettings | HFActorSettings
+    actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
 
     critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
 

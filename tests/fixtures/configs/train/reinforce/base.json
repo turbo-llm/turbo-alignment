@@ -125,6 +125,13 @@
     }
   },
   "trainer_settings": {
+    "actor_settings": {
+      "actor_type": "distributed_vllm",
+      "vllm_num_engines": 1,
+      "vllm_tensor_parallel_size": 1
+    },
+    "critic_type": "ray_transformers",
+    "reward_processor_type": "rloo",
     "evaluation_strategy": "steps",
     "per_device_train_batch_size": 8,
     "per_device_eval_batch_size": 8,

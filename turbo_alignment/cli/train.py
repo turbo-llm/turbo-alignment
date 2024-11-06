@@ -135,7 +135,7 @@ def reinforce_training(
     reference_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=ReferenceModel)
 
     # TODO_RLOO if possible hide init inside RayGroup
-    ray.get(policy_models.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
+    ray.get(policy_models.async_init_model_from_pretrained())
     ray.get(reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path))
     ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
 

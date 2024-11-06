@@ -8,10 +8,10 @@ from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSet
 from turbo_alignment.settings.tf.trainer import TrainerSettings
 from turbo_alignment.settings.online import (
     CriticType,
-    vLLMActorType,
-    HFActorType,
+    ActorType,
     RewardProcessorType,
 )
+from typing import Union
 
 class REINFORCETrainerSettings(TrainerSettings):
     max_tokens_count: int = 1024
@@ -30,8 +30,8 @@ class REINFORCETrainerSettings(TrainerSettings):
     temperature: float | None = None
     whiten_rewards: bool = False
 
-    actor_type: (vLLMActorType| HFActorType)
-    critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
+    actor_type: ActorType = ActorType.DISTRIBUTED_VLLM
+    critic_type: CriticType = CriticType.RAY_TRANSFORMERS
 
     reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
 

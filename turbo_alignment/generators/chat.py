@@ -16,7 +16,7 @@ from vllm.lora.request import LoRARequest
 from vllm import SamplingParams
 import ray
 
-class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
+class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
     def __init__(
         self,
         transformers_settings: GeneratorTransformersSettings,
@@ -65,7 +65,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         original_records: list[ChatDatasetRecord] | None = None,
     ) -> list[ChatInferenceOutput]:
         
-        #TODO Make sure that records are already splitted between ranks
+        #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
 
         input_ids = [record['input_ids'].tolist() for record in records]
 
