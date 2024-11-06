@@ -147,8 +147,8 @@ def reinforce_training(
     '''
 
     vllm_engines = create_vllm_engines(
-        num_engines=experiment_settings.trainer_settings.actor_type.vllm_num_engines,
-        tensor_parallel_size=experiment_settings.trainer_settings.actor_type.vllm_tensor_parallel_size,
+        num_engines=experiment_settings.trainer_settings.actor_settings.vllm_num_engines,
+        tensor_parallel_size=experiment_settings.trainer_settings.actor_settings.vllm_tensor_parallel_size,
         pretrain=experiment_settings.model_settings.model_path,
         seed=0,
         enable_prefix_caching=False,

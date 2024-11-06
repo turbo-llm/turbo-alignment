@@ -8,6 +8,8 @@ from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSet
 from turbo_alignment.settings.tf.trainer import TrainerSettings
 from turbo_alignment.settings.online import (
     CriticType,
+    vLLMActorSettings,
+    HFActorSettings,
     ActorType,
     RewardProcessorType,
 )
@@ -32,6 +34,7 @@ class REINFORCETrainerSettings(TrainerSettings):
 
     actor_type: ActorType = ActorType.DISTRIBUTED_VLLM
     critic_type: CriticType = CriticType.RAY_TRANSFORMERS
+    actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
 
     reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
 

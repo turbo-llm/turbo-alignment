@@ -61,9 +61,9 @@ class REINFORCETrainingArguments(TrainingArguments):
     temperature: float | None = None
     whiten_rewards: bool = False
 
+    actor_type: ActorType = ActorType.DISTRIBUTED_VLLM
+    critic_type: CriticType = CriticType.RAY_TRANSFORMERS
     actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
-
-    critic_type: CriticType = CriticType.LOCAL_TRANSFORMERS
 
     reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
 
