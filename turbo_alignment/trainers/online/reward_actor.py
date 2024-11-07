@@ -23,5 +23,8 @@ class RewardModel(DistributedTorchRayActor):
         tokenized_input = self.tokenize(text).to('cuda')
         return self.model(**tokenized_input)
     
+    def eval(self):
+        return self.model.eval()
+    
     def forward(self, x):
         return self.model(**x)

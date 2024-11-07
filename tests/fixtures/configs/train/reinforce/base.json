@@ -130,6 +130,7 @@
       "vllm_num_engines": 1,
       "vllm_tensor_parallel_size": 1
     },
+    "deepspeed": "tests/fixtures/configs/train/reinforce/deepspeed_cfg.json",
     "critic_type": "ray_transformers",
     "reward_processor_type": "rloo",
     "evaluation_strategy": "steps",

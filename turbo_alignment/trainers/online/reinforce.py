@@ -40,6 +40,7 @@ from turbo_alignment.trainers.utils import prepare_model
 import deepspeed
 import ray
 import socket
+import os
 from deepspeed.runtime.engine import DeepSpeedEngine
 
 # FIXME
@@ -92,17 +93,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         )
 
         self.vllm_engines = vllm_engines
-        # TODO: TODO_RLOO take from accelerator
-        self.zero_stage = 2 
 
         if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
             master_address = ray._private.services.get_node_ip_address()
             with socket.socket() as sock:
                 sock.bind(("", 0))
                 master_port = sock.getsockname()[1]
-
+            
             # TODO_RLOO assert tp_size same for all engines
-            world_size = len(self.vllm_engines) * self.vllm_engines[0].tensor_parallel_size + 1
+            world_size = args.actor_settings["vllm_num_engines"] * args.actor_settings["vllm_tensor_parallel_size"] + 1
 
             backend = "nccl"
             # https://github.com/OpenRLHF/OpenRLHF/issues/313
@@ -118,7 +117,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 engine.init_process_group.remote(
                     master_address,
                     master_port,
-                    i * self.vllm_tensor_parallel_size + 1,
+                    i * args.actor_settings["vllm_tensor_parallel_size"] + 1,
                     world_size,
                     "rloo",
                     backend=backend,
@@ -141,7 +140,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.ref_model = ref_model
         # TODO: delete later
-        self.ref_model.eval()
+        ray.get(self.ref_model.async_eval())
 
         # TODO: TODO_RLOO watch later
         # if self.ref_model is not None:
@@ -149,7 +148,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.reward_model = reward_model
         # TODO: delete later
-        self.ref_model.eval()
+        ray.get(self.ref_model.async_eval())
 
         self._stored_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
         self.kl_coef = args.kl_coef
@@ -197,14 +196,14 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
             # Fire all vllm engines for broadcast
             if torch.distributed.get_rank() == 0:
-                shape = param.shape if self.zero_stage != 3 else param.ds_shape
+                shape = param.shape if self.accelerator.deepspeed_plugin.zero_stage != 3 else param.ds_shape
                 refs = [
                     engine.update_weight.remote(name, dtype=param.dtype, shape=shape, empty_cache=count == num_params)
                     for engine in self.vllm_engines
                 ]
 
             # For ZeRO-3, allgather sharded parameter and broadcast to all vllm engines by rank 0
-            with deepspeed.zero.GatheredParameters([param], enabled=self.zero_stage == 3):
+            with deepspeed.zero.GatheredParameters([param], enabled=self.accelerator.deepspeed_plugin.zero_stage == 3):
                 if torch.distributed.get_rank() == 0:
                     torch.distributed.broadcast(param.data, 0, group=self._model_update_group)
                     ray.get(refs)

@@ -100,6 +100,9 @@ class RayGroup:
                     ).remote(world_size, rank, local_rank, master_addr, master_port)
                 self._actor_handlers.append(worker_actor)
 
+    def async_eval(self):
+        return [actor.eval.remote() for actor in self._actor_handlers]
+    
     def async_init_model_from_pretrained(
         self,
         *args,

@@ -17,7 +17,7 @@ class LLMRayActor:
 
         # See https://github.com/vllm-project/vllm/blob/main/vllm/executor/gpu_executor.py
         if self.use_gpu_executor:
-            from vllm_worker_wrap import WorkerWrap
+            from turbo_alignment.trainers.online.ray.vllm_worker_wrap import WorkerWrap
 
             vllm.worker.worker.Worker = WorkerWrap
         else:
