@@ -135,8 +135,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             ray.get(refs)
 
         torch.distributed.barrier()
-        
-        
 
         self.ref_model = ref_model
         # TODO: delete later
@@ -185,6 +183,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
+        
+    # def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]], num_items_in_batch=None) -> torch.Tensor:
+    #     print('traning step', flush=True)
+    #     print(f'reinforce.py: {type(model)=}', flush=True)
+    #     assert True == False
     
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
         # avoid OOM
@@ -247,7 +250,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     tokenizer=self.tokenizer,
                     transformers_settings=self.generator_transformers_settings,
                     custom_generation_settings=self.generator_custom_settings,
-                    accelerator=self.accelerator
                 )
             case _:
                 raise ValueError(f'LLM Actor {self.args.actor_type} is not supported')
@@ -255,22 +257,39 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
     def get_answers_and_rewards(
         self,
-        model: torch.nn.Module | PreTrainedModel,
+        model: torch.nn.Module | PreTrainedModel | DeepSpeedEngine ,
         inputs: dict[str, torch.Tensor],
+        do_broadcast=True
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+
+        if do_broadcast:
+            # TODO: move to generator
+            assert isinstance(model, DeepSpeedEngine)
+            self._broadcast_to_vllm(model)
+            torch.distributed.barrier()
+
+        model = self.accelerator.unwrap_model(model)
         generator = self._get_chat_generator(model)
-
-        # TODO: move to generator
-
-        self._broadcast_to_vllm(model)
-        torch.distributed.barrier()
         
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
-            dataset_name='online', records_batch=inputs
+            dataset_name='online', records=inputs
         )
 
-        response_ids = torch.stack([ans.answer_token_ids for g in generations for ans in g.answers])
-        response_attention_mask = torch.stack([ans.answer_attention_mask for g in generations for ans in g.answers])
+        response_ids = [ans.answer_token_ids for g in generations for ans in g.answers]
+        response_attention_mask = [ans.answer_attention_mask for g in generations for ans in g.answers]
+
+        # Padding
+        max_length = max(response_id.size(1) for response_id in response_ids)
+        def pad_sequences(sequences, max_length, pad_value=0):
+            padded_sequences = []
+            for seq in sequences:
+                padding_needed = max_length - seq.size(1)
+                padded_seq = torch.cat([seq.squeeze(0), torch.full((padding_needed,), pad_value, dtype=seq.dtype)])
+                padded_sequences.append(padded_seq)
+            return torch.stack(padded_sequences)
+
+        response_ids = pad_sequences(response_ids, max_length, pad_value=self.tokenizer.pad_token_id)
+        response_attention_mask = pad_sequences(response_attention_mask, max_length, pad_value=0)
 
         response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.float32)
         response_tokens_mask[:, generations[0].input_token_ids.shape[0] :] = 1.0
@@ -404,8 +423,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             samples_processed = 0
             for batch in dataloader:
                 _, _, _, _, rewards = self.get_answers_and_rewards(
-                    model=self.accelerator.unwrap_model(model),
+                    model=model,
                     inputs=batch,
+                    do_broadcast=False
                 )
                 rewards, _ = self.reward_processor.postprocess_rewards(rewards=rewards)
 

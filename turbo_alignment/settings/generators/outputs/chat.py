@@ -24,7 +24,7 @@ class ChatInferenceOutput(BaseInferenceOutput):
     input_token_ids: torch.Tensor | None = None
     input_attention_mask: torch.Tensor | None = None
     answers: list[AnswerMessage]
-    messages: list[ChatMessage] | None
+    messages: list[ChatMessage] | None = None
     label: str | None = None
     meta: dict[str, Any] | None = None
 

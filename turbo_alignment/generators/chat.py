@@ -23,24 +23,25 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         custom_generation_settings: CustomChatGenerationSettings,
         vllm_engines: list,
         tokenizer: PreTrainedTokenizerBase,
-        batch: int,
         return_logits: bool = False,
         lora_request: LoRARequest | None = None,
     ):
-        super().__init__(vllm_engines, tokenizer, batch=batch)
+        super().__init__(vllm_engines, tokenizer)
 
         if isinstance(transformers_settings.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
 
         eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
 
-        beam_search_params: dict[str, Any] = {
-            'best_of': transformers_settings.num_return_sequences,
-            'use_beam_search': False,
-        }
-        if transformers_settings.num_beams > 1:
-            beam_search_params['use_beam_search'] = True
-            beam_search_params['best_of'] = transformers_settings.num_beams
+        #TODO beam search was deprecated in vllm 0.6.2
+
+        # beam_search_params: dict[str, Any] = {
+        #     'best_of': transformers_settings.num_return_sequences,
+        #     'use_beam_search': False,
+        # }
+        # if transformers_settings.num_beams > 1:
+        #     beam_search_params['use_beam_search'] = True
+        #     beam_search_params['best_of'] = transformers_settings.num_beams
 
         self._sampling_params = SamplingParams(
             n=transformers_settings.num_return_sequences,
@@ -51,53 +52,65 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
             max_tokens=transformers_settings.max_new_tokens,
-            **beam_search_params,
+            # **beam_search_params,
         )
         self._lora_request = lora_request
-
+        self.vllm_engines = vllm_engines
         self._custom_generation_settings = custom_generation_settings
+    
+    #TODO ?
+    def generate_from_batch(self, dataset_name, records, original_records = None):
+        return super().generate_from_batch(dataset_name, records, original_records)
 
-
-    def generate_from_batch(
+    def generate_from_batch_records(
         self,
         dataset_name: str,
         records: list[dict[str, Any]],
         original_records: list[ChatDatasetRecord] | None = None,
     ) -> list[ChatInferenceOutput]:
-        
+        import os
         #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
-
-        input_ids = [record['input_ids'].tolist() for record in records]
-
+        input_ids = records['input_ids'].tolist()
+        
         rank = torch.distributed.get_rank()
         llm = self.vllm_engines[rank % len(self.vllm_engines)]
         request_outputs = ray.get(llm.generate.remote(sampling_params=self._sampling_params, prompt_token_ids=input_ids, lora_request=self._lora_request))
 
         outputs = []
         for i, request_output in enumerate(request_outputs):
-            original_record = original_records[i]
             answers = []
             for a in request_output.outputs:
+                answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0)
                 ans_msg = AnswerMessage(
                     id=str(a.index),
                     content=a.text,
                     sequence_score=a.cumulative_logprob,
+                    answer_token_ids=answer_token_ids,
+                    answer_attention_mask=torch.ones_like(answer_token_ids)
                 )
-                if self._custom_generation_settings.return_logits:
-                    ans_msg.input_token_ids = torch.tensor(request_output.prompt_token_ids).unsqueeze(0)
-                    ans_msg.answer_token_ids = torch.tensor(a.token_ids).unsqueeze(0)
 
                 answers.append(ans_msg)
-
-            outputs.append(
-                ChatInferenceOutput(
-                    id=original_record.id,
-                    dataset_name=dataset_name,
-                    messages=original_record.messages,
-                    label=original_record.label,
-                    answers=answers,
+            if original_records:
+                original_record = original_records[i]
+                outputs.append(
+                    ChatInferenceOutput(
+                        input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0),
+                        id=original_record.id,
+                        dataset_name=dataset_name,
+                        messages=original_record.messages,
+                        label=original_record.label,
+                        answers=answers,
+                    )
                 )
-            )
+            else:
+                outputs.append(
+                    ChatInferenceOutput(
+                        input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0),
+                        dataset_name=dataset_name,
+                        answers=answers,
+                    )
+                )
+
         return outputs
 
 
