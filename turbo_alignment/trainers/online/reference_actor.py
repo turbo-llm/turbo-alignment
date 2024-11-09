@@ -1,6 +1,7 @@
 import ray
 from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
 @ray.remote(num_gpus=1)
 class ReferenceModel(DistributedTorchRayActor):
@@ -11,7 +12,7 @@ class ReferenceModel(DistributedTorchRayActor):
     
     def init_model_from_pretrained(self, pretrain):
         self._setup_distributed()
-        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda')
+        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16)
         self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
         print(f"Reference model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
         print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
@@ -26,5 +27,8 @@ class ReferenceModel(DistributedTorchRayActor):
     def eval(self):
         return self.model.eval()
     
+    @torch.no_grad
     def forward(self, x):
+        self.model.eval()
+        x = {k: v.cuda() for k, v in x.items()}
         return self.model(**x)

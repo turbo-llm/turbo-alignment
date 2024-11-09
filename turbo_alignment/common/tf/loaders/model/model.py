@@ -59,6 +59,8 @@ def load_model(
         **model_settings.model_kwargs,
         torch_dtype=torch.bfloat16,
     )
+    import ray
+    print(f'node_id:{ray.get_runtime_context().get_node_id()}, gpu_id: {ray.get_runtime_context().get_accelerator_ids()["GPU"]}', flush=True)
 
     if model_settings.transformers_settings.load_in_8bit:
         model = prepare_model_for_int8_training(model)

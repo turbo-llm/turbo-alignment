@@ -1,6 +1,7 @@
 import ray
 from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import torch
 
 @ray.remote(num_gpus=1)
 class RewardModel(DistributedTorchRayActor):
@@ -11,8 +12,12 @@ class RewardModel(DistributedTorchRayActor):
     
     def init_model_from_pretrained(self, rm_model):
         self._setup_distributed()
-        self.model = AutoModelForSequenceClassification.from_pretrained(rm_model, device_map='cuda')
+        self.model = AutoModelForSequenceClassification.from_pretrained(rm_model, device_map='cuda', torch_dtype=torch.bfloat16)
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model, trust_remote_code=True)
+        
+        self.model.config.pad_token_id = self.model.config.eos_token_id
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+
         print(f"Reward model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
         print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
 
@@ -26,5 +31,11 @@ class RewardModel(DistributedTorchRayActor):
     def eval(self):
         return self.model.eval()
     
+    @torch.no_grad
     def forward(self, x):
+        self.model.eval()
+        x = {k: v.cuda() for k, v in x.items()}
+        print('\n\n\nRM model', [v.shape for k, v in x.items()], 'RM model\n\n\n')
+        # print(self.tokenizer.decode(x['input_ids'][0], skip_special_tokens=False))
+        #TODO reward from eos
         return self.model(**x)

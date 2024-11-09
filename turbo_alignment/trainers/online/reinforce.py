@@ -102,6 +102,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             
             # TODO_RLOO assert tp_size same for all engines
             world_size = args.actor_settings["vllm_num_engines"] * args.actor_settings["vllm_tensor_parallel_size"] + 1
+            
+            #TODO turn on nccl
 
             backend = "nccl"
             # https://github.com/OpenRLHF/OpenRLHF/issues/313
@@ -184,7 +186,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             model=self.model, dataloader=self.get_train_dataloader()
         )
         
-    # def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]], num_items_in_batch=None) -> torch.Tensor:
+    # def training_step(self, model, inputs, num_items_in_batch=None) -> torch.Tensor:
     #     print('traning step', flush=True)
     #     print(f'reinforce.py: {type(model)=}', flush=True)
     #     assert True == False
@@ -225,7 +227,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 generator = RayRMSamplingGenerator(
                     model=reward_model,
                     tokenizer=self.tokenizer,
-                    accelerator=self.accelerator,
                 )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
                 generator = ...
@@ -264,7 +265,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         if do_broadcast:
             # TODO: move to generator
-            assert isinstance(model, DeepSpeedEngine)
+            print('broadcast', type(model), flush=True)
+            # assert isinstance(model, DeepSpeedEngine)
             self._broadcast_to_vllm(model)
             torch.distributed.barrier()
 
@@ -322,7 +324,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 position_ids,
                 rewards,
             ) = self.get_answers_and_rewards(
-                model=self.accelerator.unwrap_model(model),
+                model=model,
                 inputs=inputs,
             )
 
@@ -377,6 +379,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     'invalid_rewards',
                 ],
             ):
+                tensor = tensor.cuda()
                 metrics = {
                     **metrics,
                     **get_log_mean_std(tensor, name, train_eval),
@@ -390,7 +393,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         return loss.mean(), metrics
 
-    def compute_loss(self, model, inputs, return_outputs: bool = False):
+    def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
         self.store_metrics(metrics=metrics, train_eval='train')
@@ -450,16 +453,32 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         position_ids: torch.Tensor,
         loss_mask: torch.Tensor,
     ):
-        logits = ray.get(model.forward.remote(
-            {'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'position_ids': position_ids,
-            'use_cache': False,}
-        )).logits[:, :-1]
+        from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
+        
+        input_ids = input_ids.cuda()
+        attention_mask = attention_mask.cuda()
+        position_ids = position_ids.cuda()
+
+        if isinstance(model, RayGroup):
+            records = {
+                'input_ids': input_ids,
+                'attention_mask': attention_mask,
+                'position_ids': position_ids,
+                #'use_cache': False
+            }
+            #TODO only one reference model -> maybe delete from group??
+            logits = ray.get(model.async_forward(records))[0].logits[:, :-1]
+        else:
+            logits = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                use_cache=False,
+            ).logits[:, :-1]
+
         logits /= self.args.temperature
-
         all_logprob = F.log_softmax(logits, dim=-1)
-
+        print(f'{all_logprob.device=}, {input_ids.device=}')
         logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
         logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
 
