@@ -18,8 +18,8 @@ def read_jsonl(path: Path):
         return [json.loads(line) for line in f]
 
 
-def write_jsonl(records: Any, path: Path) -> None:
-    with path.open('w', encoding='utf-8') as f:
+def write_jsonl(records: Any, path: Path, mode='w') -> None:
+    with path.open(mode, encoding='utf-8') as f:
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + '\n')
 
