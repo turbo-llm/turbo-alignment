@@ -71,19 +71,38 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
                     )
                 )
         else:
-            with self._accelerator.split_between_processes(
-                list(zip(records_batches, original_records_batches)), apply_padding=True
-            ) as accelerator_records:
-                generations = [
-                    self._generate_from_batch(
-                        records_batch,
-                        original_records_batch,
-                        dataset.source.name,
-                    )
-                    for records_batch, original_records_batch in accelerator_records
-                ][: len(records_batches)]
+            # with self._accelerator.split_between_processes(
+            #     list(zip(records_batches, original_records_batches)), apply_padding=True
+            # ) as accelerator_records:
+            len_records_batches = len(records_batches)
+            world_size = self._accelerator.num_processes
+            rank_device = self._accelerator.process_index
+            window_size = math.ceil(len_records_batches / world_size)
 
-        return sum(generations, [])
+            print(f"len records_batches", len(records_batches))
+            print("original_records_batches", len(original_records_batches))
+            print("rank_device", rank_device)
+            print("world_size", world_size)
+            print(f"slice [{rank_device * window_size} : {rank_device * window_size + window_size}]")
+
+            slice_records_batches = records_batches[rank_device * window_size : rank_device * window_size + window_size]
+            slice_original_records_batches = original_records_batches[rank_device * window_size : (rank_device + 1) * window_size]
+
+            flattened_records_batches = [r for batch in slice_records_batches for r in batch]
+            flattened_original_records_batches = [r for batch in slice_original_records_batches for r in batch]
+
+            generations = self._generate_from_batch(
+                flattened_records_batches,
+                flattened_original_records_batches,
+                dataset.source.name,
+            )
+                # for records_batch, original_records_batch in accelerator_records
+            # ][: len(records_batches)]
+            # ]
+            # print(generations)
+
+        # return sum(generations, [])
+        return generations
 
 
 class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]):
