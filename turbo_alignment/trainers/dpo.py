@@ -26,9 +26,9 @@ from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.settings.pipelines.train.dpo import (
     APODownLossSettings,
     APOZeroLossSettings,
+    ASFTLossSettings,
     CPOLossSettings,
     DPOLossesType,
-    ASFTLossSettings,
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
@@ -575,11 +575,17 @@ class DPOTrainer(Trainer):
         return (per_token_logps * loss_mask).sum(-1)
 
     def concatenated_forward(
-        self, model: nn.Module, batch: dict[str, Any]
+        self,
+        model: nn.Module,
+        batch: dict[str, Any],
+        get_from_dataset=False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
         concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
 
         precomputed_margins: torch.Tensor | None = concatenated_batch.pop('margin', None)
+
+        if get_from_dataset:
+            return concatenated_batch.pop('ref_chosen_logps'), concatenated_batch.pop('ref_rejected_logps')
 
         all_logits = model(
             concatenated_batch['input_ids'],
@@ -601,16 +607,19 @@ class DPOTrainer(Trainer):
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
 
     def _get_logps(self, model: nn.Module | None, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
-        with torch.no_grad():
-            if model is not None:
-                (chosen_logps, rejected_logps, *_) = self.concatenated_forward(model, batch)
-            else:
-                with self.accelerator.unwrap_model(self.model).disable_adapter():
-                    (
-                        chosen_logps,
-                        rejected_logps,
-                        *_,
-                    ) = self.concatenated_forward(self.model, batch)
+        if self.ref_model is None:
+            chosen_logps, rejected_logps = self.concatenated_forward(model, batch, get_from_dataset=True)
+        else:
+            with torch.no_grad():
+                if model is not None:
+                    (chosen_logps, rejected_logps, *_) = self.concatenated_forward(model, batch)
+                else:
+                    with self.accelerator.unwrap_model(self.model).disable_adapter():
+                        (
+                            chosen_logps,
+                            rejected_logps,
+                            *_,
+                        ) = self.concatenated_forward(self.model, batch)
 
         return chosen_logps, rejected_logps
 

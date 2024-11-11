@@ -1,4 +1,5 @@
 from collections import defaultdict
+
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from turbo_alignment.metrics.metric import Metric

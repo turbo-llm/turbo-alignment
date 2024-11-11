@@ -1,9 +1,8 @@
 from typing import Callable
 
-from torch.utils.data import Dataset
+from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import DataCollatorMixin
-from torch.utils.data import ConcatDataset, Dataset
 
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
@@ -61,7 +60,6 @@ class ref_model_DPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         data_collator: Callable,
         output_path='logits_outputs.jsonl',
     ):
-
         extra_args = {}
         if experiment_settings.trainer_settings.use_ref_model:
             ref_model = load_model(experiment_settings.model_settings, tokenizer)
@@ -109,8 +107,6 @@ class ref_model_DPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             'Mask-l check: {mask}'.format(mask=collator([dataset[0], dataset[1]])['inputs_l']['attention_mask'][0])
         )
 
-
-
     def run(self, experiment_settings: DPOTrainExperimentSettings) -> None:
         training_args = self._get_training_args(experiment_settings)
 
@@ -154,7 +150,7 @@ class ref_model_DPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             train_dataset,
             val_dataset,
             data_collator,
-            output_path='logits_outputs.jsonl'
+            output_path='logits_outputs.jsonl',
         )
 
         if self.trainer.accelerator.is_main_process:
@@ -162,8 +158,7 @@ class ref_model_DPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
 
         self._add_trainer_callbacks(experiment_settings)
 
-
-        print('👀'*15, 'ref_model')
+        print('👀' * 15, 'ref_model')
 
         self.trainer.train()
 

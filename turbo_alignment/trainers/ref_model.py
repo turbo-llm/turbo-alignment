@@ -1,7 +1,6 @@
+import gc
 from pathlib import Path
 from typing import Any, Callable, Literal
-
-import gc
 
 import torch
 from torch import nn
@@ -16,13 +15,9 @@ from transformers import (
 from turbo_alignment.common.data.io import write_jsonl
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
-from turbo_alignment.trainers.utils import (
-    concatenated_inputs,
-    prepare_model,
-)
+from turbo_alignment.trainers.utils import concatenated_inputs, prepare_model
 
 logger = get_project_logger()
-
 
 
 class ref_model_DPOTrainer(Trainer):
@@ -62,7 +57,6 @@ class ref_model_DPOTrainer(Trainer):
         )
         self.model = prepare_model(ref_model, self.accelerator, self.is_deepspeed_enabled)
 
-      
     def _get_batch_logps(
         self,
         logits: torch.Tensor,
@@ -130,7 +124,6 @@ class ref_model_DPOTrainer(Trainer):
         batch: dict[str, Any],
         train_eval: Literal['train', 'eval'] = 'train',
     ) -> tuple[torch.Tensor, dict[str, float]]:
-
         reference_chosen_logps, reference_rejected_logps = self._get_logps(self.model, batch)
         return reference_chosen_logps, reference_rejected_logps
 
@@ -141,7 +134,9 @@ class ref_model_DPOTrainer(Trainer):
         return_outputs=False,
         num_items_in_batch=None,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
-        reference_chosen_logps, reference_rejected_logps = self.get_batch_metrics(self.model, inputs, train_eval='train')
+        reference_chosen_logps, reference_rejected_logps = self.get_batch_metrics(
+            self.model, inputs, train_eval='train'
+        )
 
         if self.accelerator.is_main_process:
             data = {
@@ -163,7 +158,6 @@ class ref_model_DPOTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys: list[str] | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
-
         if prediction_loss_only:
             return torch.tensor([0.0]).detach(), None, None
 
