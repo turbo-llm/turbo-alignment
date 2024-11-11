@@ -749,9 +749,9 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix_name}grad_term'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().mean().item()
         )
-        metrics[f'{prefix_name}grad_term_std'] = (
-            (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
-        )
+        # metrics[f'{prefix_name}grad_term_std'] = (
+        #     (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
+        # )
 
         return metrics
 
@@ -791,6 +791,7 @@ class DPOTrainer(Trainer):
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, torch.Tensor | Any],
         return_outputs=False,
+        num_items_in_batch=None,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
         loss, metrics = self.get_batch_metrics(model, inputs, train_eval='train')
 
