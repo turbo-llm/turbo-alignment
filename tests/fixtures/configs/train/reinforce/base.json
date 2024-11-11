@@ -161,7 +161,7 @@
     "kl_coef": 0.05,
     "mean_baseline_coef": 0.95,
     "num_samples_for_reward_stats": 1000,
-    "no_cuda": true
+    "no_cuda": false
   },
   "special_tokens_settings": {
     "bos_token": "<s>",

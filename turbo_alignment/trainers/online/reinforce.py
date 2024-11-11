@@ -262,6 +262,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
         do_broadcast=True
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        
+        for k, v in inputs.items():
+            if isinstance(v, torch.Tensor):
+                print(f'get_answers_and_rewards:inputs: {k}, {v.device=}', flush=True)
 
         if do_broadcast:
             # TODO: move to generator
@@ -305,9 +309,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             'position_ids': position_ids,
         }
 
+        for k, v in rm_inputs.items():
+            if isinstance(v, torch.Tensor):
+                print(f'get_answers_and_rewards:rm_inputs: {k}, {v.device=}', flush=True)
+        
+        # accelerator.num_process_id
+
         critic_generator = self._get_rm_generator(self.reward_model)
         rewards = critic_generator.generate_from_batch_records(rm_inputs)
-
+        print(f'rewards: {rewards.device}', flush=True)
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
     def get_batch_loss_metrics(
@@ -390,7 +400,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 metrics[f'{train_eval}/{k}'] = v
             for k, v in baseline_metrics.items():
                 metrics[f'{train_eval}/{k}'] = v
-
+        # print(f'{metrics=}')
         return loss.mean(), metrics
 
     def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):

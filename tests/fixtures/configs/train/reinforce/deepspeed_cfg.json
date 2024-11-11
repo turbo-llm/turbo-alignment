@@ -25,7 +25,14 @@
      },
   
     "zero_optimization": {
-        "stage": 3,
+        "stage": 2,
+        "offload_param": {
+            "device": "none"
+        },
+        "offload_optimizer": {
+            "device": "none",
+            "pin_memory": true
+        },
         "allgather_partitions": true,
         "allgather_bucket_size": 2e8,
         "overlap_comm": false,
