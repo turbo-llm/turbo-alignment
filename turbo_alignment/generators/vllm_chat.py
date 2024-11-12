@@ -51,6 +51,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
             max_tokens=transformers_settings.max_new_tokens,
+            logprobs=transformers_settings.logprobs,
             **beam_search_params,
         )
         self._lora_request = lora_request

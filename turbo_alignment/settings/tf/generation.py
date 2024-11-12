@@ -11,3 +11,4 @@ class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     top_k: int = 50
     temperature: float = 1.0
     stop_strings: str | list[str] = '</s>'
+    logprobs: int = 1
