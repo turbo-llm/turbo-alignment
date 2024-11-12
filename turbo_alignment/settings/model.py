@@ -17,6 +17,8 @@ class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
     use_rope: bool = True
     use_cross_entropy: bool = True
     use_geglu: bool = True
+    use_fused_linear_cross_entropy: bool = False
+    use_rms_norm: bool = False
 
 
 class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):

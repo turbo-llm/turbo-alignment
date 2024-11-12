@@ -34,11 +34,17 @@
             "pin_memory": true
         },
         "allgather_partitions": true,
-        "allgather_bucket_size": 2e8,
+        "allgather_bucket_size": 1e5,
         "overlap_comm": false,
         "reduce_scatter": true,
-        "reduce_bucket_size": 2e8,
-        "contiguous_gradients": true
+        "reduce_bucket_size": "auto",
+        "contiguous_gradients": true,
+        "sub_group_size": 1e5,
+        "stage3_param_persistence_threshold": "auto",
+        "stage3_prefetch_bucket_size": 0,
+        "stage3_max_live_parameters": 0,
+        "stage3_max_reuse_distance": 0,
+        "stage3_gather_16bit_weights_on_model_save": true
     },
    "gradient_accumulation_steps": "auto",
    "gradient_clipping": "auto",

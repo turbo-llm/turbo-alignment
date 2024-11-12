@@ -122,7 +122,7 @@
   "trainer_settings": {
     "actor_settings": {
       "actor_type": "distributed_vllm",
-      "vllm_num_engines": 1,
+      "vllm_num_engines": 6,
       "vllm_tensor_parallel_size": 1
     },
     "deepspeed": "tests/fixtures/configs/train/reinforce/deepspeed_cfg.json",
@@ -151,7 +151,7 @@
     "max_grad_norm": 2,
     "save_total_limit": 11,
     "dataloader_num_workers": 12,
-    "stop_token": "<|eot_id|>",
+    "stop_token": "<end_of_turn>",
     "temperature": 0.7,
     "non_eos_penalty": true,
     "penalty_reward_value": -1,

@@ -114,6 +114,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 print(
                     "Warning: using --vllm_sync_backend=gloo for vLLM version > 0.4.2 (or export NCCL_P2P_DISABLE=1)"
                 )
+            else:
+                print("Using NCCL backend")
 
             refs = [
                 engine.init_process_group.remote(
@@ -185,11 +187,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
-        
-    # def training_step(self, model, inputs, num_items_in_batch=None) -> torch.Tensor:
-    #     print('traning step', flush=True)
-    #     print(f'reinforce.py: {type(model)=}', flush=True)
-    #     assert True == False
+
     
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
         # avoid OOM
@@ -212,7 +210,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 if torch.distributed.get_rank() == 0:
                     torch.distributed.broadcast(param.data, 0, group=self._model_update_group)
                     ray.get(refs)
-                    print('broadcasted successfully', flush=True)
     
     # FIXME: some base class instead of RMSamplingGenerator (join with ChatGeneratorBase?)
     def _get_rm_generator(self, reward_model: torch.nn.Module | PreTrainedModel) -> RMSamplingGenerator:
@@ -235,7 +232,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         return generator
 
     #TODO_RLOO why every time generates new object? Since the model weights are changing, recreate new object and 
-    def _get_chat_generator(self, model: torch.nn.Module | PreTrainedModel) -> ChatGeneratorBase:
+    def _get_chat_generator(self, model: torch.nn.Module | PreTrainedModel = None) -> ChatGeneratorBase:
         match self.args.actor_type:
             case ActorType.LOCAL_TRANSFORMERS:
                 generator = ChatGenerator(
@@ -263,19 +260,20 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         do_broadcast=True
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         
-        for k, v in inputs.items():
-            if isinstance(v, torch.Tensor):
-                print(f'get_answers_and_rewards:inputs: {k}, {v.device=}', flush=True)
+        # for k, v in inputs.items():
+        #     if isinstance(v, torch.Tensor):
+        #         print(f'get_answers_and_rewards:inputs: {k}, {v.device=}', flush=True)
 
         if do_broadcast:
             # TODO: move to generator
-            print('broadcast', type(model), flush=True)
+            # print('broadcast', type(model), flush=True)
             # assert isinstance(model, DeepSpeedEngine)
+            torch.distributed.barrier()
             self._broadcast_to_vllm(model)
             torch.distributed.barrier()
 
-        model = self.accelerator.unwrap_model(model)
-        generator = self._get_chat_generator(model)
+        # model = self.accelerator.unwrap_model(model)
+        generator = self._get_chat_generator()
         
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
             dataset_name='online', records=inputs
@@ -309,15 +307,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             'position_ids': position_ids,
         }
 
-        for k, v in rm_inputs.items():
-            if isinstance(v, torch.Tensor):
-                print(f'get_answers_and_rewards:rm_inputs: {k}, {v.device=}', flush=True)
+        # for k, v in rm_inputs.items():
+        #     if isinstance(v, torch.Tensor):
+        #         print(f'get_answers_and_rewards:rm_inputs: {k}, {v.device=}', flush=True)
         
         # accelerator.num_process_id
 
         critic_generator = self._get_rm_generator(self.reward_model)
         rewards = critic_generator.generate_from_batch_records(rm_inputs)
-        print(f'rewards: {rewards.device}', flush=True)
+        # print(f'rewards: {rewards.device}', flush=True)
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
     def get_batch_loss_metrics(
@@ -488,7 +486,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         logits /= self.args.temperature
         all_logprob = F.log_softmax(logits, dim=-1)
-        print(f'{all_logprob.device=}, {input_ids.device=}')
+        # print(f'{all_logprob.device=}, {input_ids.device=}')
         logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
         logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
 

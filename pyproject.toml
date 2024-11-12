@@ -54,7 +54,7 @@ deepspeed = "^0.15.3"
 accelerate = "^1.1.1"
 vllm = "^0.6.3.post1"
 allenai-common = "^1.1.2"
-
+liger-kernel-nightly = {version = "^0.4.0.dev20241109021846", optional = true}
 
 [tool.poetry.dev-dependencies]
 coverage = "^7.2.7"
@@ -71,7 +71,7 @@ annotated-types = "^0.6.0"
 
 [tool.poetry.extras]
 deepspeed = ["deepspeed", "accelerate"]
-gpu = ["faiss-gpu", "xformers", "vllm"]
+gpu = ["faiss-gpu", "xformers", "vllm", "liger-kernel-nightly"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
