@@ -95,10 +95,8 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         inference: bool,
         max_tokens: int | None = None,
     ) -> tuple[int, int]:
-        print(max_tokens, conversation.messages)
         continuation = False
         for i, (message, end_index) in enumerate(zip(conversation.messages[::-1], replicas_cum_len[::-1])):
-            print(i, message, end_index)
             if self.settings.only_answer_loss:
                 if inference and message.role == ChatMessageRole.BOT and not continuation:
                     continuation = True
@@ -108,7 +106,6 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 continuation = False
 
             if max_tokens is None or end_index < max_tokens:
-                print('RETURN', len(replicas_cum_len) - i)
                 return 0, len(replicas_cum_len) - i
 
         raise ValueError('Can\'t trim dialogue to fit all requirements')
@@ -204,7 +201,6 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         labels = np.array([])
 
         truncated_conversation_messages = conversation.messages[left_bound:right_bound]
-        print("TRUNCATED", truncated_conversation_messages)
         truncated_tokenized_replicas = tokenized_replicas[left_bound:right_bound]
 
         if self.source.system_prompt is not None and self.settings.keep_end and left_bound != 0:
