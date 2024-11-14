@@ -85,6 +85,7 @@ def load_model(
         model_settings.model_path,
         **model_settings.transformers_settings.dict(exclude_none=True),
         **model_settings.model_kwargs,
+        torch_dtype=torch.bfloat16,
     )
 
     if model_settings.transformers_settings.load_in_8bit:
