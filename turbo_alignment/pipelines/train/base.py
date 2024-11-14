@@ -135,7 +135,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
 
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
         training_args = self._get_training_args(experiment_settings)
-
         self.tokenizer = self._load_tokenizer(experiment_settings)
 
         logger.info('Tokenizer is loaded!')
@@ -149,7 +148,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
         logger.info('Special tokens added!')
 
         self.model = self._load_model(experiment_settings, self.tokenizer)
-
         special_tokens_setter.setup_model_config(self.model)
 
         logger.info('Model is loaded!')
@@ -172,15 +170,18 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
 
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
 
-        self.trainer = self._get_trainer(
-            training_args,
-            experiment_settings,
-            self.model,
-            self.tokenizer,
-            train_dataset,
-            val_dataset,
-            data_collator,
-        )
+        from turbo_alignment.modeling.patch_accelerate import patch_acclerator
+
+        with patch_acclerator():
+            self.trainer = self._get_trainer(
+                training_args,
+                experiment_settings,
+                self.model,
+                self.tokenizer,
+                train_dataset,
+                val_dataset,
+                data_collator,
+            )
 
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)
