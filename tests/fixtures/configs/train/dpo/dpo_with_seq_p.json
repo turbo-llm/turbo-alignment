@@ -1,0 +1,194 @@
+{
+    "train_dataset_settings": {
+        "sources": [
+            {
+                "name": "rm_preferences_test",
+                "records_path": "tests/fixtures/datasets/rm/train_preferences.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "max_tokens_count": 120
+        },
+        "add_labels": true,
+        "dataset_type": "pair_preferences"
+    },
+    "val_dataset_settings": {
+        "sources": [
+            {
+                "name": "rm_preferences_test",
+                "records_path": "tests/fixtures/datasets/rm/val_preferences.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "max_tokens_count": 120
+        },
+        "add_labels": true,
+        "dataset_type": "pair_preferences"
+    },
+    "model_settings": {
+        "model_path": "/mnt/models/google/gemma-2-2b",
+        "model_type": "gemma_with_ulysses",
+        "transformers_settings": {},
+        "model_kwargs": {
+            "attn_implementation": "eager_ulysses"
+        },
+        "sequence_parallel_degree": 2
+    },
+    "cherry_pick_settings": {
+        "generator_transformers_settings": {
+            "num_beams": 1,
+            "do_sample": false,
+            "stop_strings": "</RS>",
+            "max_new_tokens": 8
+        },
+        "custom_generation_settings": {
+            "skip_special_tokens": false
+          },
+        "dataset_settings": {
+            "sources": [
+                {
+                    "name": "chat_test",
+                    "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
+                    "num_samples": 2
+                }
+            ],
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "dataset_type": "chat",
+            "max_tokens_count": 150,
+            "only_answer_loss": true
+        },
+        "metric_settings": [
+            {
+                "type": "length",
+                "parameters": {"need_average": [true]}
+            },
+            {
+                "type": "kl",
+                "parameters": {
+                    "need_average": [true],
+                    "ref_logits_type": "sft"
+                }
+            }
+        ]
+    },
+    "tokenizer_settings": {},
+    "special_tokens_settings": {
+        "bos_token": "<s>",
+        "eos_token": "</s>",
+        "pad_token": "<pad>"
+    },
+    "trainer_settings": {
+        "deepspeed": {
+            "fp16": {
+                "enabled": "auto"
+            },
+            "bf16": {
+                "enabled": "auto"
+            },
+            "optimizer": {
+                "type": "AdamW",
+               "params": {
+                   "lr": "auto",
+                     "betas": "auto",
+                     "eps": "auto",
+                     "weight_decay": "auto"
+                 }
+            },
+            "scheduler": {
+                "type": "WarmupDecayLR",
+                "params": {
+                    "warmup_min_lr": "auto",
+                    "warmup_max_lr": "auto",
+                    "warmup_num_steps": "auto",
+                    "total_num_steps": "auto"
+                }
+            },
+            "zero_optimization": {
+                "stage": 3,
+                "allgather_partitions": true,
+                "allgather_bucket_size": 1e5,
+                "overlap_comm": false,
+                "reduce_scatter": true,
+                "reduce_bucket_size": "auto",
+                "contiguous_gradients": true,
+                "sub_group_size": 1e5,
+                "stage3_param_persistence_threshold": "auto",
+                "stage3_prefetch_bucket_size": 0,
+                "stage3_max_live_parameters": 0,
+                "stage3_max_reuse_distance": 0,
+                "stage3_gather_16bit_weights_on_model_save": true
+            },
+            "gradient_accumulation_steps": "auto",
+            "gradient_clipping": "auto",
+            "steps_per_print": 2,
+            "train_batch_size": "auto",
+            "train_micro_batch_size_per_gpu": 1,
+            "wall_clock_breakdown": false
+        },
+        "evaluation_strategy": "steps",
+        "per_device_train_batch_size": 1,
+        "per_device_eval_batch_size": 2,
+        "gradient_accumulation_steps": 1,
+        "eval_steps": 4,
+        "save_steps": 4,
+        "max_steps": 10,
+        "logging_steps": 1,
+        "learning_rate": 0.0003,
+        "num_train_epochs": 2,
+        "lr_scheduler_type": "cosine",
+        "warmup_steps": 2,
+        "gradient_checkpointing": true,
+        "torch_compile": false,
+        "gradient_checkpointing_kwargs": {
+            "use_reentrant": false
+        },
+        "fp16": false,
+        "bf16": true,
+        "optim": "adamw_torch",
+        "save_total_limit": 1,
+        "average_log_prob": true,
+        "loss_settings": {
+            "loss_type": "simpo"
+        },
+        "sync_ref_settings": {
+            "sync_ref_model": false
+        },
+        "use_ref_model": false,
+        "use_sft_model": false,
+        "sequence_parallel": 2
+    },
+    "logging_settings": {
+        "project_name": "alignment",
+        "run_name": "dpo",
+        "entity": "turbo-alignment"
+    },
+    "log_path": "/mnt/p.geyn/test_dpo_llama_train_output"
+}
