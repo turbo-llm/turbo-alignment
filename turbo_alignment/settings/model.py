@@ -14,7 +14,6 @@ class ModelType(str, Enum):
     SEQ_CLS = 'seq_cls'
     ENC = 'encoder'
     GEMMA_WITH_ULYSSES = 'gemma_with_ulysses'
-    QWEN_WITH_ULYSSES = 'qwen_with_ulysses'
 
 
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
@@ -48,6 +47,8 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
     embeddings_initialization_strategy: dict[str, str] | None = None
 
     liger_kernels_settings: LigerKernelSettings | None = None
+
+    sequence_parallel_degree: int | None = None
 
 
 class PreTrainedAdaptersModelSettings(PreTrainedModelSettings):

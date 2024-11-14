@@ -140,16 +140,8 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             )
 
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
-        set_random_seed(experiment_settings.seed)
-
-        with patch_acclerator():
-            self.tokenizer = self._load_tokenizer(experiment_settings)
-            logger.info('Tokenizer is loaded!')
-            additional_special_tokens = self._get_additional_special_tokens(experiment_settings)
-            logger.info(f'Special tokens: {additional_special_tokens}')
-            special_tokens_setter = SpecialTokensSetter(self.tokenizer, experiment_settings.special_tokens_settings)
-            special_tokens_setter.set_all()
-            special_tokens_setter.set_custom_tokens(additional_special_tokens)
+        training_args = self._get_training_args(experiment_settings)
+        self.tokenizer = self._load_tokenizer(experiment_settings)
 
             # In the older version, we loaded the model before args were created,
             # because of bug in embedding resizing with DeepSpeed Zero3
@@ -161,16 +153,16 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             self.model = self._load_model(experiment_settings, self.tokenizer)
             logger.info('Model is loaded!')
 
-            special_tokens_setter.setup_model_config(self.model)
+        self.model = self._load_model(experiment_settings, self.tokenizer)
+        special_tokens_setter.setup_model_config(self.model)
 
-            set_random_seed(training_args.seed)
-            train_dataset: ConcatDataset = ConcatDataset(
-                datasets=DatasetLoader().load_datasets(
-                    experiment_settings.train_dataset_settings,
-                    tokenizer=self.tokenizer,
-                    strategy=DatasetStrategy.TRAIN,
-                    seed=experiment_settings.seed,
-                )
+        logger.info('Model is loaded!')
+
+        train_dataset: ConcatDataset = ConcatDataset(
+            datasets=DatasetLoader().load_datasets(
+                experiment_settings.train_dataset_settings,
+                tokenizer=self.tokenizer,
+                strategy=DatasetStrategy.TRAIN,
             )
 
             set_random_seed(training_args.seed)
@@ -192,6 +184,9 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                     seq_p_world_size=get_sequence_parallel_world_size(),
                 )
 
+        from turbo_alignment.modeling.patch_accelerate import patch_acclerator
+
+        with patch_acclerator():
             self.trainer = self._get_trainer(
                 training_args,
                 experiment_settings,

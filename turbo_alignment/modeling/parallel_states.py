@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 # Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 from torch import distributed as dist
 
