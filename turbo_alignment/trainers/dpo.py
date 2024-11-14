@@ -516,6 +516,16 @@ class DPOTrainingArguments(TrainingArguments):
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False
+    seq_parallel: int = 1
+
+    def __post_init__(self):
+        return super().__post_init__()
+
+    @property
+    def world_size(self) -> int:
+        world_size = super().world_size
+        assert world_size % self.seq_parallel == 0, (world_size, self.seq_parallel)
+        return world_size // self.seq_parallel
 
 
 class DPOTrainer(Trainer):
