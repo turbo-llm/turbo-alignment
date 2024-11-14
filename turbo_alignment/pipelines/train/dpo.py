@@ -61,6 +61,7 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,
+            seq_parallel=experiment_settings.model_settings.sequence_parallel_degree,
             **experiment_settings.trainer_settings.dict(),
         )
 
