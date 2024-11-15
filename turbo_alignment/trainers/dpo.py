@@ -26,9 +26,9 @@ from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.settings.pipelines.train.dpo import (
     APODownLossSettings,
     APOZeroLossSettings,
+    ASFTLossSettings,
     CPOLossSettings,
     DPOLossesType,
-    ASFTLossSettings,
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
