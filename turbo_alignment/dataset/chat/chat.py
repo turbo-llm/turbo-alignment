@@ -207,7 +207,6 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             truncated_conversation_messages = [conversation.messages[0]] + truncated_conversation_messages
             truncated_tokenized_replicas = [truncated_tokenized_replicas[0]] + truncated_tokenized_replicas
 
-
         for ind, (message, tokenized_replica) in enumerate(
             zip(
                 truncated_conversation_messages,
