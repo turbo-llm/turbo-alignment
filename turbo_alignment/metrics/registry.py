@@ -1,4 +1,5 @@
 from enum import Enum
+
 from pydantic import field_validator
 
 from turbo_alignment.common.registry import Registrable

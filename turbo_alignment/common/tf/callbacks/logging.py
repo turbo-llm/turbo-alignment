@@ -70,10 +70,7 @@ class WandbLoggingCallback(LoggingCallback):
         self._wandb_run.log({**rewritten_logs, 'train/global_step': state.global_step}, step=state.global_step)
 
     def _fix_table_type(self, logs: dict[str, Any]) -> dict[str, Any]:
-        return {
-            k: wandb.Table(dataframe=v) if isinstance(v, pd.DataFrame) else v
-            for k, v in logs.items()
-        }
+        return {k: wandb.Table(dataframe=v) if isinstance(v, pd.DataFrame) else v for k, v in logs.items()}
 
 
 class ClearMLLoggingCallback(LoggingCallback):
