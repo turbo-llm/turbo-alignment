@@ -1,4 +1,5 @@
 from enum import Enum
+
 from pydantic import field_validator
 
 from turbo_alignment.common.registry import Registrable
@@ -103,7 +104,7 @@ class RetrievalUtilitySettings(MetricSettings):
 @MetricSettingsRegistry.register(MetricType.EXACT_MATCH)
 class ExactMatchMetricSettings(MetricSettings):
     selected_argument_keys: list[str]
-    possible_day_lifts: list[int] = [0,1,3]
+    possible_day_lifts: list[int] = [0, 1, 3]
 
     class Config:
         env_prefix: str = 'EXACT_MATCH_METRIC_'

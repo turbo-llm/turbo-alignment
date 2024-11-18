@@ -1,5 +1,6 @@
 from turbo_alignment.metrics.distinctness import DistinctnessMetric
 from turbo_alignment.metrics.diversity import DiversityMetric
+from turbo_alignment.metrics.exact_match import ExactMatchMetric
 from turbo_alignment.metrics.kl import KLMetric
 from turbo_alignment.metrics.length import LengthMetric
 from turbo_alignment.metrics.meteor import MeteorMetric
@@ -10,4 +11,3 @@ from turbo_alignment.metrics.retrieval_utility import RetrievalUtilityMetric
 from turbo_alignment.metrics.reward import RewardMetric
 from turbo_alignment.metrics.rouge import RougeMetric
 from turbo_alignment.metrics.self_bleu import SelfBleuMetric
-from turbo_alignment.metrics.exact_match import ExactMatchMetric
