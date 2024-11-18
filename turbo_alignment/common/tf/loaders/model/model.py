@@ -56,7 +56,7 @@ def load_model(
             cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,
             swiglu=model_settings.liger_kernels_settings.use_mlp,
             rms_norm=model_settings.liger_kernels_settings.use_rms_norm,
-            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_liner_cross_entropy,
+            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_linear_cross_entropy,
         )
 
         apply_liger_kernel_to_gemma2(
@@ -64,7 +64,7 @@ def load_model(
             cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,
             geglu=model_settings.liger_kernels_settings.use_mlp,
             rms_norm=model_settings.liger_kernels_settings.use_rms_norm,
-            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_liner_cross_entropy,
+            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_linear_cross_entropy,
         )
 
         apply_liger_kernel_to_qwen2(
@@ -72,7 +72,7 @@ def load_model(
             cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,
             swiglu=model_settings.liger_kernels_settings.use_mlp,
             rms_norm=model_settings.liger_kernels_settings.use_rms_norm,
-            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_liner_cross_entropy,
+            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_linear_cross_entropy,
         )
 
     model = TransformersAutoModelRegistry.by_name(model_settings.model_type).from_pretrained(
@@ -119,3 +119,4 @@ def load_model(
             model.base_model.model.score.weight.requires_grad = True
 
     return model
+

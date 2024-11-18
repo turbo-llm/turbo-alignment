@@ -18,13 +18,13 @@ class ModelType(str, Enum):
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
     use_rope: bool = True
     use_cross_entropy: bool = False
-    use_fused_liner_cross_entropy: bool = False
+    use_fused_linear_cross_entropy: bool = False
     use_mlp: bool = True
     use_rms_norm: bool = False
 
     @model_validator(mode='after')
     def correct_cross_entopy_kernels(self) -> 'LigerKernelSettings':
-        if self.use_fused_liner_cross_entropy and self.use_cross_entropy:
+        if self.use_fused_linear_cross_entropy and self.use_cross_entropy:
             raise ValueError(
                 'You cannot use both FusedLinearCrossEntropy and CrossEntropy kernels. '
                 'FusedLinearCrossEntropy is preferred if possible.'
