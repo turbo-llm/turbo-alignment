@@ -81,6 +81,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             answers = []
             for a in request_output.outputs:
                 answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0)
+                
                 ans_msg = AnswerMessage(
                     id=str(a.index),
                     content=a.text,
@@ -120,6 +121,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         dataset_name: str,
         records_batch: dict[str, torch.Tensor] | BatchEncoding,
         original_records: list[ChatDatasetRecord] | None = None,
+        return_logits: bool = None
     ) -> list[ChatInferenceOutput]:
         batched_input_ids = records_batch['input_ids'].to(self.device)
         batched_attention_mask = records_batch['attention_mask'].to(self.device)
@@ -135,7 +137,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         logits: torch.Tensor | None = None
 
-        if self._custom_generation_settings.return_logits:
+        if return_logits:
             with torch.no_grad():
                 logits = self._model(output_indices).logits
 

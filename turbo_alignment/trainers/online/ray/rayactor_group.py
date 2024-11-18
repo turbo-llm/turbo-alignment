@@ -100,6 +100,10 @@ class RayGroup:
                     ).remote(world_size, rank, local_rank, master_addr, master_port)
                 self._actor_handlers.append(worker_actor)
 
+    def reference_forward(self, records: dict[str, torch.Tensor], temperature, loss_mask):
+        # TODO assuming one reference model
+        return self._actor_handlers[0].reference_forward.remote(records, temperature, loss_mask)
+    
     def async_forward(self, records: dict[str, torch.Tensor]):
         return [actor.forward.remote(records) for actor in self._actor_handlers]
     

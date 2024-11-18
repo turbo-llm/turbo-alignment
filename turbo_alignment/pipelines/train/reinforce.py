@@ -193,7 +193,13 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
 
         logger.info('Special tokens added!')
 
+        import time
+
+        start = time.time()
+
         self.model = self._load_model(experiment_settings, self.tokenizer)
+
+        print(f"Elapsed model load time: {time.time() - start} seconds")
 
         special_tokens_setter.setup_model_config(self.model)
 
@@ -216,7 +222,9 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         )
 
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
-
+        
+        start = time.time()
+        
         self.trainer = self._get_trainer(
             vllm_engines,
             training_args,
@@ -229,6 +237,9 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             val_dataset,
             data_collator,
         )
+        print(f"Elapsed get_trainer time: {time.time() - start} seconds")
+        
+        start = time.time()
 
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)
@@ -244,7 +255,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         self._save_experiment_metadata(
             experiment_metadata, Path(self.trainer.args.output_dir) / 'experiment_metadata.json'
         )
-
+        print(f"Elapsed before trainer.train() time: {time.time() - start} seconds")
         self.trainer.train()
 
         self.trainer.save_model()

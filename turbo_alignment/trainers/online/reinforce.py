@@ -82,6 +82,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ) -> None:
+        import time
+        import logging
+        
+        start = time.time()
+
         super().__init__(
             model=policy,
             args=args,
@@ -91,9 +96,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             callbacks=callbacks,
             **kwargs,
         )
-
+        logging.info(f'super().__init__ elapsed time:{time.time() - start}')
+        
         self.vllm_engines = vllm_engines
-
+        start = time.time()
         if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
             master_address = ray._private.services.get_node_ip_address()
             with socket.socket() as sock:
@@ -139,10 +145,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             ray.get(refs)
 
         torch.distributed.barrier()
+        logging.info(f'distributed vllm engine __init__ elapsed time:{time.time() - start}')
 
         self.ref_model = ref_model
         # TODO: delete later
-        ray.get(self.ref_model.async_eval())
+        # ray.get(self.ref_model.async_eval())
 
         # TODO: TODO_RLOO watch later
         # if self.ref_model is not None:
@@ -150,7 +157,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.reward_model = reward_model
         # TODO: delete later
-        ray.get(self.ref_model.async_eval())
+        # ray.get(self.ref_model.async_eval())
 
         self._stored_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
         self.kl_coef = args.kl_coef
@@ -183,10 +190,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             mean_baseline_coef=args.mean_baseline_coef,
             num_generations=args.num_generations,
         )
-
+        start = time.time()
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
+        logging.info(f'statictis in __init__ elapsed time:{time.time() - start}')
 
     
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
@@ -259,7 +267,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
         do_broadcast=True
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        
+        import time
+        import logging
         # for k, v in inputs.items():
         #     if isinstance(v, torch.Tensor):
         #         print(f'get_answers_and_rewards:inputs: {k}, {v.device=}', flush=True)
@@ -269,21 +278,31 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             # print('broadcast', type(model), flush=True)
             # assert isinstance(model, DeepSpeedEngine)
             torch.distributed.barrier()
+            start = time.time()
             self._broadcast_to_vllm(model)
             torch.distributed.barrier()
+            logging.info(f'broadcast elapsed time:{time.time() - start}')
 
         # model = self.accelerator.unwrap_model(model)
+        start = time.time()
         generator = self._get_chat_generator()
-        
+
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
             dataset_name='online', records=inputs
         )
-
+        logging.info(f'generations elapsed time:{time.time() - start}')
+        
         response_ids = [ans.answer_token_ids for g in generations for ans in g.answers]
         response_attention_mask = [ans.answer_attention_mask for g in generations for ans in g.answers]
 
+        import logging
+        logging.info(f'Generated sample: {response_ids[0].shape}')
+        logging.info(f'Last token: {response_ids[0].squeeze(0)[-1]}')
+        logging.info(f'Decoded: {self.tokenizer.decode([response_ids[0].squeeze(0)[-1]])}')
+
         # Padding
-        max_length = max(response_id.size(1) for response_id in response_ids)
+        max_length = 2048 # max(response_id.size(1) for response_id in response_ids)
+
         def pad_sequences(sequences, max_length, pad_value=0):
             padded_sequences = []
             for seq in sequences:
@@ -312,10 +331,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         #         print(f'get_answers_and_rewards:rm_inputs: {k}, {v.device=}', flush=True)
         
         # accelerator.num_process_id
-
+        start = time.time()
         critic_generator = self._get_rm_generator(self.reward_model)
         rewards = critic_generator.generate_from_batch_records(rm_inputs)
         # print(f'rewards: {rewards.device}', flush=True)
+        logging.info(f'rewards elapsed time:{time.time() - start}')
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
     def get_batch_loss_metrics(
@@ -324,6 +344,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
         train_eval: Literal['train', 'eval'] = 'train',
     ):
+        import logging
+        import time
+        
         with torch.no_grad():
             (
                 query_response,
@@ -334,8 +357,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             ) = self.get_answers_and_rewards(
                 model=model,
                 inputs=inputs,
+                do_broadcast=True if train_eval == 'train' else False
             )
-
+            start = time.time()
             ref_logprobs = self.get_logprobs(
                 model=self.ref_model,
                 input_ids=query_response,
@@ -343,9 +367,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 position_ids=position_ids,
                 loss_mask=response_tokens_mask.to(torch.float32),
             )
-
+            logging.info(f'reference elapsed time:{time.time() - start}')
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
-
+        
+        start = time.time()
         logprobs = self.get_logprobs(
             model=model,
             input_ids=query_response,
@@ -353,7 +378,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             position_ids=position_ids,
             loss_mask=response_tokens_mask,
         )
-
+        logging.info(f'policy logrobs elapsed time:{time.time() - start}')
         with torch.no_grad():
             kl_term = logprobs.detach() - ref_logprobs
             regularized_rewards = rewards - self.kl_coef * kl_term
@@ -402,10 +427,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         return loss.mean(), metrics
 
     def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
+        import logging
+        import time
+        logging.info(f'{isinstance(model, DeepSpeedEngine)=}')
+        start = time.time()
+        
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
         self.store_metrics(metrics=metrics, train_eval='train')
-
+        logging.info(f'Compute Loss elapsed time:{time.time() - start}')
         return (loss, metrics) if return_outputs else loss
 
     def prediction_step(
@@ -415,6 +445,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+        
+        import logging
+        logging.info(f'{isinstance(model, DeepSpeedEngine)=}')
+
         with torch.no_grad():
             loss, metrics = self.get_batch_loss_metrics(model, inputs, 'eval')
 
@@ -475,7 +509,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 #'use_cache': False
             }
             #TODO only one reference model -> maybe delete from group??
-            logits = ray.get(model.async_forward(records))[0].logits[:, :-1]
+            return ray.get(model.reference_forward(records, self.args.temperature, loss_mask))
         else:
             logits = model(
                 input_ids=input_ids,
@@ -484,13 +518,13 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 use_cache=False,
             ).logits[:, :-1]
 
-        logits /= self.args.temperature
-        all_logprob = F.log_softmax(logits, dim=-1)
-        # print(f'{all_logprob.device=}, {input_ids.device=}')
-        logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
-        logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
+            logits /= self.args.temperature
+            all_logprob = F.log_softmax(logits, dim=-1)
+            # print(f'{all_logprob.device=}, {input_ids.device=}')
+            logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
+            logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
 
-        return logprob.sum(-1)
+            return logprob.sum(-1)
 
     def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.args.non_eos_penalty:

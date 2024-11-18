@@ -28,6 +28,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
         tokenizer: PreTrainedTokenizerBase,
         accelerator: Accelerator | None = None,
         batch: int = 1,
+        return_logits: bool = False
     ) -> None:
         if accelerator is not None:
             self._model = accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)

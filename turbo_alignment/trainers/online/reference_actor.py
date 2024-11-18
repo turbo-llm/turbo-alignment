@@ -2,6 +2,7 @@ import ray
 from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+import torch.nn.functional as F
 
 @ray.remote(num_gpus=1)
 class ReferenceModel(DistributedTorchRayActor):
@@ -32,3 +33,20 @@ class ReferenceModel(DistributedTorchRayActor):
         self.model.eval()
         x = {k: v.cuda() for k, v in x.items()}
         return self.model(**x)
+    
+    @torch.no_grad
+    def reference_forward(self, x, temperature, loss_mask):
+        torch.cuda.empty_cache()
+        self.model.eval()
+        x = {k: v.cuda() for k, v in x.items()}
+
+        logits = self.model(**x).logits[:, :-1]
+        logits /= temperature
+        all_logprob = F.log_softmax(logits, dim=-1)
+        
+        input_ids = x['input_ids']
+
+        logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
+        logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
+
+        return logprob.sum(-1)

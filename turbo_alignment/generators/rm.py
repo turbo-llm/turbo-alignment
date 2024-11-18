@@ -18,7 +18,7 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
         with torch.no_grad():
             # TODO assuming that only one reward model
             records = {k: v.cuda() for k, v in records.items()}
-            rewards = ray.get(self._model.async_forward(records))[0].logits
+            rewards = ray.get(self._model.async_forward(records))[0]
         return rewards  # .squeeze()
 
     def generate_from_batch(

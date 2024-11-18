@@ -33,9 +33,10 @@ class RewardModel(DistributedTorchRayActor):
     
     @torch.no_grad
     def forward(self, x):
+        torch.cuda.empty_cache()
         self.model.eval()
         x = {k: v.cuda() for k, v in x.items()}
         # print('\n\n\nRM model', [v.shape for k, v in x.items()], 'RM model\n\n\n')
         # print(self.tokenizer.decode(x['input_ids'][0], skip_special_tokens=False))
         #TODO reward from eos
-        return self.model(**x)
+        return self.model(**x).logits
