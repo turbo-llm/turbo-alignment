@@ -119,4 +119,3 @@ def load_model(
             model.base_model.model.score.weight.requires_grad = True
 
     return model
-

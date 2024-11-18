@@ -23,7 +23,7 @@ class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
     use_rms_norm: bool = False
 
     @model_validator(mode='after')
-    def correct_cross_entopy_kernels(self) -> 'LigerKernelSettings':
+    def check_cross_entopy_kernels(self) -> 'LigerKernelSettings':
         if self.use_fused_linear_cross_entropy and self.use_cross_entropy:
             raise ValueError(
                 'You cannot use both FusedLinearCrossEntropy and CrossEntropy kernels. '
