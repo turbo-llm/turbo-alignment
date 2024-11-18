@@ -97,6 +97,7 @@ class ExactMatchMetric(Metric):
 
     @staticmethod
     def _load_json(data):
+        data = data.replace('<|eot_id|>', '')
         try:
             return json.loads(data)
         except json.JSONDecodeError as e:
