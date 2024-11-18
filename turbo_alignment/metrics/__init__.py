@@ -10,3 +10,4 @@ from turbo_alignment.metrics.retrieval_utility import RetrievalUtilityMetric
 from turbo_alignment.metrics.reward import RewardMetric
 from turbo_alignment.metrics.rouge import RougeMetric
 from turbo_alignment.metrics.self_bleu import SelfBleuMetric
+from turbo_alignment.metrics.exact_match import ExactMatchMetric

@@ -98,3 +98,11 @@ class ToolMetricsSettings(MetricSettings):
 @MetricSettingsRegistry.register(MetricType.RETRIEVAL_UTILITY)
 class RetrievalUtilitySettings(MetricSettings):
     doc_sep_symbol: str = '<doc_sep>'
+
+@MetricSettingsRegistry.register(MetricType.EXACT_MATCH)
+class ExactMatchMetricSettings(MetricSettings):
+    selected_argument_keys: list[str]
+    possible_day_lifts: list[int] = [0,1,3]
+
+    class Config:
+        env_prefix: str = 'EXACT_MATCH_METRIC_'
