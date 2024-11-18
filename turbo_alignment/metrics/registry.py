@@ -99,6 +99,7 @@ class ToolMetricsSettings(MetricSettings):
 class RetrievalUtilitySettings(MetricSettings):
     doc_sep_symbol: str = '<doc_sep>'
 
+
 @MetricSettingsRegistry.register(MetricType.EXACT_MATCH)
 class ExactMatchMetricSettings(MetricSettings):
     selected_argument_keys: list[str]

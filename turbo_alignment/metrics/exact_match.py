@@ -63,7 +63,9 @@ class ExactMatchMetric(Metric):
                 element_wise_scores.append(ElementWiseScores(label=label, values=temp_hits))
         return [MetricResults(element_wise_scores=element_wise_scores, need_average=True)]
 
-    def _full_match_argument(self, parsed_predicted_arguments, parsed_reference_arguments,selected_key,day_lift=None) -> bool:
+
+    def _full_match_argument(self, parsed_predicted_arguments, parsed_reference_arguments,
+                             selected_key,day_lift=None) -> bool:
         key = selected_key
         possible_day_lift = day_lift
         if 'date' in key:
@@ -78,12 +80,14 @@ class ExactMatchMetric(Metric):
                 return False
         else:
             try:
-                return parsed_reference_arguments[self._settings.selected_argument_key] == parsed_predicted_arguments[self._settings.selected_argument_key]
+                return parsed_reference_arguments[self._settings.selected_argument_key] \
+                       == parsed_predicted_arguments[self._settings.selected_argument_key]
             except:
                 return False
 
 
-    def _parse_function_with_arguments(self, inputs: InferenceChatDataset | list[list[str]]) -> tuple[list, list]:
+    def _parse_function_with_arguments(self, inputs: InferenceChatDataset | list[list[str]])\
+            -> tuple[list, list]:
         functions = []
         arguments = []
         for input_batch in inputs:
@@ -96,6 +100,7 @@ class ExactMatchMetric(Metric):
                     functions.append('')
                     arguments.append('')
         return functions, arguments
+
 
     @staticmethod
     def _load_json(data):
