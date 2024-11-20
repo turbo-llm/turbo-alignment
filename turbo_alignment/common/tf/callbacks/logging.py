@@ -46,9 +46,6 @@ class LoggingCallback(TrainerCallback, ABC):
         cherry_pick_prefix = 'cherry_pick_'
         cherry_pick_prefix_len = len(cherry_pick_prefix)
         for k, v in logs.items():
-            if isinstance(v, pd.DataFrame):
-                v = wandb.Table(dataframe=v)
-
             if k.startswith(eval_prefix):
                 rewritten_logs['eval/' + k[eval_prefix_len:]] = v
             elif k.startswith(test_prefix):
@@ -69,8 +66,11 @@ class WandbLoggingCallback(LoggingCallback):
         self._wandb_run = wandb_run
 
     def _log(self, logs: dict[str, Any], state: TrainerState) -> None:
-        rewritten_logs: dict[str, Any] = self._rewrite_logs(logs)
+        rewritten_logs = self._fix_table_type(self._rewrite_logs(logs))
         self._wandb_run.log({**rewritten_logs, 'train/global_step': state.global_step}, step=state.global_step)
+
+    def _fix_table_type(self, logs: dict[str, Any]) -> dict[str, Any]:
+        return {k: wandb.Table(dataframe=v) if isinstance(v, pd.DataFrame) else v for k, v in logs.items()}
 
 
 class ClearMLLoggingCallback(LoggingCallback):
