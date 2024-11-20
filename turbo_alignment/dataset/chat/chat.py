@@ -307,7 +307,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
             encoded_record: dict[str, Any] = {
                 # 'id': record.id, FIXME: dont work with collators
-                'input_ids': torch.LongTensor(input_ids),
+                'input_ids': torch.LongTensor(input_ids.astype(np.int32)),
                 'labels': torch.LongTensor(labels),
                 'attention_mask': torch.ones(input_ids.shape, dtype=torch.int64),
             }
