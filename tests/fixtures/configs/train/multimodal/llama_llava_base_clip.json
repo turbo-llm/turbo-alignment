@@ -22,12 +22,12 @@
       },
       "modality_reader_settings_mapping": {
         "image": {
-          "reader_type": "clip",
+          "reader_type": "pickle",
           "reader_path": "tests/fixtures/models/clip_tiny"
         },
         "audio": null
       },
-      "n_modality_embeddings": 225,
+      "n_modality_embeddings": 32,
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
@@ -58,12 +58,12 @@
       },
       "modality_reader_settings_mapping": {
         "image": {
-          "reader_type": "clip",
+          "reader_type": "pickle",
           "reader_path": "tests/fixtures/models/clip_tiny"
         },
         "audio": null
       },
-      "n_modality_embeddings": 225,
+      "n_modality_embeddings": 32,
       "start_modality_token": "<MS>",
       "end_modality_token": "</MS>",
       "dataset_type": "multimodal",
@@ -111,35 +111,40 @@
     "trainer_settings": {
       "evaluation_strategy": "epoch",
       "save_strategy": "epoch",
-      "per_device_train_batch_size": 1,
-      "per_device_eval_batch_size": 1,
-      "gradient_accumulation_steps": 1,
+      "per_device_train_batch_size": 2,
+      "per_device_eval_batch_size": 2,
+      "gradient_accumulation_steps": 2,
       "logging_steps": 1,
       "learning_rate": 0.00002,
       "num_train_epochs": 1,
       "lr_scheduler_type": "cosine",
       "warmup_steps": 0,
       "fp16": false,
-      "bf16": false,
+      "bf16": true,
       "optim": "adamw_torch",
       "save_total_limit": 1,
-      "no_cuda": true
+      "no_cuda": false,
+      "dispatch_batches": false,
+      "load_best_model_at_end": false,
+      "deepspeed": null,
+      "dataloader_num_workers": 16,
+      "dataloader_pin_memory": false
     },
     "logging_settings": {
-      "project_name": "alignment",
-      "run_name": "multimodal",
-      "entity": "turbo-alignment"
+        "project_name": "rykov",
+        "run_name": "multimodal",
+        "entity": "rykov"
     },
     "modality_encoder_settings_mapping": {
       "image": {
         "modality_encoder_type": "clip",
-        "is_pickle": false,
+        "is_pickle": true,
         "encoder_path": "tests/fixtures/models/clip_tiny"
       },
       "audio": null
     },
     "modality_projector_mapping": {
-      "image": "llava",
+      "image": "top_k_attention_pooling_with_n_heads",
       "audio": null
     },
     "modality_projector_initialization_mapping": {
@@ -176,7 +181,7 @@
         },
         "dataset_type": "multimodal",
         "max_tokens_count": 2000,
-        "n_modality_embeddings": 225,
+        "n_modality_embeddings": 32,
         "start_modality_token": "<MS>",
         "end_modality_token": "</MS>",
         "only_answer_loss": true,
@@ -186,7 +191,7 @@
         },
         "modality_reader_settings_mapping": {
           "image": {
-            "reader_type": "clip",
+            "reader_type": "pickle",
             "reader_path": "tests/fixtures/models/clip_tiny"
           },
           "audio": null
