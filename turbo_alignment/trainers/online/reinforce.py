@@ -427,22 +427,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 metrics[f'{train_eval}/{k}'] = v
         # print(f'{metrics=}')
         return loss.mean(), metrics
+    
+    def print_readable_stats(self):
+        if torch.distributed.get_rank() == 0:
+            print(f"Allocated: {torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB")
+            print(f"Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB")
 
     def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
-        def print_readable_stats():
-            stats = torch.cuda.memory_stats()
-            keys_of_interest = [
-                "allocated_bytes.all.peak",
-                "allocated_bytes.current",
-                "reserved_bytes.all.peak",
-                "reserved_bytes.current",
-                "active_bytes.all.peak",
-                "active_bytes.current",
-            ]
-            for key in keys_of_interest:
-                print(f"{key}: {stats[key] / (1024 ** 2):.2f} MB")
-
-        print_readable_stats()
+        print(f'Before batch_loss metrics\n\n')
+        self.print_readable_stats()
 
         import logging
         import time
@@ -457,6 +450,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logging.info(f'Compute Loss elapsed time:{time.time() - start}')
         gc.collect()
         torch.cuda.empty_cache()
+        print(f'After batch_loss metrics\n\n')
+        self.print_readable_stats()
+        torch.cuda.memory._dump_snapshot("my_snapshot.pickle")
+
         return (loss, metrics) if return_outputs else loss
 
     def prediction_step(

@@ -181,6 +181,8 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         training_args = self._get_training_args(experiment_settings)
 
         print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
+        import torch
+        torch.cuda.memory._record_memory_history()
         self.tokenizer = self._load_tokenizer(experiment_settings)
 
         logger.info('Tokenizer is loaded!')
