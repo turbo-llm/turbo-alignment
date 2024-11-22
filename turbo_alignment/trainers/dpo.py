@@ -452,7 +452,6 @@ class DPOPLoss(DPOLossRegistry):
         rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
 
         loss = -F.logsigmoid(self.beta * (logits - penalty_term))
-        loss = policy_chosen_logps
 
         return loss, chosen_rewards, rejected_rewards
 
