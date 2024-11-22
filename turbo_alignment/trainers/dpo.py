@@ -26,9 +26,10 @@ from turbo_alignment.constants import DISABLE_LOSS_LABEL
 from turbo_alignment.settings.pipelines.train.dpo import (
     APODownLossSettings,
     APOZeroLossSettings,
+    ASFTLossSettings,
     CPOLossSettings,
     DPOLossesType,
-    ASFTLossSettings,
+    DPOPLossSettings,
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
@@ -426,6 +427,36 @@ class APOZeroLoss(DPOLossRegistry):
         )
 
 
+@DPOLossRegistry.register(DPOLossesType.DPOP)
+class DPOPLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, lam: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        self.lam = lam
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        pi_logratios = policy_chosen_logps - policy_rejected_logps
+        ref_logratios = reference_chosen_logps - reference_rejected_logps
+        penalty_term = self.lam * torch.relu(reference_chosen_logps - policy_chosen_logps)
+
+        logits = pi_logratios - ref_logratios
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps - penalty_term).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        loss = -F.logsigmoid(self.beta * (logits - penalty_term))
+        loss = policy_chosen_logps
+
+        return loss, chosen_rewards, rejected_rewards
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
     loss_settings: (
@@ -442,6 +473,7 @@ class DPOTrainingArguments(TrainingArguments):
         | SigmoidLossWithMarginSettings
         | APOZeroLossSettings
         | APODownLossSettings
+        | DPOPLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
