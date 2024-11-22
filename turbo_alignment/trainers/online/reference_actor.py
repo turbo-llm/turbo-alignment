@@ -3,6 +3,7 @@ from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import Dist
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import torch.nn.functional as F
+import gc
 
 @ray.remote(num_gpus=1)
 class ReferenceModel(DistributedTorchRayActor):
@@ -13,7 +14,7 @@ class ReferenceModel(DistributedTorchRayActor):
     
     def init_model_from_pretrained(self, pretrain):
         self._setup_distributed()
-        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16)
+        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16) #attn_implementation='flash_attention_2'
         self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
         print(f"Reference model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
         print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
@@ -40,13 +41,21 @@ class ReferenceModel(DistributedTorchRayActor):
         self.model.eval()
         x = {k: v.cuda() for k, v in x.items()}
 
-        logits = self.model(**x).logits[:, :-1]
+        print(f"{x.keys()}")
+        logits = self.model(**x).logits[:, :-1] # 35GB
         logits /= temperature
-        all_logprob = F.log_softmax(logits, dim=-1)
-        
-        input_ids = x['input_ids']
 
-        logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
+        #logits = F.log_softmax(logits, dim=-1) # 35GB
+        '''
+        Memory Efficient implementation of log_softmax using in_place operation
+        '''
+        torch.exp(logits, out=logits)
+        summed = torch.sum(logits, dim=-1, keepdim=True)
+        logits /= summed
+        torch.log(logits, out=logits)
+
+        logprob = torch.gather(logits, 2, x['input_ids'][:, 1:].unsqueeze(-1)).squeeze(-1)
         logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
+        out = logprob.sum(-1)
 
-        return logprob.sum(-1)
+        return out

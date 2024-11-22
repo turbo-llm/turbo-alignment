@@ -102,6 +102,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         start = time.time()
         if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
             master_address = ray._private.services.get_node_ip_address()
+            print(f'TRAINER DEBUG: {master_address=}', flush=True)
             with socket.socket() as sock:
                 sock.bind(("", 0))
                 master_port = sock.getsockname()[1]
@@ -269,9 +270,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         import time
         import logging
-        # for k, v in inputs.items():
-        #     if isinstance(v, torch.Tensor):
-        #         print(f'get_answers_and_rewards:inputs: {k}, {v.device=}', flush=True)
+        for k, v in inputs.items():
+            if isinstance(v, torch.Tensor):
+                print(f'get_answers_and_rewards:inputs: {k}:{v.shape}', flush=True)
 
         if do_broadcast:
             # TODO: move to generator
@@ -301,7 +302,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logging.info(f'Decoded: {self.tokenizer.decode([response_ids[0].squeeze(0)[-1]])}')
 
         # Padding
-        max_length = 2048 # max(response_id.size(1) for response_id in response_ids)
+        max_length = 4096 # max(response_id.size(1) for response_id in response_ids) #45.89 GiB 
+        logging.info(f'{max_length=}')
 
         def pad_sequences(sequences, max_length, pad_value=0):
             padded_sequences = []
@@ -314,7 +316,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         response_ids = pad_sequences(response_ids, max_length, pad_value=self.tokenizer.pad_token_id)
         response_attention_mask = pad_sequences(response_attention_mask, max_length, pad_value=0)
 
-        response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.float32)
+        response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.bfloat16)
         response_tokens_mask[:, generations[0].input_token_ids.shape[0] :] = 1.0
 
         position_ids = (response_attention_mask.cumsum(-1) - 1).clamp(min=0)
@@ -427,8 +429,25 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         return loss.mean(), metrics
 
     def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
+        def print_readable_stats():
+            stats = torch.cuda.memory_stats()
+            keys_of_interest = [
+                "allocated_bytes.all.peak",
+                "allocated_bytes.current",
+                "reserved_bytes.all.peak",
+                "reserved_bytes.current",
+                "active_bytes.all.peak",
+                "active_bytes.current",
+            ]
+            for key in keys_of_interest:
+                print(f"{key}: {stats[key] / (1024 ** 2):.2f} MB")
+
+        print_readable_stats()
+
         import logging
         import time
+        import gc
+
         logging.info(f'{isinstance(model, DeepSpeedEngine)=}')
         start = time.time()
         
@@ -436,6 +455,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.store_metrics(metrics=metrics, train_eval='train')
         logging.info(f'Compute Loss elapsed time:{time.time() - start}')
+        gc.collect()
+        torch.cuda.empty_cache()
         return (loss, metrics) if return_outputs else loss
 
     def prediction_step(

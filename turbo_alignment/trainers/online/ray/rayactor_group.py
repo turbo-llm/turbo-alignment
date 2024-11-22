@@ -58,7 +58,7 @@ class RayGroup:
                 for i in range(len(bundles)):
                     bundles[i][resources_name] = self._num_resources_per_node
 
-            pg = placement_group(bundles, strategy="STRICT_PACK")
+            pg = placement_group(bundles, strategy="PACK")
             ray.get(pg.ready())
         if pg:
             master_actor = self.ray_actor_type.options(

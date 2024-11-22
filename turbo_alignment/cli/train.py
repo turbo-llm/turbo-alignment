@@ -130,7 +130,7 @@ def reinforce_training(
     
     experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
 
-    policy_models = RayGroup(num_nodes=1, num_gpus_per_node=8, ray_actor_type=pipelines.TrainREINFORCEStrategy)
+    policy_models = RayGroup(num_nodes=2, num_gpus_per_node=8, ray_actor_type=pipelines.TrainREINFORCEStrategy)#64.19 GiB is allocated by PyTorch, and 3.40 GiB
     reward_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=RewardModel)
     reference_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=ReferenceModel)
 
