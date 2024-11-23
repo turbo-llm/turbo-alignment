@@ -376,8 +376,7 @@ class InferenceChatDataset(ChatDataset):
 
         new_instance.records = self.records[start:end]
         new_instance.original_records_map = {
-            record['id']: self.get_original_record_by_id(record['id'])
-            for record in dataset_records
+            record['id']: self.get_original_record_by_id(record['id']) for record in dataset_records
         }
 
         return new_instance
