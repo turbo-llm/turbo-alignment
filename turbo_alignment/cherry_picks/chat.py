@@ -42,47 +42,22 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
             tokenizer=tokenizer,
             transformers_settings=self._generator_transformers_settings,
             custom_generation_settings=self._custom_generation_settings,
-            # accelerator=accelerator,
             return_logits=True,
         )
 
         batch_size = self._generator_transformers_settings.num_return_sequences
 
         if accelerator is not None:
-            len_records_batches = len(dataset)
-            world_size = accelerator.num_processes
-            rank_device = accelerator.process_index
-            window_size = math.ceil(len_records_batches / world_size)
-
-            print(f"len records_batches", len_records_batches)
-            print("rank_device", rank_device)
-            print("world_size", world_size)
-            print(f"slice [{rank_device * window_size} : {rank_device * window_size + window_size}]")
-
-
-            dataset = dataset[rank_device * window_size : rank_device * window_size + window_size]
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
 
         generations = generator.generate_from_dataset(dataset)
 
-        print(f"len dataset {len(dataset)}")
-        print(f"first 2 prompts: {[record['prompt'] for record in dataset][:2]}")
-        print(f"len generations {len(generations)}")
-        print(f"first 2 generations: {generations[:2]}")
-
         prompts = [record['prompt'] for record in dataset]
 
-        # len_records_batches = len(prompts)
-        # world_size = accelerator.num_processes
-        # rank_device = accelerator.process_index
-        # window_size = math.ceil(len_records_batches / world_size)
-
-        # prompts =
-
-
-
         string_answers = [[answer.content for answer in g.answers] for g in generations]
-        print(f"prompts: {len(prompts)}, {prompts[:2]}")
-        print(f"string_answers: {len(string_answers)}, {string_answers[:2]}")
         string_labels = [[g.messages[-1].content] * len(g.answers) for g in generations]
 
         flattened_answers = [answer for g in generations for answer in g.answers]
@@ -98,9 +73,6 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         if sft_model is not None:
             metrics_kwargs[KLType.SFT_MODEL] = get_logits(input_tokens_ids, answer_tokens_ids, sft_model)
 
-        print(f"len prompts {len(prompts)}")
-        print(f"batch_size {batch_size}")
-        print(f"prompt element_wise_scores {len([prompt for prompt in prompts for _ in range(batch_size)])}")
         metric_outputs = [
             MetricResults(
                 element_wise_scores=[
@@ -121,10 +93,6 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
                 ]
             ),
         ]
-        print(f"prompts: {len(metric_outputs[0].element_wise_scores[0].values)}, {metric_outputs[0].element_wise_scores[0].values}")
-        print(f"labels: {len(metric_outputs[1].element_wise_scores[0].values)}, {metric_outputs[1].element_wise_scores[0].values}")
-        # print(f"metric_outputs: {metric_outputs}")
-
 
         for metric in self._metrics:
             metric_results = metric.compute(
@@ -143,3 +111,9 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
             metric_outputs.extend(metric_results)
         return metric_outputs
+
+    def _get_sharded_dataset(self, dataset: InferenceChatDataset, accelerator: Accelerator) -> InferenceChatDataset:
+        rank_device = accelerator.process_index
+        window_size = math.ceil(len(dataset) / accelerator.num_processes)
+
+        return dataset.get_slice(rank_device * window_size, rank_device * window_size + window_size)

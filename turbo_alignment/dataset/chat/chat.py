@@ -2,7 +2,7 @@ import random
 from abc import ABC
 from itertools import accumulate
 from pathlib import Path
-from typing import Any, overload
+from typing import Any, Self, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -361,3 +361,21 @@ class InferenceChatDataset(ChatDataset):
 
     def convert_records(self, records: list[ChatDatasetRecord]) -> list[dict[str, Any] | None]:
         return self._encode(records, inference=True, random_cut=self._random_cut)
+
+    def get_slice(self, start: int, end: int) -> Self:
+        new_instance = self.__class__(
+            source=self.source,
+            settings=self.settings,
+            tokenizer=self.tokenizer,
+            read=False,
+            random_cut=self._random_cut,
+        )
+
+        new_instance.records = self.records[start:end]
+
+        new_instance.original_records_map = {
+            record['id']: self.get_original_record_by_id(record['id'])
+            for record in new_instance.records
+        }
+
+        return new_instance
