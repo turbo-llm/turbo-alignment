@@ -113,6 +113,6 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
     def _get_sharded_dataset(self, dataset: InferenceChatDataset, accelerator: Accelerator) -> InferenceChatDataset:
         rank_device = accelerator.process_index
-        window_size = math.ceil(len(dataset) / accelerator.num_processes)
+        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
 
-        return dataset.get_slice(rank_device * window_size, rank_device * window_size + window_size)
+        return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)
