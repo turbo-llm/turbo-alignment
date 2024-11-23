@@ -56,7 +56,6 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         generations = generator.generate_from_dataset(dataset)
 
         prompts = [record['prompt'] for record in dataset]
-
         string_answers = [[answer.content for answer in g.answers] for g in generations]
         string_labels = [[g.messages[-1].content] * len(g.answers) for g in generations]
 
