@@ -2,7 +2,8 @@ import random
 from abc import ABC
 from itertools import accumulate
 from pathlib import Path
-from typing import Any, Self, overload
+from typing import Any, overload
+from typing_extensions import Self
 
 import numpy as np
 import numpy.typing as npt
