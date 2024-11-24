@@ -42,6 +42,7 @@ import ray
 import socket
 import os
 from deepspeed.runtime.engine import DeepSpeedEngine
+import gc
 
 # FIXME
 @dataclass
@@ -192,10 +193,14 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             num_generations=args.num_generations,
         )
         start = time.time()
+        torch.cuda.memory._dump_snapshot("before_reward_stats.pickle")
+        self.print_readable_stats()
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
+        torch.cuda.memory._dump_snapshot("after_stats.pickle")
         logging.info(f'statictis in __init__ elapsed time:{time.time() - start}')
+        self.print_readable_stats()
 
     
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
@@ -302,7 +307,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logging.info(f'Decoded: {self.tokenizer.decode([response_ids[0].squeeze(0)[-1]])}')
 
         # Padding
-        max_length = 4096 # max(response_id.size(1) for response_id in response_ids) #45.89 GiB 
+        max_length = 8192 # max(response_id.size(1) for response_id in response_ids) #45.89 GiB 
         logging.info(f'{max_length=}')
 
         def pad_sequences(sequences, max_length, pad_value=0):
@@ -332,11 +337,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         #     if isinstance(v, torch.Tensor):
         #         print(f'get_answers_and_rewards:rm_inputs: {k}, {v.device=}', flush=True)
         
-        # accelerator.num_process_id
         start = time.time()
         critic_generator = self._get_rm_generator(self.reward_model)
         rewards = critic_generator.generate_from_batch_records(rm_inputs)
-        # print(f'rewards: {rewards.device}', flush=True)
+
         logging.info(f'rewards elapsed time:{time.time() - start}')
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
@@ -367,12 +371,17 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 input_ids=query_response,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
-                loss_mask=response_tokens_mask.to(torch.float32),
+                loss_mask=response_tokens_mask.to(torch.bfloat16),
             )
             logging.info(f'reference elapsed time:{time.time() - start}')
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
         
         start = time.time()
+        del inputs
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.memory._dump_snapshot("before_inference.pickle")
+
         logprobs = self.get_logprobs(
             model=model,
             input_ids=query_response,
@@ -414,10 +423,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     'invalid_rewards',
                 ],
             ):
-                tensor = tensor.cuda()
                 metrics = {
                     **metrics,
-                    **get_log_mean_std(tensor, name, train_eval),
+                    **get_log_mean_std(tensor.cuda(), name, train_eval),
                 }
             metrics[f'{train_eval}/kl_coef'] = self.kl_coef
 
@@ -425,7 +433,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 metrics[f'{train_eval}/{k}'] = v
             for k, v in baseline_metrics.items():
                 metrics[f'{train_eval}/{k}'] = v
-        # print(f'{metrics=}')
+            
+            for k, v in metrics.items():
+                if isinstance(v, torch.Tensor):
+                    metrics[k] = metrics[k].cpu()
         return loss.mean(), metrics
     
     def print_readable_stats(self):
@@ -452,7 +463,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         torch.cuda.empty_cache()
         print(f'After batch_loss metrics\n\n')
         self.print_readable_stats()
-        torch.cuda.memory._dump_snapshot("my_snapshot.pickle")
+        torch.cuda.memory._dump_snapshot("after_compute_loss.pickle")
 
         return (loss, metrics) if return_outputs else loss
 
@@ -515,31 +526,32 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     ):
         from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
         
-        input_ids = input_ids.cuda()
-        attention_mask = attention_mask.cuda()
-        position_ids = position_ids.cuda()
+
+        records = {
+            'input_ids': input_ids.cuda(),
+            'attention_mask': attention_mask.cuda(),
+            'position_ids': position_ids.cuda(),
+            #'use_cache': False
+        }
 
         if isinstance(model, RayGroup):
-            records = {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask,
-                'position_ids': position_ids,
-                #'use_cache': False
-            }
             #TODO only one reference model -> maybe delete from group??
             return ray.get(model.reference_forward(records, self.args.temperature, loss_mask))
         else:
-            logits = model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                use_cache=False,
-            ).logits[:, :-1]
+            # Memory efficient - a chain operations
+            logits = F.log_softmax(
+                model(
+                    input_ids=records['input_ids'],
+                    attention_mask=records['attention_mask'],
+                    position_ids=records['position_ids'],
+                    use_cache=False,
+                ).logits[:, :-1] / self.args.temperature,
+                dim=-1
+            )
 
-            logits /= self.args.temperature
-            all_logprob = F.log_softmax(logits, dim=-1)
-            # print(f'{all_logprob.device=}, {input_ids.device=}')
-            logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
+            # logits /= self.args.temperature
+            # all_logprob = F.log_softmax(logits, dim=-1)
+            logprob = torch.gather(logits, 2, records['input_ids'][:, 1:].unsqueeze(-1)).squeeze(-1)
             logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
 
             return logprob.sum(-1)
