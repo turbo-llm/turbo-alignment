@@ -43,6 +43,7 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
             read=False,
         )
         super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        self.settings: PairPreferenceDatasetSettings = settings
 
         if read:
             self._read()
