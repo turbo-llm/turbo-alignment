@@ -1,4 +1,3 @@
-import math
 from typing import Iterable
 
 from accelerate import Accelerator
@@ -110,9 +109,3 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
             metric_outputs.extend(metric_results)
         return metric_outputs
-
-    def _get_sharded_dataset(self, dataset: InferenceChatDataset, accelerator: Accelerator) -> InferenceChatDataset:
-        rank_device = accelerator.process_index
-        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
-
-        return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)

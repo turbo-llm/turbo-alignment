@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, overload
 
 from transformers import PreTrainedTokenizerBase
+from typing_extensions import Self
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.logging import get_project_logger
@@ -107,3 +108,20 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
         if isinstance(records, list):
             return [PairPreferenceRecord(**record) for record in records]
         raise NotImplementedError
+
+    def get_slice(self, start: int, end: int) -> Self:
+        new_instance = self.__class__(
+            source=self.source,
+            settings=self.settings,
+            tokenizer=self.tokenizer,
+            read=False,
+        )
+
+        dataset_records = [self[idx] for idx in range(len(self))]
+
+        new_instance.records = self.records[start:end]
+        new_instance.original_records_map = {
+            record['id']: self.get_original_record_by_id(record['id']) for record in dataset_records
+        }
+
+        return new_instance

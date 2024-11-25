@@ -1,6 +1,8 @@
 from abc import abstractmethod
+import math
 from typing import Generic, Iterable, TypeVar
 
+from accelerate import Accelerator
 from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
@@ -72,3 +74,10 @@ class CherryPickCallbackBase(TrainerCallback, Generic[InferenceDatasetT]):
         model.train()
 
         return dataset_metrics
+
+    @staticmethod
+    def _get_sharded_dataset(dataset: InferenceDatasetT, accelerator: Accelerator) -> InferenceDatasetT:
+        rank_device = accelerator.process_index
+        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
+
+        return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)

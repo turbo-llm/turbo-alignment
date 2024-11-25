@@ -33,8 +33,13 @@ class ClassificationCherryPickCallback(CherryPickCallbackBase[ClassificationData
         generator = ClassificationGenerator(
             model=model,
             tokenizer=tokenizer,
-            accelerator=accelerator,
         )
+
+        if accelerator is not None:
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
 
         generations = generator.generate_from_dataset(dataset)
         predictions = [record.predicted_label for record in generations]

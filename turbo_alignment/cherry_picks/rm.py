@@ -35,6 +35,12 @@ class RmCherryPickCallback(CherryPickCallbackBase[PairPreferenceDataset]):
             accelerator=accelerator,
         )
 
+        if accelerator is not None:
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
+
         generations = generator.generate_from_dataset(dataset)
         generations_w = [gen.reward_w for gen in generations]
         generations_l = [gen.reward_l for gen in generations]

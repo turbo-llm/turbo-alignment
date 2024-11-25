@@ -22,8 +22,13 @@ class RagCherryPickCallback(ChatCherryPickCallback):
             tokenizer=tokenizer,
             transformers_settings=self._generator_transformers_settings,
             custom_generation_settings=self._custom_generation_settings,
-            accelerator=accelerator,
         )
+
+        if accelerator is not None:
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
 
         generations = generator.generate_from_dataset(dataset)
 
