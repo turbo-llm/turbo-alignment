@@ -82,6 +82,18 @@ class ClassificationDataset(AlignmentDataset[ClassificationDatasetRecord], ABC):
             return [ClassificationDatasetRecord(**record) for record in records]
         raise NotImplementedError
 
+
+@ClassificationDatasetTypeRegistry.register(DatasetStrategy.TRAIN)
+class TrainClassificationDataset(ClassificationDataset):
+    def convert_records(self, records: list[ClassificationDatasetRecord]) -> list[dict[str, Any] | None]:
+        return self._encode(records, inference=False)
+
+
+@ClassificationDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
+class InferenceClassificationDataset(ClassificationDataset):
+    def convert_records(self, records: list[ClassificationDatasetRecord]) -> list[dict[str, Any] | None]:
+        return self._encode(records, inference=True)
+
     def get_slice(self, start: int, end: int) -> Self:
         new_instance = self.__class__(
             source=self.source,
@@ -97,15 +109,3 @@ class ClassificationDataset(AlignmentDataset[ClassificationDatasetRecord], ABC):
         }
 
         return new_instance
-
-
-@ClassificationDatasetTypeRegistry.register(DatasetStrategy.TRAIN)
-class TrainClassificationDataset(ClassificationDataset):
-    def convert_records(self, records: list[ClassificationDatasetRecord]) -> list[dict[str, Any] | None]:
-        return self._encode(records, inference=False)
-
-
-@ClassificationDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
-class InferenceClassificationDataset(ClassificationDataset):
-    def convert_records(self, records: list[ClassificationDatasetRecord]) -> list[dict[str, Any] | None]:
-        return self._encode(records, inference=True)

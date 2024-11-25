@@ -6,7 +6,6 @@ from typing import Any, Generic, TypeVar, overload
 import torch
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
-from typing_extensions import Self
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.dataset.base.models import DatasetRecord
@@ -101,10 +100,6 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
     @staticmethod
     @abstractmethod
     def _read_records(records):
-        ...
-
-    @abstractmethod
-    def get_slice(self, start: int, end: int) -> Self:
         ...
 
 
