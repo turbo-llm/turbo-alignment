@@ -11,6 +11,7 @@ class vLLMActorSettings(ExtraFieldsNotAllowedBaseModel):
     
     vllm_num_engines: int = 1
     vllm_tensor_parallel_size: int = 1
+    max_model_len: int = 8192
 
 class HFActorSettings(ExtraFieldsNotAllowedBaseModel):
     actor_type: Literal[ActorType.LOCAL_TRANSFORMERS] = ActorType.LOCAL_TRANSFORMERS

@@ -47,7 +47,7 @@ import gc
 # FIXME
 @dataclass
 class REINFORCETrainingArguments(TrainingArguments):
-    max_tokens_count: int = 1024
+    max_new_tokens: int = 1024
     stop_token: str = '<eos>'
 
     penalty_reward_value: float = 0.1
@@ -177,7 +177,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.generator_transformers_settings = GeneratorTransformersSettings(
             temperature=args.temperature,
-            max_length=args.max_tokens_count,
+            max_new_tokens=args.max_new_tokens,
             num_return_sequences=args.num_generations,
             num_beams=args.num_generations,
             do_sample=True,
@@ -193,12 +193,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             num_generations=args.num_generations,
         )
         start = time.time()
-        torch.cuda.memory._dump_snapshot("before_reward_stats.pickle")
         self.print_readable_stats()
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
-        torch.cuda.memory._dump_snapshot("after_stats.pickle")
         logging.info(f'statictis in __init__ elapsed time:{time.time() - start}')
         self.print_readable_stats()
 
@@ -275,21 +273,19 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         import time
         import logging
-        for k, v in inputs.items():
-            if isinstance(v, torch.Tensor):
-                print(f'get_answers_and_rewards:inputs: {k}:{v.shape}', flush=True)
+
+        if torch.distributed.get_rank() == 0:
+            print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
+            print(f'Input Example at index [0]: {self.tokenizer.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
 
         if do_broadcast:
             # TODO: move to generator
-            # print('broadcast', type(model), flush=True)
-            # assert isinstance(model, DeepSpeedEngine)
             torch.distributed.barrier()
             start = time.time()
             self._broadcast_to_vllm(model)
             torch.distributed.barrier()
             logging.info(f'broadcast elapsed time:{time.time() - start}')
 
-        # model = self.accelerator.unwrap_model(model)
         start = time.time()
         generator = self._get_chat_generator()
 
@@ -301,13 +297,13 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         response_ids = [ans.answer_token_ids for g in generations for ans in g.answers]
         response_attention_mask = [ans.answer_attention_mask for g in generations for ans in g.answers]
 
-        import logging
-        logging.info(f'Generated sample: {response_ids[0].shape}')
-        logging.info(f'Last token: {response_ids[0].squeeze(0)[-1]}')
-        logging.info(f'Decoded: {self.tokenizer.decode([response_ids[0].squeeze(0)[-1]])}')
+        if torch.distributed.get_rank() == 0:
+            print(f'Generated completion at index [0] shape: {response_ids[0].shape}', flush=True)
+            print(f'Completion decoded: {self.tokenizer.batch_decode(response_ids[0, :].unsqueeze(0))}', flush=True)
 
         # Padding
-        max_length = 8192 # max(response_id.size(1) for response_id in response_ids) #45.89 GiB 
+
+        max_length = max([response_id.size(1) for response_id in response_ids])
         logging.info(f'{max_length=}')
 
         def pad_sequences(sequences, max_length, pad_value=0):
@@ -332,10 +328,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             'attention_mask': response_attention_mask,
             'position_ids': position_ids,
         }
-
-        # for k, v in rm_inputs.items():
-        #     if isinstance(v, torch.Tensor):
-        #         print(f'get_answers_and_rewards:rm_inputs: {k}, {v.device=}', flush=True)
         
         start = time.time()
         critic_generator = self._get_rm_generator(self.reward_model)
@@ -380,7 +372,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         del inputs
         gc.collect()
         torch.cuda.empty_cache()
-        torch.cuda.memory._dump_snapshot("before_inference.pickle")
 
         logprobs = self.get_logprobs(
             model=model,
@@ -445,14 +436,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             print(f"Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB")
 
     def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
-        print(f'Before batch_loss metrics\n\n')
-        self.print_readable_stats()
-
         import logging
         import time
         import gc
 
-        logging.info(f'{isinstance(model, DeepSpeedEngine)=}')
         start = time.time()
         
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
@@ -461,9 +448,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logging.info(f'Compute Loss elapsed time:{time.time() - start}')
         gc.collect()
         torch.cuda.empty_cache()
-        print(f'After batch_loss metrics\n\n')
-        self.print_readable_stats()
-        torch.cuda.memory._dump_snapshot("after_compute_loss.pickle")
 
         return (loss, metrics) if return_outputs else loss
 

@@ -16,7 +16,7 @@ from turbo_alignment.settings.online import (
 from typing import Union
 
 class REINFORCETrainerSettings(TrainerSettings):
-    max_tokens_count: int = 1024
+    max_new_tokens: int = 1024
     stop_token: str = '<eos>'
 
     penalty_reward_value: float = 0.1

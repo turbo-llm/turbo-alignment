@@ -153,7 +153,7 @@ def reinforce_training(
         seed=0,
         enable_prefix_caching=False,
         enforce_eager=False,
-        max_model_len=1024,
+        max_model_len=experiment_settings.trainer_settings.actor_settings.max_model_len,
     )
 
     ray.get(policy_models.async_fit_actor_model(
