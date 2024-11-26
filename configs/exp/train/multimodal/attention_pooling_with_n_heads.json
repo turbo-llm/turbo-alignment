@@ -198,7 +198,7 @@
                 },
                 "audio": null
         },
-            "truncate_top": false
+        "truncate_top": false
         },
         "metric_settings": []
     }
