@@ -13,12 +13,12 @@ class SpecialTokensSetter:
         self._special_tokens_settings = special_tokens_settings
         self._special_tokens_already_set: bool = False
 
-    def setBOS(self, bos_token: str) -> None:
+    def setBOS(self, bos_token: str | None) -> None:
         if self._tokenizer.bos_token_id is None:
             logger.info('Model does not have bos_token_id')
             self._tokenizer.add_special_tokens(special_tokens_dict={'bos_token': bos_token})
-            assert self._tokenizer.bos_token_id is not None
-            logger.info(f'Created bos_token_id = {self._tokenizer.bos_token_id}')
+            if self._tokenizer.bos_token_id is not None:
+                logger.info(f'Created bos_token_id = {self._tokenizer.bos_token_id}')
         else:
             logger.info(f'Model has bos_token_id = {self._tokenizer.bos_token_id}')
 
@@ -94,9 +94,10 @@ class SpecialTokensSetter:
         assert added_tokens == len(tokens)
 
     def setup_model_config(self, model: PreTrainedModel) -> None:
-        model.config.bos_token_id = self._tokenizer.bos_token_id
         model.config.eos_token_id = self._tokenizer.eos_token_id
 
+        if self._tokenizer.bos_token_id is not None:
+            model.config.bos_token_id = self._tokenizer.bos_token_id
         if self._tokenizer.pad_token_id is not None:
             model.config.pad_token_id = self._tokenizer.pad_token_id
         if self._tokenizer.sep_token_id is not None:

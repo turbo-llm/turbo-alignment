@@ -31,7 +31,13 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
 
         return chosen_rewards, rejected_rewards
 
-    def compute_loss(self, model, inputs, return_outputs=False) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        return_outputs=False,
+        num_items_in_batch=None,
+    ) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
         rewards_w, rewards_l = self.concatenated_forward(model, inputs)
 
         loss = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean()
