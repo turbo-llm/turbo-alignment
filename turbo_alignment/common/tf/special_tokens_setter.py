@@ -16,8 +16,8 @@ class SpecialTokensSetter:
     def setBOS(self, bos_token: str | None) -> None:
         if self._tokenizer.bos_token_id is None:
             logger.info('Model does not have bos_token_id')
-            self._tokenizer.add_special_tokens(special_tokens_dict={'bos_token': bos_token})
             if self._tokenizer.bos_token_id is not None:
+                self._tokenizer.add_special_tokens(special_tokens_dict={'bos_token': bos_token})
                 logger.info(f'Created bos_token_id = {self._tokenizer.bos_token_id}')
         else:
             logger.info(f'Model has bos_token_id = {self._tokenizer.bos_token_id}')
