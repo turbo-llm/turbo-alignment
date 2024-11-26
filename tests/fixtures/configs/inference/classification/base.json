@@ -4,6 +4,7 @@
       "model_settings": {
         "model_path": "tests/fixtures/models/llama2_tiny",
         "model_type": "seq_cls",
+        "resize_token_embeddings": true,
         "transformers_settings": {
         },
         "model_kwargs": {
