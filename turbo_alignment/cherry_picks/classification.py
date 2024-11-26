@@ -41,9 +41,11 @@ class ClassificationCherryPickCallback(CherryPickCallbackBase[ClassificationData
         labels = [record['labels'] for record in dataset]
 
         contexts = [
-            Conversation(system_prompt=dataset.source.system_prompt, messages=record.messages).get_prompt_repr(
-                0, len(record.messages)
-            )
+            Conversation(
+                system_prompt=dataset.source.system_prompt,
+                messages=record.messages,
+                ignore_system_prompt=dataset.settings.chat_settings.ignore_system_prompt,
+            ).get_prompt_repr(0, len(record.messages))
             for record in generations
         ]
 

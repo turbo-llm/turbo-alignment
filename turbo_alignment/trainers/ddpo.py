@@ -18,7 +18,7 @@ from transformers import (
 from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.common.tf.callbacks.common import WandbMetricsCallbackHandler
+from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.trainers.dpo import DPOTrainer
 from turbo_alignment.trainers.utils import concatenated_inputs, prepare_model
 
@@ -74,7 +74,7 @@ class DDPOTrainer(DPOTrainer):
 
         default_callbacks = [DefaultFlowCallback] + get_reporting_integration_callbacks(self.args.report_to)
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
-        self.callback_handler = WandbMetricsCallbackHandler(
+        self.callback_handler = MetricsCallbackHandler(
             callbacks, model, tokenizer, None, None, ref_model=ref_model, accelerator=self.accelerator
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else ProgressCallback)
