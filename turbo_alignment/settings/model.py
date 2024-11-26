@@ -42,7 +42,7 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
     transformers_settings: ModelTransformersSettings
 
     resize_token_embeddings: bool = False
-    
+
     embeddings_initialization_strategy: dict[str, str] | None = None
 
     liger_kernels_settings: LigerKernelSettings | None = None
