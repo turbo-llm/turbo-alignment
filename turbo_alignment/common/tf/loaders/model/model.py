@@ -85,7 +85,7 @@ def load_model(
     if model_settings.transformers_settings.load_in_8bit:
         model = prepare_model_for_int8_training(model)
 
-    model.resize_token_embeddings(len(tokenizer))
+    # model.resize_token_embeddings(len(tokenizer))
 
     if model_settings.embeddings_initialization_strategy is not None:
         with torch.no_grad():

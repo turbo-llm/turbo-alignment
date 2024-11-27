@@ -181,6 +181,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             num_return_sequences=args.num_generations,
             num_beams=args.num_generations,
             do_sample=True,
+            stop_strings=args.stop_token
         )
         self.generator_custom_settings = CustomChatGenerationSettings(
             batch=self.args.per_device_train_batch_size,
@@ -299,10 +300,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         if torch.distributed.get_rank() == 0:
             print(f'Generated completion at index [0] shape: {response_ids[0].shape}', flush=True)
-            print(f'Completion decoded: {self.tokenizer.batch_decode(response_ids[0, :].unsqueeze(0))}', flush=True)
+            print(f'Completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
 
         # Padding
-
         max_length = max([response_id.size(1) for response_id in response_ids])
         logging.info(f'{max_length=}')
 
