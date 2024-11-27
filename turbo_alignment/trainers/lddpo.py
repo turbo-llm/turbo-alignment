@@ -14,7 +14,7 @@ from turbo_alignment.trainers.utils import concatenated_inputs
 
 @dataclass
 class LDDPOTrainingArguments(DPOTrainingArguments):
-    alpha: float = 0.1
+    lc_alpha: float = 0.1
 
 
 class LDDPOTrainer(DPOTrainer):
@@ -34,7 +34,7 @@ class LDDPOTrainer(DPOTrainer):
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
-        self.alpha = args.alpha
+        self.lc_alpha = args.lc_alpha
 
         super().__init__(
             model=model,
@@ -72,40 +72,17 @@ class LDDPOTrainer(DPOTrainer):
         ).logits.to(torch.float32)
 
         loss_mask = concatenated_batch['labels'][:, 1:] != DISABLE_LOSS_LABEL
+        batch_size = concatenated_batch['input_ids'].size(0) // 2
+        chosen_mask, rejected_mask = loss_mask.split(batch_size, dim=0)
 
-        per_token_logps = self._get_batch_logps(all_logits, concatenated_batch['labels'])
-        chosen_idxs = batch['inputs_w']['input_ids'].shape[0]
-        rejected_idx = batch['inputs_l']['input_ids'].shape[0]
+        all_logps = self._get_batch_logps(all_logits, concatenated_batch['labels'])
 
-        chosen_logits = all_logits[:chosen_idxs]
-        rejected_logits = all_logits[chosen_idxs:]
+        public_ = chosen_mask * rejected_mask
+        public_mask = torch.cat([public_, public_])
+        public_logps = all_logps * public_mask
+        all_logps = self.lc_alpha * all_logps + (1 - self.lc_alpha) * public_logps
 
-        chosen_per_token_logps = per_token_logps[:chosen_idxs]
-        rejected_per_token_logps = per_token_logps[chosen_idxs : chosen_idxs + rejected_idx]
-
-        chosen_loss_mask = loss_mask[:chosen_idxs]
-        rejected_loss_mask = loss_mask[chosen_idxs : chosen_idxs + rejected_idx]
-
-        min_lengths = torch.min(chosen_loss_mask.sum(-1), rejected_loss_mask.sum(-1))
-
-        answer_start_idx = torch.argmax(
-            chosen_loss_mask.int(), -1
-        )  # The index of the beginning of the chosen and rejected
-        split_start_idx = answer_start_idx + min_lengths  # Add the length of the shorter answer
-
-        # Setting the increment mask
-        alpha_mask = torch.arange(torch.full_like(chosen_loss_mask, 1).size(1)).unsqueeze(
-            0
-        ) >= split_start_idx.unsqueeze(1)
-
-        # Incrementing by alpha logprobs that are out of bounds
-        chosen_per_token_logps[alpha_mask] = chosen_per_token_logps[alpha_mask] ** self.alpha
-        rejected_per_token_logps[alpha_mask] = rejected_per_token_logps[alpha_mask] ** self.alpha
-
-        if self.average_log_prob:
-            chosen_logps = (chosen_per_token_logps * chosen_loss_mask).sum(-1) / chosen_loss_mask.sum(-1)
-            rejected_logps = (rejected_per_token_logps * rejected_loss_mask).sum(-1) / rejected_loss_mask.sum(-1)
-        chosen_logps = (chosen_per_token_logps * chosen_loss_mask).sum(-1)
-        rejected_logps = (rejected_per_token_logps * rejected_loss_mask).sum(-1)
+        chosen_logps, rejected_logps = all_logps.split(batch_size, dim=0)
+        chosen_logits, rejected_logits = all_logits.split(batch_size, dim=0)
 
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
