@@ -10,6 +10,7 @@ from turbo_alignment.settings.pipelines.train.classification import (
 from turbo_alignment.settings.pipelines.train.ddpo import DDPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.dpo import DPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.kto import KTOTrainExperimentSettings
+from turbo_alignment.settings.pipelines.train.lddpo import LDDPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.multimodal import (
     MultimodalTrainExperimentSettings,
 )
