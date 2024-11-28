@@ -79,6 +79,7 @@ class LDDPOTrainer(DPOTrainer):
 
         public_ = chosen_mask * rejected_mask
         public_mask = torch.cat([public_, public_])
+
         public_logps = all_logps * public_mask
 
         all_logps = self.lc_alpha * all_logps + (1 - self.lc_alpha) * public_logps

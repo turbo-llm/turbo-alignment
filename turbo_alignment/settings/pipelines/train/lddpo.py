@@ -5,7 +5,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
 
 
 class LDDPOTrainerSettings(DPOTrainerSettings):
-    lc_alpha: float = 1.0
+    lc_alpha: float
 
 
 class LDDPOTrainExperimentSettings(DPOTrainExperimentSettings):
