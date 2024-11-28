@@ -174,7 +174,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.stop_generation_token_id = tokenizer.encode(args.stop_token, add_special_tokens=False)
         assert len(self.stop_generation_token_id) == 1, self.stop_generation_token_id
-
+        
+        #TODO separate stop_strings and eos_token
+        
         self.generator_transformers_settings = GeneratorTransformersSettings(
             temperature=args.temperature,
             max_new_tokens=args.max_new_tokens,
@@ -291,16 +293,26 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         generator = self._get_chat_generator()
 
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
-            dataset_name='online', records=inputs
+            dataset_name='online', records=inputs, original_records=True
         )
         logging.info(f'generations elapsed time:{time.time() - start}')
         
-        response_ids = [ans.answer_token_ids for g in generations for ans in g.answers]
-        response_attention_mask = [ans.answer_attention_mask for g in generations for ans in g.answers]
+        for g in generations:
+            for ans in g.answers:
+                print(f'{g.input_token_ids.device=}, {ans.answer_token_ids.device=}', flush=True)
+                print(f'{g.input_attention_mask.device=}, {ans.answer_attention_mask.device=}', flush=True)
+                break
+            break
+        response_ids = [torch.cat([g.input_token_ids, ans.answer_token_ids], dim=1) for g in generations for ans in g.answers]
+        response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
+        
+        import random
+        ind = random.randint(0, len(response_ids) - 1)
+        assert response_ids[ind].shape == response_attention_mask[ind].shape
 
         if torch.distributed.get_rank() == 0:
-            print(f'Generated completion at index [0] shape: {response_ids[0].shape}', flush=True)
-            print(f'Completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
+            print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
+            print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
 
         # Padding
         max_length = max([response_id.size(1) for response_id in response_ids])

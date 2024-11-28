@@ -31,8 +31,9 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         if isinstance(transformers_settings.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
 
-        eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
-
+        #TODO separate stop_strings and eos_token
+        self.eos_token_id: int = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
+        assert len(self.eos_token_id) == 1, 'Currently stop_strings == stop_token'
         #TODO beam search was deprecated in vllm 0.6.2
 
         # beam_search_params: dict[str, Any] = {
@@ -45,7 +46,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         print(f'Generation Params:{transformers_settings.stop_strings=}\n{transformers_settings.num_return_sequences=}\n\
             {transformers_settings.repetition_penalty=}\n{transformers_settings.temperature=}\n\
             {transformers_settings.top_p=}\n{transformers_settings.top_k=}\n\
-            {custom_generation_settings.skip_special_tokens=}\n{eos_token_id=}\n{transformers_settings.max_new_tokens=}', flush=True)
+            {custom_generation_settings.skip_special_tokens=}\n{self.eos_token_id=}\n{transformers_settings.max_new_tokens=}', flush=True)
         
         self._sampling_params = SamplingParams(
             n=transformers_settings.num_return_sequences,
@@ -54,7 +55,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             top_p=transformers_settings.top_p,
             top_k=transformers_settings.top_k,
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
-            stop_token_ids=eos_token_id,
+            stop_token_ids=self.eos_token_id,
             max_tokens=transformers_settings.max_new_tokens,
             # **beam_search_params,
         )
@@ -70,7 +71,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         self,
         dataset_name: str,
         records: list[dict[str, Any]],
-        original_records: list[ChatDatasetRecord] | None = None,
+        original_records: bool = False,
     ) -> list[ChatInferenceOutput]:
         import os
         #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
@@ -85,7 +86,8 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             answers = []
             for a in request_output.outputs:
                 answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0)
-                
+                #TODO assuming len(eos_token_id) == 1
+                answer_token_ids[:, -1] = self.eos_token_id[0]
                 ans_msg = AnswerMessage(
                     id=str(a.index),
                     content=a.text,
@@ -96,14 +98,14 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
 
                 answers.append(ans_msg)
             if original_records:
-                original_record = original_records[i]
                 outputs.append(
                     ChatInferenceOutput(
                         input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0),
-                        id=original_record.id,
+                        input_attention_mask=records['attention_mask'][i, :].unsqueeze(0).cpu(),
+                        id=None,
                         dataset_name=dataset_name,
-                        messages=original_record.messages,
-                        label=original_record.label,
+                        messages=None,
+                        label=None,
                         answers=answers,
                     )
                 )
