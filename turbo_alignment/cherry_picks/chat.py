@@ -1,4 +1,5 @@
 from typing import Iterable
+import torch
 
 from accelerate import Accelerator
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -36,18 +37,23 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         ref_model: dict = kwargs.get('ref_model', None)
         sft_model: dict = kwargs.get('sft_model', None)
 
-        generator = ChatGenerator(
-            model=model,
-            tokenizer=tokenizer,
-            transformers_settings=self._generator_transformers_settings,
-            custom_generation_settings=self._custom_generation_settings,
-            accelerator=accelerator,
-            return_logits=True,
-        )
+        with torch.distributed.fsdp.FullyShardedDataParallel.summon_full_params(model):
+            # print('👀'*5, 'model_gathered')
+            generator = ChatGenerator(
+                model=model.module,
+                tokenizer=tokenizer,
+                transformers_settings=self._generator_transformers_settings,
+                custom_generation_settings=self._custom_generation_settings,
+                accelerator=accelerator,
+                return_logits=True,
+            )
 
-        batch_size = self._generator_transformers_settings.num_return_sequences
+            batch_size = self._generator_transformers_settings.num_return_sequences
 
-        generations = generator.generate_from_dataset(dataset)
+            # print('🐷'*5, 'before generation started')
+            generations = generator.generate_from_dataset(dataset)
+            # print('🐙'*5, 'after generation ended')
+            # torch.distributed.barrier()
 
         prompts = [record['prompt'] for record in dataset]
         string_answers = [[answer.content for answer in g.answers] for g in generations]

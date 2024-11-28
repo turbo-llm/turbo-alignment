@@ -80,13 +80,16 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         input_ids = torch.unsqueeze(record['input_ids'], 0).to(self.device)
         attention_mask = torch.unsqueeze(record['attention_mask'], 0).to(self.device)
 
+        # print('🐌'*5, 'generating!!!')
         output_indices = self._model.generate(
             inputs=input_ids,
             attention_mask=attention_mask,
             generation_config=self._transformers_generator_parameters,
             tokenizer=self._tokenizer,
             pad_token_id=self._tokenizer.pad_token_id,
+            synced_gpus=True,
         )
+        # print('🚀'*5, 'generating ended!!!')
 
         postprocessed_output_indices = self._postprocess(
             input_indices=input_ids,
