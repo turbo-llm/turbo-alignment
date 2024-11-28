@@ -112,6 +112,7 @@
         "pad_token": "<pad>"
     },
     "trainer_settings": {
+        "lc_alpha": 0.5,
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 2,
         "per_device_eval_batch_size": 2,
