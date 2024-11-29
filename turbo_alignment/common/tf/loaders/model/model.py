@@ -54,16 +54,6 @@ def load_model(
             apply_liger_kernel_to_qwen2,
         )
 
-    if model_settings.sequence_parallel_degree:
-        import turbo_alignment.modeling.parallel_states as parallel_states
-        from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
-
-        patch_gemma_attn_dict()
-
-        parallel_states.initialize_model_parallel(sequence_parallel_size=model_settings.sequence_parallel_degree)
-        assert parallel_states.sequence_parallel_is_initialized()
-
-    if model_settings.liger_kernels_settings is not None:
         apply_liger_kernel_to_llama(
             rope=model_settings.liger_kernels_settings.use_rope,
             cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,

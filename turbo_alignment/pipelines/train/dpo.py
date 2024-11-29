@@ -17,6 +17,9 @@ from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.dpo import DPOTrainExperimentSettings
 from turbo_alignment.trainers.dpo import DPOTrainer, DPOTrainingArguments
+from turbo_alignment.dataset.loader import DatasetLoader
+
+from torch.utils.data import ConcatDataset
 
 logger = get_project_logger()
 
@@ -61,7 +64,6 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,
-            seq_parallel=experiment_settings.model_settings.sequence_parallel_degree,
             **experiment_settings.trainer_settings.dict(),
         )
 
