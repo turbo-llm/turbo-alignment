@@ -111,8 +111,8 @@ def dpo_model(
     patch_gemma_attn_dict()
 
     experiment_settings = DPOTrainExperimentSettings.parse_file(SETTINGS_PATH)
+    experiment_settings.trainer_settings.load_best_model_at_end = False
     run_pipeline(experiment_settings)
-
 
 
 @app.command(name='dpo_model_vanilla')
@@ -134,14 +134,16 @@ def dpo_model_vanilla(
     vanilla_settings = experiment_settings.copy(deep=True)
     vanilla_settings.model_settings.sequence_parallel_degree = 1
     vanilla_settings.trainer_settings.sequence_parallel = 1
-    vanilla_settings.trainer_settings.deepspeed = None
+    # vanilla_settings.model_settings.model_kwargs["attn_implementation"] = "flash_attention_2"
+    vanilla_settings.model_settings.model_kwargs["attn_implementation"] = "eager"
+    vanilla_settings.model_settings.model_type = 'causal'
+    vanilla_settings.trainer_settings.load_best_model_at_end = False
+    experiment_settings.trainer_settings.load_best_model_at_end = False
+    # vanilla_settings.trainer_settings.deepspeed = None
 
     print(vanilla_settings)
 
     print('##### RUN VANILLA')
-    vanilla_settings.model_settings.model_kwargs["attn_implementation"] = "flash_attention_2"
-    vanilla_settings.model_settings.model_type = 'causal'
-
     run_pipeline(vanilla_settings)
 
 

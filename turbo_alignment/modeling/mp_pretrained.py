@@ -54,7 +54,7 @@ from transformers.modeling_utils import (
     WEIGHTS_INDEX_NAME,
 )
 
-from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2Model
+from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2Model, HybridCache
 
 from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel
 from turbo_alignment.modeling import parallel_states
@@ -105,17 +105,50 @@ class Gemma2ModelWithMPU(Gemma2Model):
         if self.config._attn_implementation == 'flash_attention_2_ulysses':
             self.config._attn_implementation = 'flash_attention_2'
 
-    # def _update_causal_mask(self, attention_mask, input_tensor, cache_position, past_key_values, output_attentions):
-    #     if self.config._attn_implementation == "flash_attention_2_ulysses":
-    #         return attention_mask
+        elif self.config._attn_implementation == 'eager_ulysses':
+            self.config._attn_implementation = 'eager'
 
-    #     return super()._update_causal_mask(
-    #         attention_mask,
-    #         input_tensor,
-    #         cache_position,
-    #         past_key_values,
-    #         output_attentions,
-    #     )
+    def _update_causal_mask(
+        self,
+        attention_mask: torch.Tensor,
+        input_tensor: torch.Tensor,
+        cache_position: torch.Tensor,
+        past_key_values: 'HybridCache',
+        output_attentions: bool,
+    ):
+        # Flash Attention currently doesn't support static cache but Gemma2 work only with static cache.
+        # So we will pass in attention mask as is in any case, not only when ther's padding. Then we'll use its shape
+        # to cut out keys/values trailing 0 used in static cache. This workaround should be compile compatible
+        # as it doesn't cause dynamic control issues.
+        if self.config._attn_implementation.startswith("flash_attention_2"):
+            # cover ulysses and usual cases
+            return attention_mask
+
+        dtype, device = input_tensor.dtype, input_tensor.device
+        sequence_length = input_tensor.shape[1]
+        if parallel_states.sequence_parallel_is_initialized():
+            sequence_length = sequence_length * parallel_states.get_sequence_parallel_world_size()
+
+        if isinstance(past_key_values, HybridCache):
+            target_length = past_key_values.get_max_cache_shape()
+        else:
+            target_length = attention_mask.shape[-1] if attention_mask is not None else sequence_length
+            # HACK
+            cache_position = torch.arange(
+                0, sequence_length, device=input_tensor.device
+            )
+
+        # In case the provided `attention` mask is 2D, we generate a causal mask here (4D).
+        causal_mask = self._prepare_4d_causal_attention_mask_with_cache_position(
+            attention_mask,
+            sequence_length=sequence_length,
+            target_length=target_length,
+            dtype=dtype,
+            device=device,
+            cache_position=cache_position,
+            batch_size=input_tensor.shape[0],
+        )
+        return causal_mask
 
 
 class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
@@ -1348,8 +1381,11 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
     @classmethod
     def _autoset_attn_implementation(cls, config, use_flash_attention_2 = False, torch_dtype = None, device_map = None, check_device_map = True):
         old = config._attn_implementation
-        if old == 'flash_attention_2_ulysses':
-            config._attn_implementation = 'flash_attention_2'
+        if old.endswith('_ulysses'):
+            config._attn_implementation = old[:-len('_ulysses')]
+
+        # if old == 'flash_attention_2_ulysses':
+        #     config._attn_implementation = 'flash_attention_2'
 
         res = super()._autoset_attn_implementation(config, use_flash_attention_2, torch_dtype, device_map, check_device_map)
         res._attn_implementation = old
