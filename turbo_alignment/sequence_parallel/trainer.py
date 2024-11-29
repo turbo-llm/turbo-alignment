@@ -57,7 +57,7 @@ class TrainerWithSeqP(Trainer):
     ):
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
-        print(f'1 {self._train_batch_size=}')
+        # print(f'1 {self._train_batch_size=}')
         if self.args.auto_find_batch_size:
             if self.state.train_batch_size != self._train_batch_size:
                 from accelerate.utils import release_memory
@@ -73,7 +73,7 @@ class TrainerWithSeqP(Trainer):
                     self.propagate_args_to_deepspeed(True)
                     self.args.per_device_train_batch_size = original_bs
             self.state.train_batch_size = self._train_batch_size
-            print(f'2 {self._train_batch_size=}')
+            # print(f'2 {self._train_batch_size=}')
         logger.debug(f"Currently training with a batch size of: {self._train_batch_size}")
         # Data loader and number of training steps
         train_dataloader = self.get_train_dataloader()
@@ -84,7 +84,7 @@ class TrainerWithSeqP(Trainer):
         # number of training epochs: num_train_epochs
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
-        print(f'{args.world_size=}')
+        # print(f'{args.world_size=}')
         total_train_batch_size = self._train_batch_size * args.gradient_accumulation_steps * args.world_size // parallel_states.get_sequence_parallel_world_size_or_one()
 
         len_dataloader = None
