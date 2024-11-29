@@ -711,39 +711,39 @@ class DPOTrainer(TrainerWithSeqP):
 
         # shape: bs x seq_len
         per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
-        if dist.is_initialized():
-            logger.info(f'{dist.get_rank()=} : {per_token_logps=}')
-            filename = f'rank_{dist.get_rank()}_per_token_logps.bin'
-        else:
-            logger.info(f'{per_token_logps=}')
-            filename = f'rank_per_token_logps.bin'
+        # if dist.is_initialized():
+        #     logger.info(f'{dist.get_rank()=} : {per_token_logps=}')
+        #     filename = f'rank_{dist.get_rank()}_per_token_logps.bin'
+        # else:
+        #     logger.info(f'{per_token_logps=}')
+        #     filename = f'rank_per_token_logps.bin'
 
-        with open(filename, 'wb') as output:
-            ar = per_token_logps.cpu().detach().numpy()
-            output.write(ar.tobytes())
+        # with open(filename, 'wb') as output:
+        #     ar = per_token_logps.cpu().detach().numpy()
+        #     output.write(ar.tobytes())
 
         if average_log_prob:
             n_tokens = loss_mask.sum(-1)
-            old_n_tokens = n_tokens.sum().item()
-            group_size = 1
+            # old_n_tokens = n_tokens.sum().item()
+            # group_size = 1
             if seqp_initialized:
-                group_size = seqp_world_size
+                # group_size = seqp_world_size
                 dist.all_reduce(n_tokens, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
-                new_n_tokens = n_tokens.sum().item()
-                print(f'{dist.get_rank()=} {old_n_tokens=} {new_n_tokens=} {group_size}')
+                # new_n_tokens = n_tokens.sum().item()
+                # print(f'{dist.get_rank()=} {old_n_tokens=} {new_n_tokens=} {group_size}')
 
             local_loss = (per_token_logps * loss_mask).sum(-1) / n_tokens
-            if dist.is_initialized():
-                logger.info(f'{dist.get_rank()=} Local_loss before: {local_loss=}')
-            else:
-                logger.info(f'Local_loss before: {local_loss=} {n_tokens=}')
+            # if dist.is_initialized():
+            #     logger.info(f'{dist.get_rank()=} Local_loss before: {local_loss=}')
+            # else:
+            #     logger.info(f'Local_loss before: {local_loss=} {n_tokens=}')
             if seqp_initialized:
                 dist.all_reduce(local_loss, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
 
-            if dist.is_initialized():
-                logger.info(f'{dist.get_rank()=} Local_loss: {local_loss}')
-            else:
-                logger.info(f'Local_loss: {local_loss}')
+            # if dist.is_initialized():
+            #     logger.info(f'{dist.get_rank()=} Local_loss: {local_loss}')
+            # else:
+            #     logger.info(f'Local_loss: {local_loss}')
             return local_loss
 
         return (per_token_logps * loss_mask).sum(-1)
