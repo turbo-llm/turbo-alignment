@@ -158,7 +158,6 @@ class TrainerWithSeqP(Trainer):
         )
         self.state.is_hyper_param_search = trial is not None
         self.state.train_batch_size = self._train_batch_size
-        print(1)
 
         # Compute absolute values for logging, eval, and save if given as ratio
         if args.logging_steps is not None:

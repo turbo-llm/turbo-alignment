@@ -286,8 +286,10 @@ class SimPOLoss(DPOLossRegistry):
 
         loss = -F.logsigmoid(self.beta * logits)
 
-        if dist.is_initialized():
-            print(f'{dist.get_rank()=} {pi_logratios.size()=} {logits.size()=} {chosen_rewards.size()=} {rejected_rewards.size()=} {loss.size()=} {loss=}')
+        # if dist.is_initialized():
+        #     print(f'{dist.get_rank()=} {pi_logratios=} {logits=} {chosen_rewards=} {rejected_rewards=} {loss=}')
+        # else:
+        #     print(f'{pi_logratios=} {logits=} {chosen_rewards=} {rejected_rewards=} {loss=}')
 
         return (
             loss,
@@ -725,12 +727,13 @@ class DPOTrainer(TrainerWithSeqP):
         if average_log_prob:
             n_tokens = loss_mask.sum(-1)
             # old_n_tokens = n_tokens.sum().item()
-            # group_size = 1
             if seqp_initialized:
                 # group_size = seqp_world_size
-                dist.all_reduce(n_tokens, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
+
+                import torch.distributed.nn.functional as dist_funtional
+                n_tokens = dist_funtional.all_reduce(n_tokens, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
                 # new_n_tokens = n_tokens.sum().item()
-                # print(f'{dist.get_rank()=} {old_n_tokens=} {new_n_tokens=} {group_size}')
+                # print(f'{dist.get_rank()=} {old_n_tokens=} {new_n_tokens=}')
 
             local_loss = (per_token_logps * loss_mask).sum(-1) / n_tokens
             # if dist.is_initialized():
@@ -738,7 +741,8 @@ class DPOTrainer(TrainerWithSeqP):
             # else:
             #     logger.info(f'Local_loss before: {local_loss=} {n_tokens=}')
             if seqp_initialized:
-                dist.all_reduce(local_loss, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
+                import torch.distributed.nn.functional as dist_funtional
+                local_loss = dist_funtional.all_reduce(local_loss, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
 
             # if dist.is_initialized():
             #     logger.info(f'{dist.get_rank()=} Local_loss: {local_loss}')
@@ -751,6 +755,11 @@ class DPOTrainer(TrainerWithSeqP):
     def concatenated_forward(
         self, model: nn.Module, batch: dict[str, Any]
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        # if dist.is_initialized():
+        #     print(f'{dist.get_rank()=} {batch=}')
+
+        # else:
+        #     print(f'{batch=}')
         concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
 
         precomputed_margins: torch.Tensor | None = concatenated_batch.pop('margin', None)
@@ -827,11 +836,11 @@ class DPOTrainer(TrainerWithSeqP):
             model, batch
         )  # pylit: disable=unbalanced-tuple-unpacking
 
-        if parallel_states.sequence_parallel_is_initialized():
-            spg: dist.ProcessGroup = parallel_states.get_sequence_parallel_group()
-            print(f'{dist.get_rank()=} {spg.name()=} {spg.group_name=} {policy_chosen_logps=} {policy_rejected_logps=} ')
-        else:
-            print(f'{policy_chosen_logps=} {policy_rejected_logps=} ')
+        # if parallel_states.sequence_parallel_is_initialized():
+        #     spg: dist.ProcessGroup = parallel_states.get_sequence_parallel_group()
+        #     print(f'{dist.get_rank()=} {spg.name()=} {spg.group_name=} {policy_chosen_logps=} {policy_rejected_logps=} ')
+        # else:
+        #     print(f'{policy_chosen_logps=} {policy_rejected_logps=} ')
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
@@ -939,6 +948,20 @@ class DPOTrainer(TrainerWithSeqP):
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
         final_losses = losses.mean()
+        if train_eval == 'train':
+            if dist.is_initialized():
+                print(f'{dist.get_rank()=} {final_losses=}')
+            else:
+                print(f'{final_losses=}')
+
+        if parallel_states.sequence_parallel_is_initialized():
+            if parallel_states.get_sequence_parallel_rank() == 0:
+                pass
+            else:
+                final_losses = final_losses * 0
+
+            # final_losses = final_losses / parallel_states.get_sequence_parallel_world_size()
+
         return final_losses, metrics
 
     def _get_train_sampler(self):

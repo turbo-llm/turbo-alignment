@@ -116,9 +116,6 @@ class Gemma2AttentionUlysses(torch.nn.Module):
         key_states = _SeqAllToAll().apply(spg, key_states, scatter_idx, gather_idx)
         value_states = _SeqAllToAll().apply(spg, value_states, scatter_idx, gather_idx)
 
-        key_states = key_states
-        value_states = value_states
-
         logger.debug(f'{query_states.size()=} {key_states.size()=}')
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) * self.scaling
@@ -129,6 +126,7 @@ class Gemma2AttentionUlysses(torch.nn.Module):
             attn_weights = attn_weights * self.config.attn_logit_softcapping
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+            # print(f'{attn_weights.size()=} {key_states.size()=} {causal_mask.size()=} {attention_mask.size()=} {key_states.size()=}')
             attn_weights = attn_weights + causal_mask
 
         # upcast attention to fp32
