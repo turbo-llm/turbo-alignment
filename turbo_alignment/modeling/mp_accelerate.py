@@ -315,7 +315,7 @@ class HfTrainerDeepSpeedSeqPConfig(HfTrainerDeepSpeedConfig):
         # train_batch_size = world_size * train_micro_batch_size_per_gpu * gradient_accumulation_steps
         # train_batch_size = args.world_size * args.per_device_train_batch_size * args.gradient_accumulation_steps
         train_batch_size = args.world_size // getattr(args, 'sequence_parallel', 1) * args.per_device_train_batch_size * args.gradient_accumulation_steps
-        print(f'{train_batch_size=}')
+        # print(f'{train_batch_size=}')
         self.fill_match(
             "train_micro_batch_size_per_gpu",
             args.per_device_train_batch_size,
@@ -621,6 +621,7 @@ class AcceleratorWithModelParallism(Accelerator):
 
             #### BEGIN OF PATCH
             if mpu.sequence_parallel_is_initialized():
+                logger.info('Set mpu')
                 kwargs["mpu"] = mpu
             else:
                 logger.info('Does not set mpu')
