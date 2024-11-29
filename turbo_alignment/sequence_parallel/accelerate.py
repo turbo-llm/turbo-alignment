@@ -2,7 +2,6 @@ import math
 from typing import Callable, List, Optional, Union
 
 import torch
-import torch.distributed as dist
 from torch.utils.data import DistributedSampler
 from accelerate.accelerator import (  # prepare_data_loader,
     AcceleratedScheduler,
@@ -315,7 +314,6 @@ class HfTrainerDeepSpeedSeqPConfig(HfTrainerDeepSpeedConfig):
         # train_batch_size = world_size * train_micro_batch_size_per_gpu * gradient_accumulation_steps
         # train_batch_size = args.world_size * args.per_device_train_batch_size * args.gradient_accumulation_steps
         train_batch_size = args.world_size // getattr(args, 'sequence_parallel', 1) * args.per_device_train_batch_size * args.gradient_accumulation_steps
-        # print(f'{train_batch_size=}')
         self.fill_match(
             "train_micro_batch_size_per_gpu",
             args.per_device_train_batch_size,
@@ -383,7 +381,7 @@ class HfTrainerDeepSpeedSeqPConfig(HfTrainerDeepSpeedConfig):
             self._dtype = torch.float16
 
 
-class AcceleratorWithModelParallism(Accelerator):
+class AcceleratorWithSequenceParallelism(Accelerator):
     def prepare_data_loader(
         self, data_loader: torch.utils.data.DataLoader, device_placement=None, slice_fn_for_dispatch=None
     ):
