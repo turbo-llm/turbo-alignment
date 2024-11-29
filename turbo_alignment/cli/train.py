@@ -20,6 +20,11 @@ def train_sft_entrypoint(
     pipelines.TrainSFTStrategy().run(experiment_settings)
 
 
+def set_prct():
+    import prctl
+    prctl.set_ptracer(prctl.SET_PTRACER_ANY)
+
+
 @app.command(name='train_dpo', help='Run DPO pipeline')
 def train_dpo_entrypoint(
     experiment_settings_path: Path = typer.Option(
@@ -29,6 +34,12 @@ def train_dpo_entrypoint(
         help='Path to experiment config file',
     )
 ) -> None:
+    import prctl
+    prctl.set_ptracer(prctl.SET_PTRACER_ANY)
+
+    import os
+    os.register_at_fork(after_in_child=set_prct)
+
     experiment_settings = pipeline_settings.DPOTrainExperimentSettings.parse_file(experiment_settings_path)
     pipelines.TrainDPOStrategy().run(experiment_settings)
 

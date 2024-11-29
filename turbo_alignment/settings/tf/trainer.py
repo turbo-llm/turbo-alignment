@@ -30,7 +30,7 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     adam_epsilon: float = 1e-8
     weight_decay: float = 0.0
     max_grad_norm: float = 1.0
-    deepspeed: Path | None = None
+    deepspeed: Path | None | dict[str, Any] = None
     save_total_limit: int = 1
     save_only_model: bool = False
     no_cuda: bool = False
@@ -47,3 +47,4 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     gradient_checkpointing_kwargs: dict[str, Any] = {}
     neftune_noise_alpha: float | None = None
     report_to: list[str] = []
+    sequence_parallel: int = 1
