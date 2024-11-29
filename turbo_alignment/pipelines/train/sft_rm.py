@@ -1,5 +1,6 @@
 from typing import Callable
 
+import torch
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
@@ -39,15 +40,15 @@ class MultiheadModel(PreTrainedModel, GenerationMixin):
         self.decoder = model.model
 
         self.lm_head = model.lm_head
-        self.rm_head = nn.Linear(self.decoder.norm.weight.shape[0], 1, bias=False)
+        self.rm_head = nn.Linear(config.hidden_size, 1, bias=False)
 
     def forward(self, batch):
         outputs_w = self.decoder(**batch['inputs_w']).last_hidden_state[0]
         outputs_l = self.decoder(**batch['inputs_l']).last_hidden_state[0]
 
         lm_logits = self.lm_head(outputs_w)
-        rm_logits_w = self.rm_head(outputs_w[-1])
-        rm_logits_l = self.rm_head(outputs_l[-1])
+        rm_logits_w = self.rm_head(outputs_w[-1:,])[0]
+        rm_logits_l = self.rm_head(outputs_l[-1:,])[0]
 
         return lm_logits, rm_logits_w, rm_logits_l
 
@@ -99,7 +100,8 @@ class TrainMultiheadStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
         tokenizer: PreTrainedTokenizerBase,
     ) -> nn.Module | PreTrainedModel:
         config = AutoConfig.from_pretrained(experiment_settings.model_settings.model_path)
-        return MultiheadModel(config, experiment_settings.model_settings, tokenizer)
+        model = MultiheadModel(config, experiment_settings.model_settings, tokenizer)
+        return model
 
     @staticmethod
     def _get_trainer(

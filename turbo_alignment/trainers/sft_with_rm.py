@@ -15,13 +15,15 @@ logger = logging.get_logger(__name__)
 
 
 class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
-    def compute_loss(self, model, inputs, return_outputs=False) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
         sft_logits, rewards_w, rewards_l = model.forward(inputs)
         sft_labels = inputs['inputs_w']['input_ids'][0]
 
-        loss = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean() + torch.nn.functional.cross_entropy(
-            sft_logits, sft_labels
-        )
+        loss_rm = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean()
+        loss_sft = torch.nn.functional.cross_entropy(sft_logits, sft_labels)
+        alpha = 0.001
+        loss = (1 - alpha) * loss_rm + alpha * loss_sft
+        
         if return_outputs:
             return loss, {'rewards_w': rewards_w, 'rewards_l': rewards_l}
         return loss
@@ -78,11 +80,5 @@ class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
             ):
                 self.state.best_metric = metric_value
                 self.state.best_model_checkpoint = output_dir
-
-        (output_dir / 'decoder').mkdir(parents=True, exist_ok=True)
-
-        torch.save(model.module.lm_head.state_dict(), output_dir / 'lm_head.pt')
-        torch.save(model.module.rm_head.state_dict(), output_dir / 'rm_head.pt')
-
-        model.module.decoder.save_pretrained(output_dir / 'decoder')
-        self.tokenizer.save_pretrained(output_dir / 'decoder')
+        
+        return super()._save_checkpoint(model, trial, metrics)
