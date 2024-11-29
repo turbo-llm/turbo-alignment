@@ -3,9 +3,10 @@ import inspect
 import json
 import os
 import warnings
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import torch
+import torch.distributed
 from transformers.modeling_utils import (
     CONFIG_NAME,
     FLAX_WEIGHTS_NAME,
@@ -53,10 +54,149 @@ from transformers.modeling_utils import (
     WEIGHTS_INDEX_NAME,
 )
 
-from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM
+from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2Model
+
+from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel
+from turbo_alignment.modeling import parallel_states
+
+
+def get_slice_for_tensor(
+    tensor: torch.Tensor,
+    group: torch.distributed.ProcessGroup,
+    dim: int = -1,
+    pad_value: Any = None,
+):
+    is_group_master = torch.distributed.get_rank(group) == 0
+    group_size = torch.distributed.get_world_size(group)
+    tensor_size = tensor.size()
+
+    tenzor_sizes = [None] * group_size
+    torch.distributed.gather_object(tensor_size, tenzor_sizes, dst=0, group=group)
+
+    tensors = None
+    if is_group_master:
+        tensors = [
+            torch.zeros(*tensor_size, dtype=tensor.dtype)
+            for tensor_size in tenzor_sizes
+        ]
+
+    torch.distributed.gather(tensor, tensors, dst=9, group=group)
+
+    single_tensor = None
+    splitted = None
+    chunk_size = [None]
+    if is_group_master:
+        single_tensor = torch.cat(tensors, dim=dim)
+        single_tensor = pad_for_sequence_parallel(tensor, group_size, pad_value, dim=dim)
+        chunk_size = single_tensor.size(dim) // group_size
+        splitted = single_tensor.split(chunk_size, dim=dim)
+        chunk_size = [splitted[0].size()]
+
+    torch.distributed.broadcast_object_list(chunk_size, 0, group=group)
+    result = torch.zeros(*chunk_size[0], dtype=tensor.dtype)
+    torch.distributed.scatter(result, splitted, src=0, group=group)
+    return result
+
+
+class Gemma2ModelWithMPU(Gemma2Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._actual_attn_implemenation = self.config._attn_implementation
+        if self.config._attn_implementation == 'flash_attention_2_ulysses':
+            self.config._attn_implementation = 'flash_attention_2'
+
+    # def _update_causal_mask(self, attention_mask, input_tensor, cache_position, past_key_values, output_attentions):
+    #     if self.config._attn_implementation == "flash_attention_2_ulysses":
+    #         return attention_mask
+
+    #     return super()._update_causal_mask(
+    #         attention_mask,
+    #         input_tensor,
+    #         cache_position,
+    #         past_key_values,
+    #         output_attentions,
+    #     )
 
 
 class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
+    def __init__(self, config):
+        super().__init__(config)
+        self.model = Gemma2ModelWithMPU(config)
+        self.vocab_size = config.vocab_size
+        self.lm_head = torch.nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+
+        self._rearrage_in_forward = False
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def generate(
+        self,
+        inputs=None,
+        generation_config=None,
+        logits_processor=None,
+        stopping_criteria=None,
+        prefix_allowed_tokens_fn=None,
+        synced_gpus=None,
+        assistant_model=None,
+        streamer=None,
+        negative_prompt_ids=None,
+        negative_prompt_attention_mask=None,
+        **kwargs
+    ):
+        try:
+            self._rearrage_in_forward = True
+            return super().generate(
+                inputs,
+                generation_config,
+                logits_processor,
+                stopping_criteria,
+                prefix_allowed_tokens_fn,
+                synced_gpus,
+                assistant_model,
+                streamer,
+                negative_prompt_ids,
+                negative_prompt_attention_mask,
+                **kwargs,
+            )
+        finally:
+            self._rearrage_in_forward = False
+
+    def forward(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional['HybridCache'] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        num_logits_to_keep: int = 0,
+        **loss_kwargs
+    ):
+        # if self._rearrage_in_forward:
+        #     input_ids = get_slice_for_tensor()
+
+        return super().forward(
+            input_ids,
+            attention_mask,
+            position_ids,
+            past_key_values,
+            inputs_embeds,
+            labels,
+            False,
+            output_attentions,
+            output_hidden_states,
+            return_dict,
+            cache_position,
+            num_logits_to_keep,
+            **loss_kwargs,
+        )
+
     # copied and slighlty modified
     @classmethod
     def from_pretrained(
@@ -953,7 +1093,16 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
             import turbo_alignment.modeling.parallel_states as mpu
 
             logger.info("Detected DeepSpeed ZeRO-3: activating zero.init() for this model")
-            init_contexts = [deepspeed.zero.Init(config_dict_or_path=deepspeed_config(), mpu=mpu if mpu.sequence_parallel_is_initialized() else None)] + init_contexts
+            mpu_inited = mpu.sequence_parallel_is_initialized()
+
+            init_contexts = [
+                deepspeed.zero.Init(
+                    config_dict_or_path=deepspeed_config(),
+                    mpu=mpu if mpu_inited else None,
+                    # sequence_data_parallel_group=mpu.get_sequence_data_parallel_group() if mpu_inited else None,
+                    data_parallel_group=mpu.get_data_parallel_group() if mpu_inited else None,
+                )
+            ] + init_contexts
         elif low_cpu_mem_usage:
             init_contexts.append(init_empty_weights())
 

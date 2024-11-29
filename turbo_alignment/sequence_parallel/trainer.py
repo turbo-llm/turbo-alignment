@@ -1,32 +1,21 @@
-# pylint: skip-file
-# flake8: noqa
-
 import contextlib
-import gc
 import functools
 import logging
 import math
 import os
+import time
 import shutil
 import sys
-import time
-from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 import torch
 import torch.distributed as dist
-from packaging import version
 from torch import nn
-from torch.utils.data import RandomSampler
 from transformers import Trainer
-from transformers.modeling_utils import unwrap_model
 from transformers.trainer import (
-    TRAINER_STATE_NAME,
     DebugOption,
     DebugUnderflowOverflow,
-    DistributedType,
     ExportableState,
-    HPSearchBackend,
     OptimizerNames,
     ParallelMode,
     TrainerState,
@@ -34,23 +23,21 @@ from transformers.trainer import (
     _is_peft_model,
     deepspeed_init,
     deepspeed_load_checkpoint,
-    get_model_param_count,
     has_length,
-    hp_params,
-    is_accelerate_available,
-    is_apex_available,
     is_sagemaker_mp_enabled,
     is_torch_xla_available,
     skip_first_batches,
     speed_metrics,
     tpu_spmd_dataloader,
-    SAFE_WEIGHTS_NAME,
-    WEIGHTS_NAME,
+    TRAINER_STATE_NAME,
+    get_model_param_count,
+    HPSearchBackend,
+    hp_params,
+    DistributedType,
+    is_accelerate_available,
+    is_apex_available,
 )
-from transformers.trainer_pt_utils import remove_dummy_checkpoint
 from turbo_alignment.modeling import parallel_states
-
-from .utils import create_forward_hook, create_hook
 
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
@@ -61,75 +48,16 @@ if is_sagemaker_mp_enabled():
 if is_apex_available():
     from apex import amp
 
-
-if is_sagemaker_mp_enabled():
-    import smdistributed.modelparallel.torch as smp
-    from smdistributed.modelparallel import __version__ as SMP_VERSION
-
-    IS_SAGEMAKER_MP_POST_1_10 = version.parse(SMP_VERSION) >= version.parse("1.10")
-
-    from transformers.trainer_pt_utils import (
-        smp_forward_backward,
-        smp_forward_only,
-        smp_gather,
-        smp_nested_concat,
-    )
-else:
-    IS_SAGEMAKER_MP_POST_1_10 = False
-
-
-if is_accelerate_available():
-    from accelerate import __version__ as accelerate_version
-
 logger = logging.getLogger(__name__)
 
 
 class TrainerWithSeqP(Trainer):
-    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        r = super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
-        return r
-
-    def _get_train_sampler(self):
-        from transformers.trainer_pt_utils import LengthGroupedSampler
-        from transformers.trainer_utils import has_length
-        from transformers.utils.import_utils import is_datasets_available
-
-        if is_datasets_available():
-            import datasets
-
-        if self.train_dataset is None or not has_length(self.train_dataset):
-            return None
-
-        # Build the sampler.
-        if self.args.group_by_length:
-            if is_datasets_available() and isinstance(self.train_dataset, datasets.Dataset):
-                lengths = (
-                    self.train_dataset[self.args.length_column_name]
-                    if self.args.length_column_name in self.train_dataset.column_names
-                    else None
-                )
-            else:
-                lengths = None
-            model_input_name = (
-                self.processing_class.model_input_names[0] if self.processing_class is not None else None
-            )
-            return LengthGroupedSampler(
-                self.args.train_batch_size * self.args.gradient_accumulation_steps,
-                dataset=self.train_dataset,
-                lengths=lengths,
-                model_input_name=model_input_name,
-            )
-
-        else:
-            generator = torch.Generator()
-            generator.manual_seed(self.args.seed)
-            return RandomSampler(self.train_dataset, generator=generator)
-
     def _inner_training_loop(
         self, batch_size=None, args=None, resume_from_checkpoint=None, trial=None, ignore_keys_for_eval=None
     ):
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
+        print(f'1 {self._train_batch_size=}')
         if self.args.auto_find_batch_size:
             if self.state.train_batch_size != self._train_batch_size:
                 from accelerate.utils import release_memory
@@ -144,8 +72,8 @@ class TrainerWithSeqP(Trainer):
                     self.args.per_device_train_batch_size = self._train_batch_size // max(1, self.args.n_gpu)
                     self.propagate_args_to_deepspeed(True)
                     self.args.per_device_train_batch_size = original_bs
-
             self.state.train_batch_size = self._train_batch_size
+            print(f'2 {self._train_batch_size=}')
         logger.debug(f"Currently training with a batch size of: {self._train_batch_size}")
         # Data loader and number of training steps
         train_dataloader = self.get_train_dataloader()
@@ -156,14 +84,8 @@ class TrainerWithSeqP(Trainer):
         # number of training epochs: num_train_epochs
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
-
-        # BEGIN OF PATCH
-        total_train_batch_size = (
-            self._train_batch_size
-            * args.gradient_accumulation_steps
-            * (args.world_size // parallel_states.get_sequence_parallel_world_size_or_one())
-        )
-        # END OF PATCH
+        print(f'{args.world_size=}')
+        total_train_batch_size = self._train_batch_size * args.gradient_accumulation_steps * args.world_size // parallel_states.get_sequence_parallel_world_size_or_one()
 
         len_dataloader = None
         num_train_tokens = None
@@ -236,6 +158,7 @@ class TrainerWithSeqP(Trainer):
         )
         self.state.is_hyper_param_search = trial is not None
         self.state.train_batch_size = self._train_batch_size
+        print(1)
 
         # Compute absolute values for logging, eval, and save if given as ratio
         if args.logging_steps is not None:
@@ -264,17 +187,11 @@ class TrainerWithSeqP(Trainer):
         # this is for unhandled cases such as
         # FSDP-XLA, SageMaker MP/DP, DataParallel, IPEX
         use_accelerator_prepare = True if model is self.model else False
-        if use_accelerator_prepare and self.is_fsdp_enabled:
-            # In case of auto_find_batch_size=True
-            # Remove FSDP wrapping from sub-models.
-            self.model = unwrap_model(self.model, recursive=True)
 
         if delay_optimizer_creation:
             if use_accelerator_prepare:
-                # configure fsdp plugin for qlora if any
                 self._fsdp_qlora_plugin_updates()
-                if self.accelerator.mixed_precision != "fp8":
-                    self.model = self.accelerator.prepare(self.model)
+                self.model = self.accelerator.prepare(self.model)
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         # prepare using `accelerator` prepare
@@ -397,31 +314,6 @@ class TrainerWithSeqP(Trainer):
             self._evaluate(trial, ignore_keys_for_eval, skip_scheduler=True)
 
         total_batched_samples = 0
-
-        if os.getenv('CREATE_GRADIENT_HOOK'):
-            m: nn.Module = self.model
-            for name, param in m.named_parameters():
-                if not param.requires_grad:
-                    continue
-
-                param.register_hook(
-                    create_hook(
-                        name,
-                        seq_p_inited=self.args.sequence_parallel > 1,
-                        output_dir=os.getenv('GRADIENT_HOOK_OUTPUT_DIR', '/mnt/p.geyn/gradients'),
-                    )
-                )
-
-            for name, module in m.named_modules():
-                module.register_forward_hook(
-                    create_forward_hook(
-                        name,
-                        seq_p_inited=self.args.sequence_parallel > 1,
-                        output_dir=os.getenv('FORWARD_HOOK_OUTPUT_DIR', '/mnt/p.geyn/forward'),
-                    ),
-                    with_kwargs=True,
-                )
-
         for epoch in range(epochs_trained, num_train_epochs):
             epoch_dataloader = train_dataloader
             if hasattr(epoch_dataloader, "set_epoch"):
@@ -465,7 +357,12 @@ class TrainerWithSeqP(Trainer):
                 for i, inputs in enumerate(batch_samples):
                     step += 1
                     total_batched_samples += 1
-                    do_sync_step = (step + 1) % args.gradient_accumulation_steps == 0 or (step + 1) == steps_in_epoch
+                    is_last_step_and_steps_less_than_grad_acc = (
+                        steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch
+                    )
+                    do_sync_step = is_last_step_and_steps_less_than_grad_acc or (
+                        total_batched_samples % args.gradient_accumulation_steps == 0
+                    )
                     # Since we perform prefetching, we need to manually set sync_gradients
                     if not do_sync_step:
                         self.accelerator.gradient_state._set_sync_gradients(False)
@@ -506,27 +403,11 @@ class TrainerWithSeqP(Trainer):
                     # We explicitly want to avoid relying on `accelerator.accumulate` for generation training
                     context = (
                         functools.partial(self.accelerator.no_sync, model=model)
-                        if i != len(batch_samples) - 1
-                        and self.accelerator.distributed_type != DistributedType.DEEPSPEED
+                        if i == len(batch_samples) - 1
                         else contextlib.nullcontext
                     )
-
                     with context():
-                        start = time.time()
                         tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
-                        num_tokens = None
-                        if num_items_in_batch is not None:
-                            if isinstance(num_items_in_batch, torch.Tensor):
-                                num_items_in_batch = num_items_in_batch.item()
-
-                            num_tokens = num_items_in_batch
-
-                        speed_metrics_ = speed_metrics(
-                            'train',
-                            start,
-                            num_samples=len(inputs),
-                            num_tokens=num_tokens,
-                        )
 
                     if (
                         args.logging_nan_inf_filter
@@ -538,7 +419,7 @@ class TrainerWithSeqP(Trainer):
                     else:
                         if tr_loss.device != tr_loss_step.device:
                             raise ValueError(
-                                f"Calculated loss must be on the original device: {tr_loss.device} but device in use is {tr_loss_step.device}"  # pylint: disable
+                                f"Calculated loss must be on the original device: {tr_loss.device} but device in use is {tr_loss_step.device}"
                             )
                         tr_loss = tr_loss + tr_loss_step
 
@@ -574,7 +455,6 @@ class TrainerWithSeqP(Trainer):
                                 # In some cases the grad norm may not return a float
                                 if hasattr(grad_norm, "item"):
                                     grad_norm = grad_norm.item()
-
                             else:
                                 grad_norm = _grad_norm
 
@@ -594,15 +474,7 @@ class TrainerWithSeqP(Trainer):
                         self.state.global_step += 1
                         self.state.epoch = epoch + (step + 1 + steps_skipped) / steps_in_epoch
                         self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                        self._maybe_log_save_evaluate(
-                            tr_loss,
-                            grad_norm,
-                            model,
-                            trial,
-                            epoch,
-                            ignore_keys_for_eval,
-                            metrics=speed_metrics_,
-                        )
+                        self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval)
                     else:
                         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
@@ -700,97 +572,3 @@ class TrainerWithSeqP(Trainer):
             self._deactivate_neftune(self.model)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
-
-    def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, metrics=None):
-        if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
-            if is_torch_xla_available():
-                xm.mark_step()
-
-            logs: Dict[str, float] = {}
-
-            # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-
-            # reset tr_loss to zero
-            tr_loss -= tr_loss
-
-            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
-
-            if grad_norm is not None:
-                logs["grad_norm"] = grad_norm.detach().item() if isinstance(grad_norm, torch.Tensor) else grad_norm
-            logs["learning_rate"] = self._get_learning_rate()
-
-            self._total_loss_scalar += tr_loss_scalar
-            self._globalstep_last_logged = self.state.global_step
-            self.store_flos()
-
-            if metrics:
-                logs.update(metrics)
-
-            self.log(logs)
-
-        metrics = None
-        if self.control.should_evaluate:
-            metrics = self._evaluate(trial, ignore_keys_for_eval)
-
-        if self.control.should_save:
-            self._save_checkpoint(model, trial)
-            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
-
-    def save_model(self, output_dir: Optional[str] = None, _internal_call: bool = False):
-        """
-        Will save the model, so you can reload it using `from_pretrained()`.
-
-        Will only save from the main process.
-        """
-
-        if output_dir is None:
-            output_dir = self.args.output_dir
-
-        if is_torch_xla_available():
-            self._save_tpu(output_dir)
-        elif is_sagemaker_mp_enabled():
-            # Calling the state_dict needs to be done on the wrapped model and on all processes.
-            os.makedirs(output_dir, exist_ok=True)
-            state_dict = self.model_wrapped.state_dict()
-            if self.args.should_save:
-                self._save(output_dir, state_dict=state_dict)
-            if IS_SAGEMAKER_MP_POST_1_10:
-                # 'user_content.pt' indicates model state_dict saved with smp >= 1.10
-                Path(os.path.join(output_dir, "user_content.pt")).touch()
-        elif self.is_fsdp_enabled:
-            if ("FULL_STATE_DICT" in str(self.accelerator.state.fsdp_plugin.state_dict_type)) and (
-                version.parse(accelerate_version) > version.parse("0.24.1")
-            ):
-                state_dict = self.accelerator.get_state_dict(self.model)
-                if self.args.should_save:
-                    self._save(output_dir, state_dict=state_dict)
-        elif self.is_deepspeed_enabled:
-            try:
-                state_dict = self.accelerator.get_state_dict(self.deepspeed)
-                if self.args.should_save:
-                    self._save(output_dir, state_dict=state_dict)
-
-                # BEGIN OF PATCH
-                logger.info('Del state_dict of checkpoint')
-                del state_dict
-                logger.info('call gc')
-                gc.collect()
-                # END OF PATCH
-            except ValueError:
-                logger.warning(
-                    " stage3_gather_16bit_weights_on_model_save=false. Saving the full checkpoint instead, use"
-                    " zero_to_fp32.py to recover weights"
-                )
-                if self.args.should_save:
-                    self._save(output_dir, state_dict={})
-                # remove the dummy state_dict
-                remove_dummy_checkpoint(self.args.should_save, output_dir, [WEIGHTS_NAME, SAFE_WEIGHTS_NAME])
-                self.model_wrapped.save_checkpoint(output_dir)
-
-        elif self.args.should_save:
-            self._save(output_dir)
-
-        # Push to the Hub when `save_model` is called by the user.
-        if self.args.push_to_hub and not _internal_call:
-            self.push_to_hub(commit_message="Model save")

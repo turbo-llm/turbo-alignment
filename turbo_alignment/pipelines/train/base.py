@@ -31,6 +31,9 @@ from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.s3 import ExperimentMetadata, S3HandlerParameters
+from turbo_alignment.modeling.parallel_states import get_sequence_parallel_rank, get_sequence_parallel_world_size
+from turbo_alignment.modeling.seq_p_collator import DataCollatorForSequenceParallism
+from turbo_alignment.modeling.patch_accelerate import patch_acclerator
 
 logger = get_project_logger()
 
@@ -140,41 +143,54 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             )
 
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
-        training_args = self._get_training_args(experiment_settings)
-        self.tokenizer = self._load_tokenizer(experiment_settings)
+        from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
+        patch_gemma_attn_dict()
+        from turbo_alignment.common import set_random_seed
+        set_random_seed(experiment_settings.seed)
 
-            # In the older version, we loaded the model before args were created,
-            # because of bug in embedding resizing with DeepSpeed Zero3
-            # Now, we don't observe this bug and this order helps to save RAM
-
-            training_args = self._get_training_args(experiment_settings)
-
-            logger.info('Special tokens added!')
+        with patch_acclerator():
+            self.tokenizer = self._load_tokenizer(experiment_settings)
+            logger.info('Tokenizer is loaded!')
             self.model = self._load_model(experiment_settings, self.tokenizer)
             logger.info('Model is loaded!')
 
-        self.model = self._load_model(experiment_settings, self.tokenizer)
-        special_tokens_setter.setup_model_config(self.model)
+            additional_special_tokens = self._get_additional_special_tokens(experiment_settings)
+            logger.info(f'Special tokens: {additional_special_tokens}')
+            special_tokens_setter = SpecialTokensSetter(self.tokenizer, experiment_settings.special_tokens_settings)
+            special_tokens_setter.set_all()
+            special_tokens_setter.set_custom_tokens(additional_special_tokens)
 
-        logger.info('Model is loaded!')
+            logger.info('Special tokens added!')
 
-        train_dataset: ConcatDataset = ConcatDataset(
-            datasets=DatasetLoader().load_datasets(
-                experiment_settings.train_dataset_settings,
-                tokenizer=self.tokenizer,
-                strategy=DatasetStrategy.TRAIN,
+            # self.model = self._load_model(experiment_settings, self.tokenizer)
+            special_tokens_setter.setup_model_config(self.model)
+
+            # if experiment_settings.model_settings.sequence_parallel_degree > 1:
+            #     import turbo_alignment.modeling.parallel_states as parallel_states
+
+            #     parallel_states.initialize_model_parallel(
+            #         sequence_parallel_size=experiment_settings.model_settings.sequence_parallel_degree
+            #     )
+            #     assert parallel_states.sequence_parallel_is_initialized()
+            #     assert parallel_states.get_sequence_parallel_world_size() == experiment_settings.model_settings.sequence_parallel_degree
+
+            train_dataset: ConcatDataset = ConcatDataset(
+                datasets=DatasetLoader().load_datasets(
+                    experiment_settings.train_dataset_settings,
+                    tokenizer=self.tokenizer,
+                    strategy=DatasetStrategy.TRAIN,
+                )
             )
 
-            set_random_seed(training_args.seed)
             val_dataset: ConcatDataset = ConcatDataset(
                 datasets=DatasetLoader().load_datasets(
                     experiment_settings.val_dataset_settings,
                     tokenizer=self.tokenizer,
                     strategy=DatasetStrategy.TRAIN,
-                    seed=experiment_settings.seed,
                 )
             )
 
+            training_args = self._get_training_args(experiment_settings)
             data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
             if experiment_settings.trainer_settings.sequence_parallel > 1:
                 logger.info('Wrap data collator to support sequence parallelism')
@@ -184,9 +200,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                     seq_p_world_size=get_sequence_parallel_world_size(),
                 )
 
-        from turbo_alignment.modeling.patch_accelerate import patch_acclerator
-
-        with patch_acclerator():
             self.trainer = self._get_trainer(
                 training_args,
                 experiment_settings,

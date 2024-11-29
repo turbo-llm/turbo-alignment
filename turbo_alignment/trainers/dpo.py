@@ -5,10 +5,9 @@ from typing import Any, Callable, Literal
 
 import torch
 import torch.distributed as dist
-import torch.distributed.nn.functional as dist_functional
 import torch.nn.functional as F
 from torch import nn
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, RandomSampler
 from transformers import (
     BaseImageProcessor,
     DefaultFlowCallback,
@@ -55,11 +54,6 @@ from turbo_alignment.trainers.utils import (
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.sequence_parallel.trainer import TrainerWithSeqP
 from .base_args import TrainingArgumentsWithSeqP
-
-if is_deepspeed_available():
-    from deepspeed.runtime.engine import DeepSpeedEngine
-else:
-    DeepSpeedEngine = None
 
 logger = get_project_logger()
 
@@ -291,6 +285,9 @@ class SimPOLoss(DPOLossRegistry):
         rejected_rewards = self.beta * (policy_rejected_logps).detach()
 
         loss = -F.logsigmoid(self.beta * logits)
+
+        if dist.is_initialized():
+            print(f'{dist.get_rank()=} {pi_logratios.size()=} {logits.size()=} {chosen_rewards.size()=} {rejected_rewards.size()=} {loss.size()=} {loss=}')
 
         return (
             loss,
@@ -573,16 +570,6 @@ class DPOTrainingArguments(TrainingArgumentsWithSeqP):
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False
-    seq_parallel: int = 1
-
-    def __post_init__(self):
-        return super().__post_init__()
-
-    @property
-    def world_size(self) -> int:
-        world_size = super().world_size
-        assert world_size % self.seq_parallel == 0, (world_size, self.seq_parallel)
-        return world_size // self.seq_parallel
 
 
 class DPOTrainer(TrainerWithSeqP):
@@ -689,19 +676,31 @@ class DPOTrainer(TrainerWithSeqP):
             precomputed_margins=precomputed_margins,
         )
 
+    def train(self, resume_from_checkpoint = None, trial = None, ignore_keys_for_eval = None, **kwargs):
+        return super().train(resume_from_checkpoint, trial, ignore_keys_for_eval, **kwargs)
+
     def _get_batch_logps(
         self,
         logits: torch.Tensor,
         labels: torch.Tensor,
         average_log_prob: bool = False,
     ) -> torch.Tensor:
-        if parallel_states.sequence_parallel_is_initialized():
-            if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
-                logits = logits[:, :-1]
+        seqp_initialized = parallel_states.sequence_parallel_is_initialized()
+        if seqp_initialized:
+            seqp_world_size = parallel_states.get_sequence_parallel_world_size()
+            if parallel_states.get_sequence_parallel_rank() + 1 == seqp_world_size:
+                # last worker, should drop last logit
+                logits = logits[:, :-1, :]
 
         else:
             logits = logits[:, :-1, :]
-            labels = labels[:, 1:].clone()
+            labels = labels[:, 1:]
+
+        # assert seqp_initialized
+
+        # we have dropped the first label in data preparation
+        labels = labels.clone()
+        assert not labels.requires_grad
 
         if logits.shape[:-1] != labels.shape:
             raise ValueError('Logits (batch and sequence length dim) and labels must have the same shape.')
@@ -710,23 +709,44 @@ class DPOTrainer(TrainerWithSeqP):
 
         labels[labels == DISABLE_LOSS_LABEL] = 0
 
+        # shape: bs x seq_len
         per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
+        if dist.is_initialized():
+            logger.info(f'{dist.get_rank()=} : {per_token_logps=}')
+            filename = f'rank_{dist.get_rank()}_per_token_logps.bin'
+        else:
+            logger.info(f'{per_token_logps=}')
+            filename = f'rank_per_token_logps.bin'
+
+        with open(filename, 'wb') as output:
+            ar = per_token_logps.cpu().detach().numpy()
+            output.write(ar.tobytes())
 
         if average_log_prob:
             n_tokens = loss_mask.sum(-1)
-            local_loss = (per_token_logps * loss_mask).sum(-1)
+            old_n_tokens = n_tokens.sum().item()
+            group_size = 1
+            if seqp_initialized:
+                group_size = seqp_world_size
+                dist.all_reduce(n_tokens, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
+                new_n_tokens = n_tokens.sum().item()
+                print(f'{dist.get_rank()=} {old_n_tokens=} {new_n_tokens=} {group_size}')
 
-            if parallel_states.sequence_parallel_is_initialized():
-                n_tokens = dist_functional.all_reduce(n_tokens, op=dist.ReduceOp.SUM)
-                local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
+            local_loss = (per_token_logps * loss_mask).sum(-1) / n_tokens
+            if dist.is_initialized():
+                logger.info(f'{dist.get_rank()=} Local_loss before: {local_loss=}')
+            else:
+                logger.info(f'Local_loss before: {local_loss=} {n_tokens=}')
+            if seqp_initialized:
+                dist.all_reduce(local_loss, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
 
-            return local_loss / n_tokens
+            if dist.is_initialized():
+                logger.info(f'{dist.get_rank()=} Local_loss: {local_loss}')
+            else:
+                logger.info(f'Local_loss: {local_loss}')
+            return local_loss
 
-        local_loss = (per_token_logps * loss_mask).sum(-1)
-        if parallel_states.sequence_parallel_is_initialized():
-            local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
-
-        return local_loss
+        return (per_token_logps * loss_mask).sum(-1)
 
     def concatenated_forward(
         self, model: nn.Module, batch: dict[str, Any]
@@ -741,26 +761,20 @@ class DPOTrainer(TrainerWithSeqP):
 
         add_kwargs = {}
 
+        from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel
         if parallel_states.sequence_parallel_is_initialized():
             input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
-            seq_len = input_ids.size(1)
+            position_ids = torch.arange(0, input_ids.size(1), device=input_ids.device).unsqueeze(0)
             labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
-            attention_mask = pad_for_sequence_parallel(
-                attention_mask,
-                parallel_states.get_sequence_parallel_world_size(),
-                0,
-            )
+            attention_mask = pad_for_sequence_parallel(attention_mask, parallel_states.get_sequence_parallel_world_size(), 0)
             assert input_ids.size(-1) == labels.size(-1), (input_ids.size(), labels.size())
             chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
             start = chunk_size * parallel_states.get_sequence_parallel_rank()
             end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
             input_ids = input_ids[:, start:end].clone()
+            labels = labels[:, start + 1: end + 1].clone()  # we add one label for all workers except the last one, because after we drop the first label
 
-            labels = labels[:, start + 1 : end + 1]
-
-            if require_position_ids(model):
-                position_ids = torch.arange(0, seq_len, device=input_ids.device).unsqueeze(0)
-                add_kwargs['position_ids'] = position_ids
+            add_kwargs['position_ids'] = position_ids[:, start:end].clone()
 
         all_logits = model(
             input_ids,
@@ -778,9 +792,6 @@ class DPOTrainer(TrainerWithSeqP):
 
         chosen_logps = all_logps[:chosen_idxs]
         rejected_logps = all_logps[chosen_idxs : chosen_idxs + rejected_idx]
-
-        chosen_logits = all_logits[:chosen_idxs]
-        rejected_logits = all_logits[chosen_idxs:]
 
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
 
@@ -815,6 +826,12 @@ class DPOTrainer(TrainerWithSeqP):
         ) = self.concatenated_forward(
             model, batch
         )  # pylit: disable=unbalanced-tuple-unpacking
+
+        if parallel_states.sequence_parallel_is_initialized():
+            spg: dist.ProcessGroup = parallel_states.get_sequence_parallel_group()
+            print(f'{dist.get_rank()=} {spg.name()=} {spg.group_name=} {policy_chosen_logps=} {policy_rejected_logps=} ')
+        else:
+            print(f'{policy_chosen_logps=} {policy_rejected_logps=} ')
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
@@ -921,7 +938,44 @@ class DPOTrainer(TrainerWithSeqP):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        return losses.mean() / parallel_states.get_sequence_parallel_world_size_or_one(), metrics
+        final_losses = losses.mean()
+        return final_losses, metrics
+
+    def _get_train_sampler(self):
+        from transformers.trainer_utils import has_length
+        from transformers.utils.import_utils import is_datasets_available
+        from transformers.trainer_pt_utils import LengthGroupedSampler
+
+        if is_datasets_available():
+            import datasets
+
+        if self.train_dataset is None or not has_length(self.train_dataset):
+            return None
+
+        # Build the sampler.
+        if self.args.group_by_length:
+            if is_datasets_available() and isinstance(self.train_dataset, datasets.Dataset):
+                lengths = (
+                    self.train_dataset[self.args.length_column_name]
+                    if self.args.length_column_name in self.train_dataset.column_names
+                    else None
+                )
+            else:
+                lengths = None
+            model_input_name = (
+                self.processing_class.model_input_names[0] if self.processing_class is not None else None
+            )
+            return LengthGroupedSampler(
+                self.args.train_batch_size * self.args.gradient_accumulation_steps,
+                dataset=self.train_dataset,
+                lengths=lengths,
+                model_input_name=model_input_name,
+            )
+
+        else:
+            generator = torch.Generator()
+            generator.manual_seed(self.args.seed)
+            return RandomSampler(self.train_dataset, generator=generator)
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor

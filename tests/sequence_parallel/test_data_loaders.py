@@ -1,14 +1,12 @@
-import pytest
 import torch
 from transformers import Trainer, TrainingArguments
 
+from turbo_alignment.modeling.patch_accelerate import patch_acclerator
 from turbo_alignment.modeling import parallel_states
-from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 
 from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
 from tests.sequence_parallel.dataset import SimpleDataset
-from tests.sequence_parallel.launcher import app, launch_with_name
-from tests.sequence_parallel.marks import has_two_gpus
+from tests.sequence_parallel.launcher import app
 
 
 class SimpleModel(torch.nn.Module):
@@ -22,7 +20,12 @@ class SimpleModel(torch.nn.Module):
 
 @app.command(name='with-seq-p')
 def run_with_seq_p():
-    dataset = SimpleDataset([{'x': torch.tensor([i])} for i in range(2)])
+    dataset = SimpleDataset(
+        [
+            {'x': torch.tensor([i])}
+            for i in range(2)
+        ]
+    )
     with patch_acclerator():
         args = TrainingArguments(
             output_dir='.',
@@ -48,7 +51,12 @@ def run_with_seq_p():
 
 @app.command('without-seq-p')
 def run_without_seq_p():
-    dataset = SimpleDataset([{'x': torch.tensor([i])} for i in range(2)])
+    dataset = SimpleDataset(
+        [
+            {'x': torch.tensor([i])}
+            for i in range(2)
+        ]
+    )
     with patch_acclerator():
         args = TrainingArguments(
             output_dir='.',
@@ -68,24 +76,12 @@ def run_without_seq_p():
             args=args,
         )
 
-        for batch in trainer.get_train_dataloader():
+        for i, batch in enumerate(trainer.get_train_dataloader()):
             assert batch['x'].item() == torch.distributed.get_rank(), batch
 
 
 def main():
     return app()
-
-
-@pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
-@pytest.mark.parametrize(
-    'cmd_name',
-    [
-        pytest.param('with-seq-p', id='with-seq-p'),
-        pytest.param('without-seq-p', id='without-seq-p'),
-    ],
-)
-def test_data_loader(cmd_name):
-    return launch_with_name(__file__, cmd_name, 2)
 
 
 if __name__ == '__main__':

@@ -46,14 +46,13 @@
         "dataset_type": "pair_preferences"
     },
     "model_settings": {
-        "model_path": "/mnt/models/google/gemma2-2b",
+        "model_path": "/mnt/models/google/gemma-2-2b",
         "model_type": "gemma_with_ulysses",
-        "transformers_settings": {
-            "torch_dtype": "float32"
-        },
+        "transformers_settings": {},
         "model_kwargs": {
-            "attn_implementation": "eager"
-        }
+            "attn_implementation": "flash_attention_2_ulysses"
+        },
+        "sequence_parallel_degree": 2
     },
     "cherry_pick_settings": {
         "generator_transformers_settings": {
@@ -70,7 +69,7 @@
                 {
                     "name": "chat_test",
                     "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
-                    "sample_rate": 1
+                    "num_samples": 2
                 }
             ],
             "prompt_template": {
@@ -84,8 +83,7 @@
             },
             "dataset_type": "chat",
             "max_tokens_count": 150,
-            "only_answer_loss": true,
-            "random_cut": true
+            "only_answer_loss": true
         },
         "metric_settings": [
             {
@@ -167,13 +165,8 @@
         "num_train_epochs": 2,
         "lr_scheduler_type": "cosine",
         "warmup_steps": 2,
-        "gradient_checkpointing": false,
-        "torch_compile": false,
-        "gradient_checkpointing_kwargs": {
-            "use_reentrant": false
-        },
         "fp16": false,
-        "bf16": false,
+        "bf16": true,
         "optim": "adamw_torch",
         "save_total_limit": 1,
         "average_log_prob": true,
