@@ -45,8 +45,10 @@ class TrainRAGStrategy(BaseTrainStrategy[RAGTrainExperimentSettings]):
         experiment_settings: RAGTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> RagCherryPickCallback:
+    ) -> RagCherryPickCallback | None:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
+        if cherry_pick_settings is None:
+            return None
 
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
             cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE

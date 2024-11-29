@@ -18,4 +18,4 @@ class MultimodalTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: MultimodalMultiDatasetSettings
     val_dataset_settings: MultimodalMultiDatasetSettings
 
-    cherry_pick_settings: MultimodalCherryPickSettings
+    cherry_pick_settings: MultimodalCherryPickSettings | None = None

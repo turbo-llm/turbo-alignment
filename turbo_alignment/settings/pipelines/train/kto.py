@@ -20,6 +20,6 @@ class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: KTOMultiDatasetSettings
     val_dataset_settings: KTOMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
-
     trainer_settings: KTOTrainerSettings
+
+    cherry_pick_settings: ChatCherryPickSettings | None = None

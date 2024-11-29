@@ -7,4 +7,4 @@ class SftTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: ChatMultiDatasetSettings
     val_dataset_settings: ChatMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
+    cherry_pick_settings: ChatCherryPickSettings | None = None

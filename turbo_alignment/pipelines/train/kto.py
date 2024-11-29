@@ -35,7 +35,7 @@ class TrainKTOStrategy(BaseTrainStrategy[KTOTrainExperimentSettings]):
         experiment_settings: KTOTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> ChatCherryPickCallback:
+    ) -> ChatCherryPickCallback | None:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
 
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
