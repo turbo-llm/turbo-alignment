@@ -39,6 +39,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SimPOLossSettings,
     SlicHfLossSettings,
     SyncRefModelSettings,
+    NCAPairLossSettings
 )
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
@@ -456,6 +457,35 @@ class DPOPLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.NCA_PAIT)
+class NCAPairLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_logratios = policy_chosen_logps - reference_chosen_logps
+        rejected_logratios = policy_rejected_logps - reference_rejected_logps
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        loss = (
+            -F.logsigmoid(chosen_logratios * self.beta)
+            - 0.5 * F.logsigmoid(-chosen_logratios * self.beta)
+            - 0.5 * F.logsigmoid(-rejected_logratios * self.beta)
+        )
+        
+        return loss, chosen_rewards, rejected_rewards
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
     loss_settings: (
@@ -473,6 +503,7 @@ class DPOTrainingArguments(TrainingArguments):
         | APOZeroLossSettings
         | APODownLossSettings
         | DPOPLossSettings
+        | NCAPairLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
