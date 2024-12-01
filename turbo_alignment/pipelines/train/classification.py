@@ -7,7 +7,9 @@ from transformers.data.data_collator import DataCollatorMixin, DataCollatorWithP
 from turbo_alignment.cherry_picks.classification import ClassificationCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
-from turbo_alignment.dataset.classification.classification import ClassificationDataset
+from turbo_alignment.dataset.classification.classification import (
+    InferenceClassificationDataset,
+)
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.registry import MetricSettingsRegistry
@@ -47,9 +49,9 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
     ) -> ClassificationCherryPickCallback:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
 
-        cherry_pick_datasets = DatasetLoader[ClassificationDataset](ClassificationDataset).load_datasets(
-            cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
-        )
+        cherry_pick_datasets = DatasetLoader[InferenceClassificationDataset](
+            InferenceClassificationDataset
+        ).load_datasets(cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE)
 
         metrics = [
             Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, overload
 
 from transformers import PreTrainedTokenizerBase
+from typing_extensions import Self
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.logging import get_project_logger
@@ -92,3 +93,19 @@ class TrainClassificationDataset(ClassificationDataset):
 class InferenceClassificationDataset(ClassificationDataset):
     def convert_records(self, records: list[ClassificationDatasetRecord]) -> list[dict[str, Any] | None]:
         return self._encode(records, inference=True)
+
+    def get_slice(self, start: int, end: int) -> Self:
+        new_instance = self.__class__(
+            source=self.source,
+            settings=self.settings,
+            tokenizer=self.tokenizer,
+        )
+
+        dataset_records = [self[idx] for idx in range(len(self))]
+
+        new_instance.records = self.records[start:end]
+        new_instance.original_records_map = {
+            record['id']: self.get_original_record_by_id(record['id']) for record in dataset_records
+        }
+
+        return new_instance

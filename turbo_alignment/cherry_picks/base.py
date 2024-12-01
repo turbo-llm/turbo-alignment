@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from typing import Generic, Iterable, TypeVar
 
+from accelerate import Accelerator
 from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
@@ -72,3 +73,8 @@ class CherryPickCallbackBase(TrainerCallback, Generic[InferenceDatasetT]):
         model.train()
 
         return dataset_metrics
+
+    @staticmethod
+    @abstractmethod
+    def _get_sharded_dataset(dataset: InferenceDatasetT, accelerator: Accelerator) -> InferenceDatasetT:
+        ...
