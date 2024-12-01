@@ -59,6 +59,19 @@ def train_ddpo_entrypoint(
     pipelines.TrainDDPOStrategy().run(experiment_settings)
 
 
+@app.command(name='train_lddpo', help='Run LDDPO pipeline')
+def train_lddpo_entrypoint(
+    experiment_settings_path: Path = typer.Option(
+        ...,
+        '--experiment_settings_path',
+        exists=True,
+        help='Path to experiment config file',
+    )
+) -> None:
+    experiment_settings = pipeline_settings.LDDPOTrainExperimentSettings.parse_file(experiment_settings_path)
+    pipelines.TrainLDDPOStrategy().run(experiment_settings)
+
+
 @app.command(name='train_rm', help='Run RM pipeline')
 def train_rm_entrypoint(
     experiment_settings_path: Path = typer.Option(
