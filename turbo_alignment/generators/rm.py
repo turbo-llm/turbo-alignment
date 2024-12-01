@@ -78,10 +78,14 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
 
         rewards = torch.cat(rewards, dim=0)
 
-        record_rewards = [
-            {answer_id: reward.item() for answer_id, reward in zip(record['answers'].keys(), rewards)}
-            for record in records
-        ]
+        reward_index = 0
+        record_rewards = []
+        for record in records:
+            mapped_rewards = {}
+            for key in record['answers'].keys():
+                mapped_rewards[key] = rewards[reward_index].item()
+                reward_index += 1
+            record_rewards.append(mapped_rewards)
 
         return [
             RMSamplingInferenceOutput(
