@@ -1,12 +1,13 @@
 from typing import Callable
 
-from torch.utils.data import Dataset
+from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import DataCollatorMixin
 
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders.model import load_model
+from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
@@ -16,12 +17,13 @@ from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.dpo import DPOTrainExperimentSettings
-from turbo_alignment.trainers.dpo import DPOTrainer, DPOTrainingArguments
+from turbo_alignment.trainers.dpo import DPOTrainingArguments
+from turbo_alignment.trainers.ref_model import ref_model_DPOTrainer
 
 logger = get_project_logger()
 
 
-class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
+class ref_model_DPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
     @staticmethod
     def _get_data_collator(
         experiment_settings: DPOTrainExperimentSettings,
@@ -37,22 +39,6 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         **kwargs,
     ) -> ChatCherryPickCallback:
         return None
-        # cherry_pick_settings = experiment_settings.cherry_pick_settings
-
-        # cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
-        #     cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
-        # )
-
-        # metrics = [
-        #     Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))
-        #     for metric in cherry_pick_settings.metric_settings
-        # ]
-
-        # return ChatCherryPickCallback(
-        #     cherry_pick_settings=cherry_pick_settings,
-        #     datasets=cherry_pick_datasets,
-        #     metrics=metrics,
-        # )
 
     @staticmethod
     def _get_training_args(experiment_settings: DPOTrainExperimentSettings) -> DPOTrainingArguments:
@@ -72,9 +58,8 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         train_dataset: Dataset,
         val_dataset: Dataset,
         data_collator: Callable,
+        output_path='logits_outputs.jsonl',
     ):
-        model.config.use_cache = not training_args.gradient_checkpointing
-
         extra_args = {}
         if experiment_settings.trainer_settings.use_ref_model:
             ref_model = load_model(experiment_settings.model_settings, tokenizer)
@@ -90,14 +75,15 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
 
             extra_args['sft_model'] = sft_model
 
-        return DPOTrainer(
-            model=model,
+        return ref_model_DPOTrainer(
+            model=ref_model,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             callbacks=[],
             data_collator=data_collator,
             tokenizer=tokenizer,
+            output_path='logits_outputs.jsonl',
             **extra_args,
         )
 
@@ -120,3 +106,60 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         logger.info(
             'Mask-l check: {mask}'.format(mask=collator([dataset[0], dataset[1]])['inputs_l']['attention_mask'][0])
         )
+
+    def run(self, experiment_settings: DPOTrainExperimentSettings) -> None:
+        training_args = self._get_training_args(experiment_settings)
+
+        self.tokenizer = self._load_tokenizer(experiment_settings)
+
+        logger.info('Tokenizer is loaded!')
+
+        additional_special_tokens = self._get_additional_special_tokens(experiment_settings)
+        logger.info(f'Special tokens: {additional_special_tokens}')
+        special_tokens_setter = SpecialTokensSetter(self.tokenizer, experiment_settings.special_tokens_settings)
+        special_tokens_setter.set_all()
+        special_tokens_setter.set_custom_tokens(additional_special_tokens)
+
+        logger.info('Special tokens added!')
+
+        logger.info('Model is loaded!')
+
+        train_dataset: ConcatDataset = ConcatDataset(
+            datasets=DatasetLoader().load_datasets(
+                experiment_settings.train_dataset_settings,
+                tokenizer=self.tokenizer,
+                strategy=DatasetStrategy.TRAIN,
+            )
+        )
+
+        val_dataset: ConcatDataset = ConcatDataset(
+            datasets=DatasetLoader().load_datasets(
+                experiment_settings.val_dataset_settings,
+                tokenizer=self.tokenizer,
+                strategy=DatasetStrategy.TRAIN,
+            )
+        )
+
+        data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
+
+        self.trainer = self._get_trainer(
+            training_args,
+            experiment_settings,
+            None,
+            self.tokenizer,
+            train_dataset,
+            val_dataset,
+            data_collator,
+            output_path='logits_outputs.jsonl',
+        )
+
+        if self.trainer.accelerator.is_main_process:
+            self._dataset_and_collator_sanity_check(train_dataset, data_collator)
+
+        self._add_trainer_callbacks(experiment_settings)
+
+        print('👀' * 15, 'ref_model')
+
+        self.trainer.train()
+
+        # self.trainer.save_model()
