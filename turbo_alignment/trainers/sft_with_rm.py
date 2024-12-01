@@ -17,16 +17,44 @@ logger = logging.get_logger(__name__)
 class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
         sft_logits, rewards_w, rewards_l = model.forward(inputs)
-        sft_labels = inputs['inputs_w']['input_ids'][0]
+        
+        sft_labels = self.mask_labels(inputs['inputs_w']['input_ids'], inputs['inputs_l']['input_ids'])
+
+        shift_logits = sft_logits[..., :-1, :].contiguous()
+        shift_labels = sft_labels[..., 1:].contiguous()
 
         loss_rm = -torch.nn.functional.logsigmoid(rewards_w - rewards_l).mean()
-        loss_sft = torch.nn.functional.cross_entropy(sft_logits, sft_labels)
+        loss_sft = torch.nn.functional.cross_entropy(shift_logits, shift_labels)
         alpha = 0.001
         loss = (1 - alpha) * loss_rm + alpha * loss_sft
         
         if return_outputs:
             return loss, {'rewards_w': rewards_w, 'rewards_l': rewards_l}
         return loss
+    
+    def mask_labels(self, inputs_w, inputs_l):
+        inputs_w = inputs_w.view(-1)
+        inputs_l = inputs_l.view(-1)
+        
+        min_length = min(inputs_w.size(0), inputs_l.size(0))
+        
+        prefix_length = 0
+        for i in range(min_length):
+            if inputs_w[i] != inputs_l[i]:
+                break
+            prefix_length += 1
+
+        postfix_length = 0
+        for i in range(1, min_length + 1):
+            if inputs_w[-i] != inputs_l[-i]:
+                break
+            postfix_length += 1
+
+        inputs_w = inputs_w.clone()
+        inputs_w[:prefix_length] = -100
+        inputs_w[-postfix_length:] = -100
+
+        return inputs_w
 
     def prediction_step(
         self,
