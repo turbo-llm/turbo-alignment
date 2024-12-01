@@ -44,15 +44,17 @@ class SFTwithRMTrainer(MultiGPUCherryPicksTrainer):
                 break
             prefix_length += 1
 
-        postfix_length = 0
-        for i in range(1, min_length + 1):
-            if inputs_w[-i] != inputs_l[-i]:
+        eot_position = -1
+        for i in range(prefix_length, inputs_w.size(0)):
+            if inputs_w[i] == 151645:
+                eot_position = i
                 break
-            postfix_length += 1
-
+        if eot_position == -1:
+            raise ValueError("EOT token not found in replic")
+        
         inputs_w = inputs_w.clone()
         inputs_w[:prefix_length] = -100
-        inputs_w[-postfix_length:] = -100
+        inputs_w[eot_position+1:] = -100
 
         return inputs_w
 
