@@ -33,13 +33,13 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
+    NCAPairLossSettings,
     ORPOLossSettings,
     SigmoidLossSettings,
     SigmoidLossWithMarginSettings,
     SimPOLossSettings,
     SlicHfLossSettings,
     SyncRefModelSettings,
-    NCAPairLossSettings
 )
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
@@ -482,7 +482,7 @@ class NCAPairLoss(DPOLossRegistry):
             - 0.5 * F.logsigmoid(-chosen_logratios * self.beta)
             - 0.5 * F.logsigmoid(-rejected_logratios * self.beta)
         )
-        
+
         return loss, chosen_rewards, rejected_rewards
 
 
@@ -853,6 +853,7 @@ class DPOTrainer(Trainer):
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, torch.Tensor | Any],
         return_outputs=False,
+        num_items_in_batch=None,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
         loss, metrics = self.get_batch_metrics(model, inputs, train_eval='train')
 
