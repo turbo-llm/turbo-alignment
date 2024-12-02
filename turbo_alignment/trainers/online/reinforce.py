@@ -44,6 +44,12 @@ import os
 from deepspeed.runtime.engine import DeepSpeedEngine
 import gc
 
+
+def disable_dropout_in_model(model: torch.nn.Module) -> None:
+    for module in model.modules():
+        if isinstance(module, torch.nn.Dropout):
+            module.p = 0
+
 # FIXME
 @dataclass
 class REINFORCETrainingArguments(TrainingArguments):
@@ -156,6 +162,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         # TODO: TODO_RLOO watch later
         # if self.ref_model is not None:
         #     self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+        disable_dropout_in_model(self.model)
 
         self.reward_model = reward_model
         # TODO: delete later
@@ -375,7 +382,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 input_ids=query_response,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
-                loss_mask=response_tokens_mask.to(torch.bfloat16),
+                loss_mask=response_tokens_mask,
             )
             logging.info(f'reference elapsed time:{time.time() - start}')
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
@@ -392,6 +399,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             position_ids=position_ids,
             loss_mask=response_tokens_mask,
         )
+
+        print(f"Logprob from training policy: {logprobs}; Logprob from reference policy: {ref_logprobs}")
+
         logging.info(f'policy logrobs elapsed time:{time.time() - start}')
         with torch.no_grad():
             kl_term = logprobs.detach() - ref_logprobs
@@ -530,27 +540,38 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             #'use_cache': False
         }
 
+        lp = None
         if isinstance(model, RayGroup):
             #TODO only one reference model -> maybe delete from group??
-            return ray.get(model.reference_forward(records, self.args.temperature, loss_mask))
+            lp = ray.get(model.reference_forward(records, self.args.temperature, loss_mask))
         else:
+
+            hash = 0
+            for p in model.parameters():
+                hash += p.data.sum().item()
+            print("TRAINABLE MODEL HASH: ", hash)
+
+            raw_logits = model(
+                input_ids=records['input_ids'],
+                attention_mask=records['attention_mask'],
+                position_ids=records['position_ids'],
+                use_cache=False,
+            ).logits[:, :-1] / self.args.temperature
+
+            import logging
+            logging.info(f"LOGITS FROM TRAINING POLICY: {raw_logits} ; SUM: {raw_logits.sum()}")
+
             # Memory efficient - a chain operations
-            logits = F.log_softmax(
-                model(
-                    input_ids=records['input_ids'],
-                    attention_mask=records['attention_mask'],
-                    position_ids=records['position_ids'],
-                    use_cache=False,
-                ).logits[:, :-1] / self.args.temperature,
-                dim=-1
-            )
+            logits = F.log_softmax(raw_logits, dim=-1)
 
             # logits /= self.args.temperature
             # all_logprob = F.log_softmax(logits, dim=-1)
             logprob = torch.gather(logits, 2, records['input_ids'][:, 1:].unsqueeze(-1)).squeeze(-1)
             logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
 
-            return logprob.sum(-1)
+            lp = logprob.sum(-1)
+
+        return lp
 
     def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.args.non_eos_penalty:
