@@ -157,7 +157,6 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         vllm_engines,
         training_args: REINFORCETrainingArguments,
         experiment_settings: REINFORCETrainExperimentSettings,
-        ref_model,
         reward_model,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
@@ -169,9 +168,9 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
 
         # TODO: TODO_RLOO load reference and reward model here
 
-        # ref_model = load_model(experiment_settings.model_settings, tokenizer)
-        # for _, param in ref_model.named_parameters():
-        #     param.requires_grad = False
+        ref_model = load_model(experiment_settings.model_settings, tokenizer)
+        for _, param in ref_model.named_parameters():
+            param.requires_grad = False
 
         # ref_model.eval()
 
@@ -222,7 +221,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     get rid off vllm_engines, reference_model, reward_model if possible
     only get_trainer affected
     '''
-    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reference_model, reward_model) -> None:
+    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None:
         training_args = self._get_training_args(experiment_settings)
 
         print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
@@ -276,7 +275,6 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             vllm_engines,
             training_args,
             experiment_settings,
-            reference_model,
             reward_model,
             self.model,
             self.tokenizer,

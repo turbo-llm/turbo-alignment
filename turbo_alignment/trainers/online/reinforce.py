@@ -156,13 +156,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logging.info(f'distributed vllm engine __init__ elapsed time:{time.time() - start}')
 
         self.ref_model = ref_model
-        # TODO: delete later
-        # ray.get(self.ref_model.async_eval())
 
-        # TODO: TODO_RLOO watch later
-        # if self.ref_model is not None:
-        #     self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+        if self.ref_model is not None:
+            self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+
         disable_dropout_in_model(self.model)
+        disable_dropout_in_model(self.ref_model)
 
         self.reward_model = reward_model
         # TODO: delete later
@@ -377,7 +376,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 do_broadcast=True if train_eval == 'train' else False
             )
             start = time.time()
-            ref_logprobs = self.get_logprobs(
+            ref_logits, ref_logprobs = self.get_logprobs(
                 model=self.ref_model,
                 input_ids=query_response,
                 attention_mask=attention_mask,
@@ -392,7 +391,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         gc.collect()
         torch.cuda.empty_cache()
 
-        logprobs = self.get_logprobs(
+        logits, logprobs = self.get_logprobs(
             model=model,
             input_ids=query_response,
             attention_mask=attention_mask,
@@ -400,7 +399,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             loss_mask=response_tokens_mask,
         )
 
-        print(f"Logprob from training policy: {logprobs}; Logprob from reference policy: {ref_logprobs}")
+        print(f"LOGITS ALLCLOSE: {torch.allclose(ref_logits, logits)}")
+        print(f"LOGPROBS ALLCLOSE: {torch.allclose(ref_logprobs, logprobs)}")
+
+        print(f"REF LOGRPOBS: {ref_logprobs}; LOGRPOBS: {logprobs}")
 
         logging.info(f'policy logrobs elapsed time:{time.time() - start}')
         with torch.no_grad():
@@ -545,21 +547,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             #TODO only one reference model -> maybe delete from group??
             lp = ray.get(model.reference_forward(records, self.args.temperature, loss_mask))
         else:
-
-            hash = 0
-            for p in model.parameters():
-                hash += p.data.sum().item()
-            print("TRAINABLE MODEL HASH: ", hash)
-
             raw_logits = model(
                 input_ids=records['input_ids'],
                 attention_mask=records['attention_mask'],
                 position_ids=records['position_ids'],
                 use_cache=False,
             ).logits[:, :-1] / self.args.temperature
-
-            import logging
-            logging.info(f"LOGITS FROM TRAINING POLICY: {raw_logits} ; SUM: {raw_logits.sum()}")
 
             # Memory efficient - a chain operations
             logits = F.log_softmax(raw_logits, dim=-1)
@@ -571,6 +564,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
             lp = logprob.sum(-1)
 
+            return logits, lp
         return lp
 
     def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:

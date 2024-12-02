@@ -124,20 +124,17 @@ def reinforce_training(
     from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
     from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
     from turbo_alignment.trainers.online.reward_actor import RewardModel
-    from turbo_alignment.trainers.online.reference_actor import ReferenceModel
-    
+
     ray.init(address="auto")
     
     experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
 
     policy_models = RayGroup(num_nodes=2, num_gpus_per_node=8, ray_actor_type=pipelines.TrainREINFORCEStrategy)#64.19 GiB is allocated by PyTorch, and 3.40 GiB
     reward_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=RewardModel)
-    reference_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=ReferenceModel)
 
     # TODO_RLOO if possible hide init inside RayGroup
     ray.get(policy_models.async_init_model_from_pretrained())
     ray.get(reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path))
-    ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
 
     '''
     TODO_RLOO: 
@@ -159,5 +156,5 @@ def reinforce_training(
     ray.get(policy_models.async_fit_actor_model(
         experiment_settings=experiment_settings,
         vllm_engines=vllm_engines,
-        reference_model=reference_model, reward_model=reward_model
+        reward_model=reward_model
     ))
