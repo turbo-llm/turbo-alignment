@@ -112,8 +112,9 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                 )
             )
 
-        cherry_pick_callback = self._get_cherry_pick_callback(experiment_settings, self.tokenizer, **kwargs)
-
+        # cherry_pick_callback = self._get_cherry_pick_callback(experiment_settings, self.tokenizer, **kwargs)
+        cherry_pick_callback = None
+        
         if cherry_pick_callback is not None:
             self.trainer.add_callback(cherry_pick_callback)
 
