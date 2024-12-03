@@ -38,10 +38,9 @@ class RewardModel(DistributedTorchRayActor):
         x = {k: v.cuda() for k, v in x.items()}
         # print('\n\n\nRM model', [v.shape for k, v in x.items()], 'RM model\n\n\n')
         # print(self.tokenizer.decode(x['input_ids'][0], skip_special_tokens=False))
-        #TODO reward from eos
         
-        for k, v in x.items():
-            if isinstance(v, torch.Tensor):
-                print(f'REWARD MODEL:{v.shape=}', flush=True)
+        # for k, v in x.items():
+        #     if isinstance(v, torch.Tensor):
+        #         print(f'REWARD MODEL:{v.shape=}', flush=True)
 
         return self.model(**x).logits

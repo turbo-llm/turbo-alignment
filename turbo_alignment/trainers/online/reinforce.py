@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
+import torch.distributed
 import torch.nn.functional as F
 import torch.utils
 import torch.utils.data
@@ -31,7 +32,7 @@ from turbo_alignment.settings.online import (
     ActorType,
     RewardProcessorType,
 )
-
+from turbo_alignment.common.tf.loaders.model.model import disable_dropout_in_model
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.trainers.online.reward_processor import RewardProcessor
@@ -98,12 +99,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             **kwargs,
         )
         logging.info(f'super().__init__ elapsed time:{time.time() - start}')
+        print(f'{self.accelerator.num_processes=}', flush=True)
         
         self.vllm_engines = vllm_engines
         start = time.time()
         if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
             master_address = ray._private.services.get_node_ip_address()
-            print(f'TRAINER DEBUG: {master_address=}', flush=True)
             with socket.socket() as sock:
                 sock.bind(("", 0))
                 master_port = sock.getsockname()[1]
@@ -150,16 +151,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logging.info(f'distributed vllm engine __init__ elapsed time:{time.time() - start}')
 
         self.ref_model = ref_model
-        # TODO: delete later
-        # ray.get(self.ref_model.async_eval())
 
         # TODO: TODO_RLOO watch later
-        # if self.ref_model is not None:
-        #     self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+        if self.ref_model is not None:
+            self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+        
+        disable_dropout_in_model(self.model)
+        disable_dropout_in_model(self.ref_model)
 
         self.reward_model = reward_model
-        # TODO: delete later
-        # ray.get(self.ref_model.async_eval())
 
         self._stored_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
         self.kl_coef = args.kl_coef
@@ -202,7 +202,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         )
         logging.info(f'statictis in __init__ elapsed time:{time.time() - start}')
         self.print_readable_stats()
-
     
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
         # avoid OOM
@@ -297,18 +296,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         )
         logging.info(f'generations elapsed time:{time.time() - start}')
         
-        for g in generations:
-            for ans in g.answers:
-                print(f'{g.input_token_ids.device=}, {ans.answer_token_ids.device=}', flush=True)
-                print(f'{g.input_attention_mask.device=}, {ans.answer_attention_mask.device=}', flush=True)
-                break
-            break
         response_ids = [torch.cat([g.input_token_ids, ans.answer_token_ids], dim=1) for g in generations for ans in g.answers]
         response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
-        
-        import random
-        ind = random.randint(0, len(response_ids) - 1)
-        assert response_ids[ind].shape == response_attention_mask[ind].shape
 
         if torch.distributed.get_rank() == 0:
             print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
@@ -375,16 +364,18 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 input_ids=query_response,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
-                loss_mask=response_tokens_mask.to(torch.bfloat16),
+                loss_mask=response_tokens_mask,
             )
+
             logging.info(f'reference elapsed time:{time.time() - start}')
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
         
-        start = time.time()
+        
         del inputs
         gc.collect()
         torch.cuda.empty_cache()
 
+        start = time.time()
         logprobs = self.get_logprobs(
             model=model,
             input_ids=query_response,
@@ -393,11 +384,16 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             loss_mask=response_tokens_mask,
         )
         logging.info(f'policy logrobs elapsed time:{time.time() - start}')
+
+        # print(f'rank {torch.distributed.get_rank()}:{ref_logprobs.shape=}, {logprobs.shape=}', flush=True)
+        # print(f'rank {torch.distributed.get_rank()}:{ref_logprobs=}, {logprobs=}', flush=True)
+        # print(f'rank {torch.distributed.get_rank()}:{(ref_logprobs[0, -1, :] - logprobs[0, -1, :]).abs().sum()=}', flush=True)
+        # assert torch.allclose(ref_logprobs, logprobs)
+
         with torch.no_grad():
             kl_term = logprobs.detach() - ref_logprobs
             regularized_rewards = rewards - self.kl_coef * kl_term
 
-            print(f"{regularized_rewards.shape=}", flush=True)
             baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(rewards=regularized_rewards)
 
         loss = -baselined_reward * logprobs
@@ -457,7 +453,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
         self.store_metrics(metrics=metrics, train_eval='train')
-        logging.info(f'Compute Loss elapsed time:{time.time() - start}')
+        logging.info(f'get_batch_loss_metrics elapsed time:{time.time() - start}')
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -526,7 +522,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         records = {
             'input_ids': input_ids.cuda(),
             'attention_mask': attention_mask.cuda(),
-            'position_ids': position_ids.cuda(),
+            #'position_ids': position_ids.cuda(),
             #'use_cache': False
         }
 
@@ -534,13 +530,13 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             #TODO only one reference model -> maybe delete from group??
             return ray.get(model.reference_forward(records, self.args.temperature, loss_mask))
         else:
-            # Memory efficient - a chain operations
+
             logits = F.log_softmax(
                 model(
                     input_ids=records['input_ids'],
                     attention_mask=records['attention_mask'],
-                    position_ids=records['position_ids'],
-                    use_cache=False,
+                    #position_ids=records['position_ids'],
+                    #use_cache=False,
                 ).logits[:, :-1] / self.args.temperature,
                 dim=-1
             )

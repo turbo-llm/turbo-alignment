@@ -138,7 +138,7 @@ class RayGroup:
         self,
         experiment_settings: REINFORCETrainExperimentSettings,
         vllm_engines: List,
-        reference_model,
+        # reference_model,
         reward_model,
     ):
         refs = []
@@ -148,7 +148,7 @@ class RayGroup:
                 actor.run.remote(
                     experiment_settings=experiment_settings,
                     vllm_engines=vllm_engines,
-                    reference_model=reference_model,
+                    # reference_model=reference_model,
                     reward_model=reward_model,
 
                 )

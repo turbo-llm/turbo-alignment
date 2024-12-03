@@ -91,21 +91,6 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     
     def init_model_from_pretrained(self):
         self._setup_distributed()
-        
-    #     self.ds_config = get_train_ds_config(offload=False)
-    #     self.ds_config["train_micro_batch_size_per_gpu"] = 1
-
-    #     self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda')
-    #     self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
-    #     print(f"PolicyModel initialized on Node {self.node_id}, Local Rank {self.local_rank}")
-    #     print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
-
-    # def tokenize(self, text: str):
-    #     return self.tokenizer(text, return_tensors='pt')
-    
-    # def generate(self, text: str):
-    #     tokenized_input = self.tokenize(text).to('cuda')
-    #     return self.model(**tokenized_input)
 
     @staticmethod
     def _get_data_collator(
@@ -157,7 +142,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         vllm_engines,
         training_args: REINFORCETrainingArguments,
         experiment_settings: REINFORCETrainExperimentSettings,
-        ref_model,
+        # ref_model,
         reward_model,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
@@ -169,9 +154,9 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
 
         # TODO: TODO_RLOO load reference and reward model here
 
-        # ref_model = load_model(experiment_settings.model_settings, tokenizer)
-        # for _, param in ref_model.named_parameters():
-        #     param.requires_grad = False
+        ref_model = load_model(experiment_settings.model_settings, tokenizer)
+        for _, param in ref_model.named_parameters():
+            param.requires_grad = False
 
         # ref_model.eval()
 
@@ -222,7 +207,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     get rid off vllm_engines, reference_model, reward_model if possible
     only get_trainer affected
     '''
-    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reference_model, reward_model) -> None:
+    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None: #reference_model
         training_args = self._get_training_args(experiment_settings)
 
         print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
@@ -276,7 +261,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             vllm_engines,
             training_args,
             experiment_settings,
-            reference_model,
+            # reference_model,
             reward_model,
             self.model,
             self.tokenizer,
@@ -285,8 +270,6 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             data_collator,
         )
         print(f"Elapsed get_trainer time: {time.time() - start} seconds")
-        
-        start = time.time()
 
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)
@@ -302,7 +285,6 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         self._save_experiment_metadata(
             experiment_metadata, Path(self.trainer.args.output_dir) / 'experiment_metadata.json'
         )
-        print(f"Elapsed before trainer.train() time: {time.time() - start} seconds")
         self.trainer.train()
 
         self.trainer.save_model()

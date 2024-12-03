@@ -14,7 +14,7 @@ class ReferenceModel(DistributedTorchRayActor):
     
     def init_model_from_pretrained(self, pretrain):
         self._setup_distributed()
-        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16) #attn_implementation='flash_attention_2'
+        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16, attn_implementation='flash_attention_2') #attn_implementation='flash_attention_2'
         self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
         print(f"Reference model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
         print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
@@ -42,12 +42,14 @@ class ReferenceModel(DistributedTorchRayActor):
         x = {k: v.cuda() for k, v in x.items()}
 
         print(f"{x.keys()}")
-        logits = self.model(**x).logits[:, :-1] # 35GB
+        logits = self.model(**x).logits[:, :-1]
+
         logits /= temperature
 
-        #logits = F.log_softmax(logits, dim=-1) # 35GB
         '''
         Memory Efficient implementation of log_softmax using in_place operation
+        equivalent to:
+        logits = F.log_softmax(logits, dim=-1)
         '''
         torch.exp(logits, out=logits)
         summed = torch.sum(logits, dim=-1, keepdim=True)
