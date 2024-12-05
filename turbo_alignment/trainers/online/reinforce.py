@@ -99,7 +99,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             callbacks=callbacks,
             **kwargs,
         )
-        logging.info(f'super().__init__ elapsed time:{time.time() - start}')
+        logging.info(f'super().__init__  elapsed time:{time.time() - start}')
         print(f'{self.accelerator.num_processes=}', flush=True)
         
         self.vllm_engines = vllm_engines
