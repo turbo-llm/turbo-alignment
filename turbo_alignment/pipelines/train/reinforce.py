@@ -41,9 +41,6 @@ class ReinforceDataCollator(DataCollatorForTokenClassification):
     def torch_call(self, features):
         import torch
         from transformers.data.data_collator import pad_without_fast_tokenizer_warning
-        
-        for _ in features:
-            print(f'{_.keys()=}')
 
         label_name = "label" if "label" in features[0].keys() else "labels"
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None

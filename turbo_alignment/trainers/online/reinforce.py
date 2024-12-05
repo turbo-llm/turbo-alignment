@@ -48,6 +48,7 @@ import gc
 # FIXME
 @dataclass
 class REINFORCETrainingArguments(TrainingArguments):
+    num_nodes: int = 2
     max_new_tokens: int = 1024
     stop_token: str = '<eos>'
 
@@ -195,11 +196,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             mean_baseline_coef=args.mean_baseline_coef,
             num_generations=args.num_generations,
         )
+        
+        print("Generations Params:\n" + "\n".join([f"{attr}: {getattr(self.generator_transformers_settings, attr, None)}" for attr, _ in self.generator_transformers_settings.__annotations__.items()]))
+
         start = time.time()
         self.print_readable_stats()
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
+        
         logging.info(f'statictis in __init__ elapsed time:{time.time() - start}')
         self.print_readable_stats()
     
@@ -467,9 +472,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
         
-        import logging
-        logging.info(f'{isinstance(model, DeepSpeedEngine)=}')
-
         with torch.no_grad():
             loss, metrics = self.get_batch_loss_metrics(model, inputs, 'eval')
 

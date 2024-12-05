@@ -43,10 +43,6 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         # if transformers_settings.num_beams > 1:
         #     beam_search_params['use_beam_search'] = True
         #     beam_search_params['best_of'] = transformers_settings.num_beams
-        print(f'Generation Params:{transformers_settings.stop_strings=}\n{transformers_settings.num_return_sequences=}\n\
-            {transformers_settings.repetition_penalty=}\n{transformers_settings.temperature=}\n\
-            {transformers_settings.top_p=}\n{transformers_settings.top_k=}\n\
-            {custom_generation_settings.skip_special_tokens=}\n{self.eos_token_id=}\n{transformers_settings.max_new_tokens=}', flush=True)
         
         self._sampling_params = SamplingParams(
             n=transformers_settings.num_return_sequences,

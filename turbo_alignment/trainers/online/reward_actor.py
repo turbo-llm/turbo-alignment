@@ -12,7 +12,7 @@ class RewardModel(DistributedTorchRayActor):
     
     def init_model_from_pretrained(self, rm_model):
         self._setup_distributed()
-        self.model = AutoModelForSequenceClassification.from_pretrained(rm_model, device_map='cuda', torch_dtype=torch.bfloat16)
+        self.model = AutoModelForSequenceClassification.from_pretrained(rm_model, device_map='cuda', torch_dtype=torch.bfloat16, attn_implementation='flash_attention_2')
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model, trust_remote_code=True)
         
         self.model.config.pad_token_id = self.model.config.eos_token_id
