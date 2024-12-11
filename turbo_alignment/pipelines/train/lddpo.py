@@ -37,22 +37,23 @@ class TrainLDDPOStrategy(BaseTrainStrategy[LDDPOTrainExperimentSettings]):
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
     ) -> ChatCherryPickCallback:
-        cherry_pick_settings = experiment_settings.cherry_pick_settings
+        return None
+        # cherry_pick_settings = experiment_settings.cherry_pick_settings
 
-        cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
-            cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
-        )
+        # cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
+        #     cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
+        # )
 
-        metrics = [
-            Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))
-            for metric in cherry_pick_settings.metric_settings
-        ]
+        # metrics = [
+        #     Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))
+        #     for metric in cherry_pick_settings.metric_settings
+        # ]
 
-        return ChatCherryPickCallback(
-            cherry_pick_settings=cherry_pick_settings,
-            datasets=cherry_pick_datasets,
-            metrics=metrics,
-        )
+        # return ChatCherryPickCallback(
+        #     cherry_pick_settings=cherry_pick_settings,
+        #     datasets=cherry_pick_datasets,
+        #     metrics=metrics,
+        # )
 
     def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
         logger.info(f'Train sample example:\n{dataset[0]}')
