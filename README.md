@@ -12,7 +12,7 @@
 - [Development](#-development)
 - [Library Roadmap](#-library-roadmap)
 - [FAQ](#-faq)
-- [License](#-license)
+-  [License](#-license)
 
 <a name="-what-is-turbo-alignment"></a>
 ## 🌟 What is Turbo-Alignment?
