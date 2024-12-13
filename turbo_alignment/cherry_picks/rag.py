@@ -1,3 +1,5 @@
+import math
+
 from accelerate import Accelerator
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
@@ -22,8 +24,13 @@ class RagCherryPickCallback(ChatCherryPickCallback):
             tokenizer=tokenizer,
             transformers_settings=self._generator_transformers_settings,
             custom_generation_settings=self._custom_generation_settings,
-            accelerator=accelerator,
         )
+
+        if accelerator is not None:
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
 
         generations = generator.generate_from_dataset(dataset)
 
@@ -57,3 +64,10 @@ class RagCherryPickCallback(ChatCherryPickCallback):
             metric_outputs.extend(metric_results)
 
         return metric_outputs
+
+    @staticmethod
+    def _get_sharded_dataset(dataset, accelerator: Accelerator) -> InferenceChatDataset:
+        rank_device = accelerator.process_index
+        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
+
+        return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)
