@@ -26,7 +26,7 @@ class DPOLossesType(str, Enum):
     APO_DOWN = 'apo_down'
     ASFT = 'asft'
     DPOP = 'dpop'
-    NCA_PAIT = 'nca_pair'
+    NCA_PAIR = 'nca_pair'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -95,7 +95,7 @@ class DPOPLossSettings(DPOLossSettings):
 
 
 class NCAPairLossSettings(DPOLossSettings):
-    loss_type: Literal[DPOLossesType.NCA_PAIT]
+    loss_type: Literal[DPOLossesType.NCA_PAIR]
 
 
 class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
