@@ -33,6 +33,20 @@ def train_dpo_entrypoint(
     pipelines.TrainDPOStrategy().run(experiment_settings)
 
 
+@app.command(name='train_ref_model', help='Run DPO pipeline')
+def train_ref_entrypoint(
+    experiment_settings_path: Path = typer.Option(
+        ...,
+        '--experiment_settings_path',
+        exists=True,
+        help='Path to experiment config file',
+    )
+) -> None:
+    print('ok')
+    experiment_settings = pipeline_settings.DPOTrainExperimentSettings.parse_file(experiment_settings_path)
+    pipelines.ref_model_DPOStrategy().run(experiment_settings)
+
+
 @app.command(name='train_kto', help='Run KTO pipeline')
 def train_kto_entrypoint(
     experiment_settings_path: Path = typer.Option(

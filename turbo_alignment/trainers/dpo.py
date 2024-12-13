@@ -33,6 +33,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
+    NCAPairLossSettings,
     ORPOLossSettings,
     SigmoidLossSettings,
     SigmoidLossWithMarginSettings,
@@ -456,6 +457,35 @@ class DPOPLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.NCA_PAIR)
+class NCAPairLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_logratios = policy_chosen_logps - reference_chosen_logps
+        rejected_logratios = policy_rejected_logps - reference_rejected_logps
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        loss = (
+            -F.logsigmoid(chosen_logratios * self.beta)
+            - 0.5 * F.logsigmoid(-chosen_logratios * self.beta)
+            - 0.5 * F.logsigmoid(-rejected_logratios * self.beta)
+        )
+
+        return loss, chosen_rewards, rejected_rewards
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
     loss_settings: (
@@ -473,6 +503,7 @@ class DPOTrainingArguments(TrainingArguments):
         | APOZeroLossSettings
         | APODownLossSettings
         | DPOPLossSettings
+        | NCAPairLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
@@ -606,11 +637,17 @@ class DPOTrainer(Trainer):
         return (per_token_logps * loss_mask).sum(-1)
 
     def concatenated_forward(
-        self, model: nn.Module, batch: dict[str, Any]
+        self,
+        model: nn.Module,
+        batch: dict[str, Any],
+        get_from_dataset=False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
         concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
 
         precomputed_margins: torch.Tensor | None = concatenated_batch.pop('margin', None)
+
+        if get_from_dataset:
+            return concatenated_batch.pop('ref_chosen_logps'), concatenated_batch.pop('ref_rejected_logps')
 
         all_logits = model(
             concatenated_batch['input_ids'],
@@ -632,16 +669,19 @@ class DPOTrainer(Trainer):
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
 
     def _get_logps(self, model: nn.Module | None, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
-        with torch.no_grad():
-            if model is not None:
-                (chosen_logps, rejected_logps, *_) = self.concatenated_forward(model, batch)
-            else:
-                with self.accelerator.unwrap_model(self.model).disable_adapter():
-                    (
-                        chosen_logps,
-                        rejected_logps,
-                        *_,
-                    ) = self.concatenated_forward(self.model, batch)
+        if self.ref_model is None:
+            chosen_logps, rejected_logps = self.concatenated_forward(model, batch, get_from_dataset=True)
+        else:
+            with torch.no_grad():
+                if model is not None:
+                    (chosen_logps, rejected_logps, *_) = self.concatenated_forward(model, batch)
+                else:
+                    with self.accelerator.unwrap_model(self.model).disable_adapter():
+                        (
+                            chosen_logps,
+                            rejected_logps,
+                            *_,
+                        ) = self.concatenated_forward(self.model, batch)
 
         return chosen_logps, rejected_logps
 
@@ -780,9 +820,9 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix_name}grad_term'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().mean().item()
         )
-        metrics[f'{prefix_name}grad_term_std'] = (
-            (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
-        )
+        # metrics[f'{prefix_name}grad_term_std'] = (
+        #     (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
+        # )
 
         return metrics
 
@@ -822,6 +862,7 @@ class DPOTrainer(Trainer):
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, torch.Tensor | Any],
         return_outputs=False,
+        num_items_in_batch=None,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
         loss, metrics = self.get_batch_metrics(model, inputs, train_eval='train')
 
