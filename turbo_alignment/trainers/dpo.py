@@ -457,7 +457,7 @@ class DPOPLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
-@DPOLossRegistry.register(DPOLossesType.NCA_PAIT)
+@DPOLossRegistry.register(DPOLossesType.NCA_PAIR)
 class NCAPairLoss(DPOLossRegistry):
     def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
         self.beta = beta
