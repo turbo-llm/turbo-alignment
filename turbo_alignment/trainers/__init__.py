@@ -3,6 +3,7 @@ from .custom_loss import CustomLossTrainer
 from .ddpo import DDPOTrainer
 from .dpo import DPOTrainer
 from .kto import KTOTrainer
+from .lddpo import LDDPOTrainer
 from .multigpu import MultiGPUCherryPicksTrainer
 from .multimodal import MultimodalTrainer
 from .rm import RMTrainer
