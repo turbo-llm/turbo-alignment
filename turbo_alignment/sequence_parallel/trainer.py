@@ -6,11 +6,12 @@ import os
 import time
 import shutil
 import sys
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
 import torch.distributed as dist
 from torch import nn
+from torch.utils.data import RandomSampler
 from transformers import Trainer
 from transformers.trainer import (
     DebugOption,
@@ -39,6 +40,8 @@ from transformers.trainer import (
 )
 from turbo_alignment.modeling import parallel_states
 
+from .utils import create_hook, create_forward_hook
+
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
 
@@ -52,12 +55,51 @@ logger = logging.getLogger(__name__)
 
 
 class TrainerWithSeqP(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        r = super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
+        return r
+
+    def _get_train_sampler(self):
+        from transformers.trainer_utils import has_length
+        from transformers.utils.import_utils import is_datasets_available
+        from transformers.trainer_pt_utils import LengthGroupedSampler
+
+        if is_datasets_available():
+            import datasets
+
+        if self.train_dataset is None or not has_length(self.train_dataset):
+            return None
+
+        # Build the sampler.
+        if self.args.group_by_length:
+            if is_datasets_available() and isinstance(self.train_dataset, datasets.Dataset):
+                lengths = (
+                    self.train_dataset[self.args.length_column_name]
+                    if self.args.length_column_name in self.train_dataset.column_names
+                    else None
+                )
+            else:
+                lengths = None
+            model_input_name = (
+                self.processing_class.model_input_names[0] if self.processing_class is not None else None
+            )
+            return LengthGroupedSampler(
+                self.args.train_batch_size * self.args.gradient_accumulation_steps,
+                dataset=self.train_dataset,
+                lengths=lengths,
+                model_input_name=model_input_name,
+            )
+
+        else:
+            generator = torch.Generator()
+            generator.manual_seed(self.args.seed)
+            return RandomSampler(self.train_dataset, generator=generator)
+
     def _inner_training_loop(
         self, batch_size=None, args=None, resume_from_checkpoint=None, trial=None, ignore_keys_for_eval=None
     ):
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
-        # print(f'1 {self._train_batch_size=}')
         if self.args.auto_find_batch_size:
             if self.state.train_batch_size != self._train_batch_size:
                 from accelerate.utils import release_memory
@@ -73,7 +115,6 @@ class TrainerWithSeqP(Trainer):
                     self.propagate_args_to_deepspeed(True)
                     self.args.per_device_train_batch_size = original_bs
             self.state.train_batch_size = self._train_batch_size
-            # print(f'2 {self._train_batch_size=}')
         logger.debug(f"Currently training with a batch size of: {self._train_batch_size}")
         # Data loader and number of training steps
         train_dataloader = self.get_train_dataloader()
@@ -84,8 +125,10 @@ class TrainerWithSeqP(Trainer):
         # number of training epochs: num_train_epochs
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
-        # print(f'{args.world_size=}')
+
+        # BEGIN OF PATCH
         total_train_batch_size = self._train_batch_size * args.gradient_accumulation_steps * args.world_size // parallel_states.get_sequence_parallel_world_size_or_one()
+        # END OF PATCH
 
         len_dataloader = None
         num_train_tokens = None
@@ -313,6 +356,27 @@ class TrainerWithSeqP(Trainer):
             self._evaluate(trial, ignore_keys_for_eval, skip_scheduler=True)
 
         total_batched_samples = 0
+
+        if os.getenv('CREATE_GRADIENT_HOOK'):
+            for name, param in self.model.named_parameters():
+                param.register_hook(
+                    create_hook(
+                        name,
+                        seq_p_inited=self.args.sequence_parallel > 1,
+                        output_dir=os.getenv('GRADIENT_HOOK_OUTPUT_DIR', '/mnt/p.geyn/gradients'),
+                    )
+                )
+
+            m: nn.Module = self.model
+            for name, module in m.named_modules():
+                module.register_forward_hook(
+                    create_forward_hook(
+                        name,
+                        seq_p_inited=self.args.sequence_parallel > 1,
+                        output_dir=os.getenv('FORWARD_HOOK_OUTPUT_DIR', '/mnt/p.geyn/forward'),
+                    )
+                )
+
         for epoch in range(epochs_trained, num_train_epochs):
             epoch_dataloader = train_dataloader
             if hasattr(epoch_dataloader, "set_epoch"):
@@ -405,6 +469,7 @@ class TrainerWithSeqP(Trainer):
                         if i == len(batch_samples) - 1
                         else contextlib.nullcontext
                     )
+
                     with context():
                         tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
 
@@ -454,6 +519,7 @@ class TrainerWithSeqP(Trainer):
                                 # In some cases the grad norm may not return a float
                                 if hasattr(grad_norm, "item"):
                                     grad_norm = grad_norm.item()
+
                             else:
                                 grad_norm = _grad_norm
 
@@ -571,3 +637,53 @@ class TrainerWithSeqP(Trainer):
             self._deactivate_neftune(self.model)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+
+    def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval):
+        if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
+            if is_torch_xla_available():
+                xm.mark_step()
+
+            logs: Dict[str, float] = {}
+
+            # all_gather + mean() to get average loss over all processes
+            ### BEGIN OF THEN PATCH
+            # tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            # we assume, that the loss for an example if sum of losses on each worker in the sequence parallel group
+            if parallel_states.sequence_parallel_is_initialized():
+                # tr_loss_scalar = (self._nested_gather(tr_loss).sum() / parallel_states.get_data_parallel_world_size()).item()
+                tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            else:
+                tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            ### END OF THE PATCH
+
+            # reset tr_loss to zero
+            old_tr_loss = tr_loss.clone()
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+
+            r = dist.get_rank()
+            for i in range(dist.get_world_size()):
+                if r == i:
+                    print(f'{dist.get_rank()=} {tr_loss_scalar=} {logs["loss"]=} {old_tr_loss=}')
+                dist.barrier()
+
+            if grad_norm is not None:
+                logs["grad_norm"] = grad_norm.detach().item() if isinstance(grad_norm, torch.Tensor) else grad_norm
+            logs["learning_rate"] = self._get_learning_rate()
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.log(logs)
+
+        metrics = None
+        if self.control.should_evaluate:
+            metrics = self._evaluate(trial, ignore_keys_for_eval)
+
+        if self.control.should_save:
+            self._save_checkpoint(model, trial, metrics=metrics)
+            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+

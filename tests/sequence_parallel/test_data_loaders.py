@@ -1,8 +1,8 @@
 import torch
 from transformers import Trainer, TrainingArguments
 
-from turbo_alignment.modeling.patch_accelerate import patch_acclerator
 from turbo_alignment.modeling import parallel_states
+from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 
 from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
 from tests.sequence_parallel.dataset import SimpleDataset

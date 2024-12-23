@@ -1,4 +1,5 @@
 import typing as tp
+from functools import lru_cache
 
 import torch
 
@@ -35,6 +36,11 @@ def tensor_dim_slice(tensor, dim, s):
     return tensor[(slice(None),) * (dim if dim >= 0 else dim + tensor.dim()) + (s, )]
 
 
+@lru_cache
+def log_once_unused_keys(keys: tuple[str, ...]):
+    logger.info(f'Cannot split values, got keys: {" ".join(keys)}')
+
+
 class DataCollatorForSequenceParallism:
     def __init__(
         self,
@@ -49,7 +55,7 @@ class DataCollatorForSequenceParallism:
         self.base_collate_fn = base_collate_fn
         self.seq_p_rank = seq_p_rank
         self.seq_p_world_size = seq_p_world_size
-        self.fields_not_to_split = fields_not_to_split or ['attention_mask']
+        self.fields_not_to_split = fields_not_to_split or ['attention_mask', 'position_ids']
         self.pad_values_for_fields = pad_values_for_fields or DEFAULT_PAD_VALUES
         self.add_position_ids = add_position_ids
         self.add_cache_positions = add_cache_positions
@@ -63,7 +69,7 @@ class DataCollatorForSequenceParallism:
         collated = self.base_collate_fn(*args, **kwargs)
         if isinstance(collated, tp.Mapping):
             if 'input_ids' not in collated:
-                # logger.info(f'Cannot split values, got keys: {" ".join(collated.keys())}')
+                log_once_unused_keys(tuple(collated.keys()))
                 return collated
 
             input_ids = collated['input_ids']

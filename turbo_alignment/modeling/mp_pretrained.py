@@ -3,10 +3,10 @@ import inspect
 import json
 import os
 import warnings
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Tuple
 
 import torch
-import torch.distributed
+import torch.distributed as dist
 from transformers.modeling_utils import (
     CONFIG_NAME,
     FLAX_WEIGHTS_NAME,
@@ -54,48 +54,50 @@ from transformers.modeling_utils import (
     WEIGHTS_INDEX_NAME,
 )
 
+from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2Model, HybridCache
 
-from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel
+# from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel
 from turbo_alignment.modeling import parallel_states
+from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 
 
-def get_slice_for_tensor(
-    tensor: torch.Tensor,
-    group: torch.distributed.ProcessGroup,
-    dim: int = -1,
-    pad_value: Any = None,
-):
-    is_group_master = torch.distributed.get_rank(group) == 0
-    group_size = torch.distributed.get_world_size(group)
-    tensor_size = tensor.size()
+# def get_slice_for_tensor(
+#     tensor: torch.Tensor,
+#     group: torch.distributed.ProcessGroup,
+#     dim: int = -1,
+#     pad_value: Any = None,
+# ):
+#     is_group_master = torch.distributed.get_rank(group) == 0
+#     group_size = torch.distributed.get_world_size(group)
+#     tensor_size = tensor.size()
 
-    tenzor_sizes = [None] * group_size
-    torch.distributed.gather_object(tensor_size, tenzor_sizes, dst=0, group=group)
+#     tenzor_sizes = [None] * group_size
+#     torch.distributed.gather_object(tensor_size, tenzor_sizes, dst=0, group=group)
 
-    tensors = None
-    if is_group_master:
-        tensors = [
-            torch.zeros(*tensor_size, dtype=tensor.dtype)
-            for tensor_size in tenzor_sizes
-        ]
+#     tensors = None
+#     if is_group_master:
+#         tensors = [
+#             torch.zeros(*tensor_size, dtype=tensor.dtype)
+#             for tensor_size in tenzor_sizes
+#         ]
 
-    torch.distributed.gather(tensor, tensors, dst=9, group=group)
+#     torch.distributed.gather(tensor, tensors, dst=9, group=group)
 
-    single_tensor = None
-    splitted = None
-    chunk_size = [None]
-    if is_group_master:
-        single_tensor = torch.cat(tensors, dim=dim)
-        single_tensor = pad_for_sequence_parallel(tensor, group_size, pad_value, dim=dim)
-        chunk_size = single_tensor.size(dim) // group_size
-        splitted = single_tensor.split(chunk_size, dim=dim)
-        chunk_size = [splitted[0].size()]
+#     single_tensor = None
+#     splitted = None
+#     chunk_size = [None]
+#     if is_group_master:
+#         single_tensor = torch.cat(tensors, dim=dim)
+#         single_tensor = pad_for_sequence_parallel(tensor, group_size, pad_value, dim=dim)
+#         chunk_size = single_tensor.size(dim) // group_size
+#         splitted = single_tensor.split(chunk_size, dim=dim)
+#         chunk_size = [splitted[0].size()]
 
-    torch.distributed.broadcast_object_list(chunk_size, 0, group=group)
-    result = torch.zeros(*chunk_size[0], dtype=tensor.dtype)
-    torch.distributed.scatter(result, splitted, src=0, group=group)
-    return result
+#     torch.distributed.broadcast_object_list(chunk_size, 0, group=group)
+#     result = torch.zeros(*chunk_size[0], dtype=tensor.dtype)
+#     torch.distributed.scatter(result, splitted, src=0, group=group)
+#     return result
 
 
 class Gemma2ModelWithMPU(Gemma2Model):
@@ -200,7 +202,7 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
         input_ids: torch.LongTensor = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional['HybridCache'] = None,
+        past_key_values: Optional[HybridCache] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
@@ -209,25 +211,106 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         num_logits_to_keep: int = 0,
-        **loss_kwargs
-    ):
-        # if self._rearrage_in_forward:
-        #     input_ids = get_slice_for_tensor()
+        **loss_kwargs,
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        r"""
+        Args:
+            labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
+                config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
+                (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
 
-        return super().forward(
-            input_ids,
-            attention_mask,
-            position_ids,
-            past_key_values,
-            inputs_embeds,
-            labels,
-            False,
-            output_attentions,
-            output_hidden_states,
-            return_dict,
-            cache_position,
-            num_logits_to_keep,
-            **loss_kwargs,
+            num_logits_to_keep (`int`, *optional*):
+                Calculate logits for the last `num_logits_to_keep` tokens. If `0`, calculate logits for all
+                `input_ids` (special case). Only last token logits are needed for generation, and calculating them only for that
+                token can save memory, which becomes pretty significant for long sequences or large vocabulary size.
+
+        Returns:
+
+        Example:
+
+        ```python
+        >>> from transformers import AutoTokenizer, GemmaForCausalLM
+
+        >>> model = GemmaForCausalLM.from_pretrained("google/gemma-2-9b")
+        >>> tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
+
+        >>> prompt = "What is your favorite condiment?"
+        >>> inputs = tokenizer(prompt, return_tensors="pt")
+
+        >>> # Generate
+        >>> generate_ids = model.generate(inputs.input_ids, max_length=30)
+        >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+        "What is your favorite condiment?"
+        ```"""
+
+        use_cache = False
+        if self.training and self.config._attn_implementation != "eager":
+            logger.warning_once(
+                "It is strongly recommended to train Gemma2 models with the `eager` attention implementation "
+                f"instead of `{self.config._attn_implementation}`. Use `eager` with `AutoModelForCausalLM.from_pretrained('<path-to-checkpoint>', attn_implementation='eager')`."
+            )
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            cache_position=cache_position,
+        )
+
+        hidden_states = outputs[0]
+        # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
+        logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :])
+        if self.config.final_logit_softcapping is not None:
+            logits = logits / self.config.final_logit_softcapping
+            logits = torch.tanh(logits)
+            logits = logits * self.config.final_logit_softcapping
+
+        loss = None
+        if labels is not None:
+            if parallel_states.sequence_parallel_is_initialized():
+                old_logits = logits
+                old_labels = labels
+
+                spg = parallel_states.get_sequence_parallel_group()
+                logits = GatherAllLogits.apply(logits, spg)
+                labels = GatherAllLogits.apply(labels, spg)
+                if (num_items_in_batch := loss_kwargs.get('num_items_in_batch')) is not None:
+                    loss_kwargs = loss_kwargs.copy()
+                    loss_kwargs['num_items_in_batch'] = dist.all_reduce(
+                        num_items_in_batch,
+                        op=dist.ReduceOp.SUM,
+                        group=spg,
+                    )
+
+            loss = self.loss_function(logits, labels, self.vocab_size, **loss_kwargs)
+            print(f'{dist.get_rank()=} {loss=}')
+
+            if parallel_states.sequence_parallel_is_initialized():
+                logits = old_logits
+                labels = old_labels
+
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return (loss,) + output if loss is not None else output
+
+        return CausalLMOutputWithPast(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
         )
 
     # copied and slighlty modified

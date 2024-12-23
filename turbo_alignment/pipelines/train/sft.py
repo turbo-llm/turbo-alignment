@@ -17,6 +17,7 @@ from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.sft import SftTrainExperimentSettings
+from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 
 logger = get_project_logger()
@@ -61,7 +62,7 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
 
     @staticmethod
     def _get_training_args(experiment_settings: SftTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
+        return TrainingArgumentsWithSeqP(
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             **experiment_settings.trainer_settings.dict(),
         )
