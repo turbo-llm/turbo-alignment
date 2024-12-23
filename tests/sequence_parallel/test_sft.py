@@ -1,7 +1,6 @@
 import enum
 import os
 
-from turbo_alignment.common import set_random_seed
 from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
 from turbo_alignment.pipelines.train.sft import TrainSFTStrategy
 from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
