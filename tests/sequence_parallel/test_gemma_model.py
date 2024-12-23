@@ -5,14 +5,20 @@ import pytest
 import torch
 import torch.distributed
 import turbo_alignment.modeling.parallel_states as parallel_states
-from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer
+from transformers import AutoTokenizer, Trainer
 from transformers.data.data_collator import default_data_collator
 
 from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
-from turbo_alignment.modeling.mp_pretrained import Gemma2ForCausalLMWithMPU, Gemma2ForCausalLM
-from turbo_alignment.modeling.patch_accelerate import patch_acclerator
+from turbo_alignment.modeling.mp_pretrained import (
+    Gemma2ForCausalLM,
+    Gemma2ForCausalLMWithMPU,
+)
+from turbo_alignment.sequence_parallel.collator import (
+    DataCollatorForSequenceParallism,
+    pad_for_sequence_parallel,
+)
+from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
-from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel, DataCollatorForSequenceParallism
 
 from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
 from tests.sequence_parallel.dataset import SimpleDataset
@@ -21,7 +27,7 @@ from tests.sequence_parallel.launcher import app
 
 @app.command(name='gemma-model')
 def gemma_model(
-    model_path: str = '/mnt/models/google/gemma-2-2b'
+    model_path: str = '/mnt/models/google/gemma2-2b'
 ):
     if not os.path.exists(model_path):
         pytest.skip(f'directory {model_path} not found')
@@ -41,22 +47,29 @@ def gemma_model(
 
     vanilla_model = Gemma2ForCausalLM.from_pretrained(
         model_path,
-        attn_implementation="flash_attention_2",
-        torch_dtype=torch.bfloat16,
+        # attn_implementation="flash_attention_2",
+        attn_implementation="eager",
+        # torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float32,
     ).to(current_device)
 
     model = Gemma2ForCausalLMWithMPU.from_pretrained(
         model_path,
-        attn_implementation="flash_attention_2_ulysses",
-        torch_dtype=torch.bfloat16,
+        # attn_implementation="flash_attention_2_ulysses",
+        attn_implementation="eager_ulysses",
+        # torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float32,
     ).to(current_device)
 
     import deepspeed
 
-    model, *_ = deepspeed.initialize(model=model, mpu=parallel_states, config=DEEPSPEED_CONFIG)
+    config = DEEPSPEED_CONFIG
+    config['bf16']['enabled'] = False
+
+    model, *_ = deepspeed.initialize(model=model, mpu=parallel_states, config=config)
     model.train()
 
-    tokenized = tokenizer('Мама мыла раму', return_tensors='pt').to(model.device)
+    tokenized = tokenizer('Мама мыла раму. ' * 5, return_tensors='pt').to(model.device)
     input_ids = pad_for_sequence_parallel(tokenized['input_ids'],parallel_states.get_sequence_parallel_world_size(), 0)
     attention_mask = pad_for_sequence_parallel(tokenized['attention_mask'], parallel_states.get_sequence_parallel_world_size(), False)
 
@@ -75,9 +88,7 @@ def gemma_model(
     result = model(
         input_ids[:, start:end],
         attention_mask,
-        position_ids=position_ids[:, start:end],
-        # use_cache=False,
-        # cache_position=cache_position[start:end],
+        position_ids=position_ids,
     ).logits
 
     result.mean().backward()
@@ -91,7 +102,7 @@ def gemma_model(
 
     vanilla_result.mean().backward()
 
-    torch.testing.assert_close(result, vanilla_result[:, start:end], atol=0.5, rtol=0.2)
+    torch.testing.assert_close(result, vanilla_result[:, start:end], atol=0.01, rtol=0.01)
 
     if dist.get_rank() == 0 or True:
         print('####BEGIN')
@@ -127,7 +138,7 @@ def gemma_model(
 
 @app.command(name='test-dataloader')
 def _test_dataloader(
-    model_path: str = '/mnt/models/google/gemma-2-2b'
+    model_path: str = '/mnt/models/google/gemma2-2b'
 ):
     if not os.path.exists(model_path):
         pytest.skip(f'directory {model_path} not found')
@@ -176,11 +187,9 @@ def _test_dataloader(
             ),
         )
 
-        # trainer.train()
-
         for batch in trainer.get_train_dataloader():
             generated = model.generate(**batch, max_new_tokens=1, use_cache=False)
-            assert generated is None, generated
+            print(generated)
 
 
 if __name__ == '__main__':

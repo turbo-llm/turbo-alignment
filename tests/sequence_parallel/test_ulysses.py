@@ -5,7 +5,7 @@ from transformers.models.gemma2 import Gemma2Config, Gemma2Model
 from transformers.models.gemma2.modeling_gemma2 import Gemma2FlashAttention2, Gemma2Attention
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.modeling.gemma2.ulysses_attn import Gemma2FlashAttention2Ulysses, Gemma2AttentionUlysses
-from turbo_alignment.modeling.patch_accelerate import patch_acclerator
+from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 from turbo_alignment.common import set_random_seed
 
 from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
@@ -113,12 +113,13 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, attn_cls=Gemma
             attention_mask = batch['attention_mask']
             if attn_cls is Gemma2AttentionUlysses:
                 attention_mask = fix_attention_mask(attention_mask, q, cache_position)
-            # attention_mask = None
 
-            output = model(q[:, start:end], attention_mask, position_ids[:, start:end])[0]
+            output = model(q[:, start:end], attention_mask, position_ids)[0]
 
             loss = torch.nn.functional.mse_loss(output, torch.zeros_like(output))
             loss.backward()
+
+            print('Compute vanilla')
 
             vanilla = vanilla.to(q.device)
             vanilla_output = vanilla(
