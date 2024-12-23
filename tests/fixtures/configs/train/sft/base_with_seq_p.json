@@ -55,7 +55,8 @@
             "<bot>": "<unk>",
             "<user>": "<unk>",
             "<system>": "<unk>"
-        }
+        },
+        "resize_token_embeddings": true
     },
     "cherry_pick_settings": {
         "generator_transformers_settings": {
