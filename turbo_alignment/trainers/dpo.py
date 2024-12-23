@@ -5,9 +5,10 @@ from typing import Any, Callable, Literal
 
 import torch
 import torch.distributed as dist
+import torch.distributed.nn.functional as dist_functional
 import torch.nn.functional as F
 from torch import nn
-from torch.utils.data import Dataset, RandomSampler
+from torch.utils.data import Dataset
 from transformers import (
     BaseImageProcessor,
     DefaultFlowCallback,
@@ -53,7 +54,6 @@ from turbo_alignment.trainers.utils import (
 )
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.sequence_parallel.trainer import TrainerWithSeqP
-from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 from .base_args import TrainingArgumentsWithSeqP
 
 if is_deepspeed_available():
@@ -692,8 +692,16 @@ class DPOTrainer(TrainerWithSeqP):
         labels: torch.Tensor,
         average_log_prob: bool = False,
     ) -> torch.Tensor:
-        logits = logits[:, :-1, :]
-        labels = labels[:, 1:]
+        if parallel_states.sequence_parallel_is_initialized():
+            # print(f'{}')
+            if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
+                logits = logits[:, :-1]
+
+        else:
+            logits = logits[:, :-1, :]
+            labels = labels[:, 1:]
+
+        print(f'{dist.get_rank()=} {logits.size()=} {labels.size()=}')
 
         if logits.shape[:-1] != labels.shape:
             raise ValueError('Logits (batch and sequence length dim) and labels must have the same shape.')
@@ -707,9 +715,17 @@ class DPOTrainer(TrainerWithSeqP):
         if average_log_prob:
             n_tokens = loss_mask.sum(-1)
             local_loss = (per_token_logps * loss_mask).sum(-1)
+
+            if parallel_states.sequence_parallel_is_initialized():
+                n_tokens = dist_functional.all_reduce(n_tokens, op=dist.ReduceOp.SUM)
+                local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
+
             return local_loss / n_tokens
 
         local_loss = (per_token_logps * loss_mask).sum(-1)
+        if parallel_states.sequence_parallel_is_initialized():
+            local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
+
         return local_loss
 
     def concatenated_forward(
@@ -737,6 +753,8 @@ class DPOTrainer(TrainerWithSeqP):
             end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
             input_ids = input_ids[:, start:end].clone()
 
+            labels = labels[:, start + 1: end + 1]
+
             if require_position_ids(model):
                 position_ids = torch.arange(0, seq_len, device=input_ids.device).unsqueeze(0)
                 add_kwargs['position_ids'] = position_ids
@@ -747,8 +765,8 @@ class DPOTrainer(TrainerWithSeqP):
             **add_kwargs,
         ).logits.to(torch.float32)
 
-        if parallel_states.sequence_parallel_is_initialized():
-            all_logits = GatherAllLogits.apply(all_logits, parallel_states.get_sequence_parallel_group())
+        # if parallel_states.sequence_parallel_is_initialized():
+            # all_logits = GatherAllLogits.apply(all_logits, parallel_states.get_sequence_parallel_group())
 
         all_logps = self._get_batch_logps(
             all_logits,
@@ -901,8 +919,8 @@ class DPOTrainer(TrainerWithSeqP):
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
         final_losses = losses.mean()
-        if parallel_states.sequence_parallel_is_initialized():
-            final_losses = final_losses * parallel_states.get_sequence_parallel_world_size()
+        # if parallel_states.sequence_parallel_is_initialized():
+            # final_losses = final_losses * parallel_states.get_sequence_parallel_world_size()
 
         return final_losses, metrics
 
