@@ -440,6 +440,9 @@ class AcceleratorWithSequenceParallelism(Accelerator):
         self._dataloaders.append(prepared_data_loader)
         return prepared_data_loader
 
+    def prepare(self, *args, device_placement=None):
+        return super().prepare(*args, device_placement=device_placement)
+
     def _prepare_deepspeed(self, *args):
         import deepspeed
 
