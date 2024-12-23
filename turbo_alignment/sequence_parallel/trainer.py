@@ -471,7 +471,13 @@ class TrainerWithSeqP(Trainer):
                     )
 
                     with context():
+                        start = time.time()
                         tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+                        speed_metrics_ = speed_metrics(
+                            'train',
+                            start,
+                            num_samples=len(inputs),
+                            num_tokens=num_items_in_batch.item() if num_items_in_batch is not None else None)
 
                     if (
                         args.logging_nan_inf_filter
@@ -539,7 +545,15 @@ class TrainerWithSeqP(Trainer):
                         self.state.global_step += 1
                         self.state.epoch = epoch + (step + 1 + steps_skipped) / steps_in_epoch
                         self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                        self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval)
+                        self._maybe_log_save_evaluate(
+                            tr_loss,
+                            grad_norm,
+                            model,
+                            trial,
+                            epoch,
+                            ignore_keys_for_eval,
+                            metrics=speed_metrics_,
+                        )
                     else:
                         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
@@ -638,7 +652,7 @@ class TrainerWithSeqP(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval):
+    def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, metrics=None):
         if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
             if is_torch_xla_available():
                 xm.mark_step()
@@ -676,6 +690,14 @@ class TrainerWithSeqP(Trainer):
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self.store_flos()
+
+            if metrics:
+                logs.update(metrics)
+
+            if dist.get_rank() == 0:
+                print(f'{logs=}')
+
+            dist.barrier()
 
             self.log(logs)
 
