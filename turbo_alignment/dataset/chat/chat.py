@@ -247,8 +247,8 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             input_ids = input_ids[cut_index:]
 
         labels = labels[-len(input_ids) :]
-        # input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
-        # labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
+        input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
+        labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
 
         return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
 

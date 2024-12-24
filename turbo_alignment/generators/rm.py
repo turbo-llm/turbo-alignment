@@ -9,16 +9,20 @@ from turbo_alignment.settings.generators.outputs.rm import RMSamplingInferenceOu
 import ray
 
 class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, **kwargs):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, model_replicas: int = 1, **kwargs):
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
         self._micro_batch = micro_batch
+        self.model_replicas = model_replicas
         super().__init__(tokenizer=tokenizer, **kwargs)
 
     def generate_from_batch_records(self, records: dict[str, torch.Tensor] | BatchEncoding) -> torch.Tensor:
         with torch.no_grad():
             # TODO assuming that only one reward model
             records = {k: v.cuda() for k, v in records.items()}
-            rewards = ray.get(self._model.async_forward(records))[0]
+            
+            rank = torch.distributed.get_rank()
+
+            rewards = ray.get(self._model.reward_forward(records=records, index=rank % self.model_replicas))
         return rewards  # .squeeze()
 
     def generate_from_batch(

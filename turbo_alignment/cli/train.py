@@ -131,7 +131,9 @@ def reinforce_training(
     experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
 
     policy_models = RayGroup(num_nodes=experiment_settings.trainer_settings.num_nodes, num_gpus_per_node=8, ray_actor_type=pipelines.TrainREINFORCEStrategy)
-    reward_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=RewardModel)
+    
+    assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
+    reward_model = RayGroup(num_nodes=1, num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas, ray_actor_type=RewardModel)
     # reference_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=ReferenceModel)
 
     # TODO_RLOO if possible hide init inside RayGroup

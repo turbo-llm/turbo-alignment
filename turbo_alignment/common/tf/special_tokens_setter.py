@@ -77,7 +77,7 @@ class SpecialTokensSetter:
         return None
 
     def set_all(self) -> None:
-        # self.setBOS(bos_token=self._special_tokens_settings.bos_token)
+        self.setBOS(bos_token=self._special_tokens_settings.bos_token)
         self.setEOS(eos_token=self._special_tokens_settings.eos_token)
         self.setPAD(pad_token=self._special_tokens_settings.pad_token)
         self.setUNK(unk_token=self._special_tokens_settings.unk_token)
@@ -94,7 +94,7 @@ class SpecialTokensSetter:
         assert added_tokens == len(tokens)
 
     def setup_model_config(self, model: PreTrainedModel) -> None:
-        # model.config.bos_token_id = self._tokenizer.bos_token_id
+        model.config.bos_token_id = self._tokenizer.bos_token_id
         model.config.eos_token_id = self._tokenizer.eos_token_id
 
         if self._tokenizer.pad_token_id is not None:

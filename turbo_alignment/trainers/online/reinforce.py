@@ -83,6 +83,7 @@ class TimeProfiler:
 @dataclass
 class REINFORCETrainingArguments(TrainingArguments):
     num_nodes: int = 2
+    reward_model_replicas: int = 1
     max_new_tokens: int = 1024
     stop_token: str = '<eos>'
 
@@ -228,6 +229,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         print("Generations Params:\n" + "\n".join([f"{attr}: {getattr(self.generator_transformers_settings, attr, None)}" for attr, _ in self.generator_transformers_settings.__annotations__.items()]))
 
         start = time.time()
+        
+        # if num_samples_for_reward_stats == 0 then no normalization is done
+
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
@@ -268,6 +272,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 generator = RayRMSamplingGenerator(
                     model=reward_model,
                     tokenizer=self.tokenizer,
+                    model_replicas=self.args.reward_model_replicas,
                 )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
                 generator = ...
@@ -527,8 +532,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self, model: torch.nn.Module | PreTrainedModel, dataloader: torch.utils.data.DataLoader
     ) -> tuple[float, float]:
         if self.args.num_samples_for_reward_stats == 0:
-            norm_reward_mean = 0
-            norm_reward_std = 1
+            norm_reward_mean = 0.0
+            norm_reward_std = 1.0
         else:
             all_rewards = []
             samples_processed = 0

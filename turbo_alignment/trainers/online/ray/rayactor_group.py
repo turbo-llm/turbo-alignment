@@ -104,6 +104,11 @@ class RayGroup:
         # TODO assuming one reference model
         return self._actor_handlers[0].reference_forward.remote(records, temperature, loss_mask)
     
+    def reward_forward(self, records: dict[str, torch.Tensor], index: int):
+        assert index < len(self._actor_handlers), f'Reward model replicas: {len(self._actor_handlers)}, provided index: {index}'
+
+        return self._actor_handlers[index].forward.remote(records)
+    
     def async_forward(self, records: dict[str, torch.Tensor]):
         return [actor.forward.remote(records) for actor in self._actor_handlers]
     
