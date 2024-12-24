@@ -358,7 +358,11 @@ class TrainerWithSeqP(Trainer):
         total_batched_samples = 0
 
         if os.getenv('CREATE_GRADIENT_HOOK'):
-            for name, param in self.model.named_parameters():
+            m: nn.Module = self.model
+            for name, param in m.named_parameters():
+                if not param.requires_grad:
+                    continue
+
                 param.register_hook(
                     create_hook(
                         name,
@@ -367,7 +371,6 @@ class TrainerWithSeqP(Trainer):
                     )
                 )
 
-            m: nn.Module = self.model
             for name, module in m.named_modules():
                 module.register_forward_hook(
                     create_forward_hook(
