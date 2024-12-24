@@ -69,14 +69,5 @@ def sft_model_vanilla(
     run_pipeline(vanilla_settings)
 
 
-def set_prct():
-    import prctl
-    prctl.set_ptracer(prctl.SET_PTRACER_ANY)
-
-
 if __name__ == '__main__':
-    set_prct()
-
-    import os
-    os.register_at_fork(after_in_child=set_prct)
     app()
