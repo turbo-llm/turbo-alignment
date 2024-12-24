@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, Trainer
 from transformers.data.data_collator import default_data_collator
 
 from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
-from turbo_alignment.modeling.mp_pretrained import (
+from turbo_alignment.modeling.gemma import (
     Gemma2ForCausalLM,
     Gemma2ForCausalLMWithMPU,
 )

@@ -57,47 +57,8 @@ from transformers.modeling_utils import (
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2Model, HybridCache
 
-# from turbo_alignment.modeling.seq_p_collator import pad_for_sequence_parallel
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
-
-
-# def get_slice_for_tensor(
-#     tensor: torch.Tensor,
-#     group: torch.distributed.ProcessGroup,
-#     dim: int = -1,
-#     pad_value: Any = None,
-# ):
-#     is_group_master = torch.distributed.get_rank(group) == 0
-#     group_size = torch.distributed.get_world_size(group)
-#     tensor_size = tensor.size()
-
-#     tenzor_sizes = [None] * group_size
-#     torch.distributed.gather_object(tensor_size, tenzor_sizes, dst=0, group=group)
-
-#     tensors = None
-#     if is_group_master:
-#         tensors = [
-#             torch.zeros(*tensor_size, dtype=tensor.dtype)
-#             for tensor_size in tenzor_sizes
-#         ]
-
-#     torch.distributed.gather(tensor, tensors, dst=9, group=group)
-
-#     single_tensor = None
-#     splitted = None
-#     chunk_size = [None]
-#     if is_group_master:
-#         single_tensor = torch.cat(tensors, dim=dim)
-#         single_tensor = pad_for_sequence_parallel(tensor, group_size, pad_value, dim=dim)
-#         chunk_size = single_tensor.size(dim) // group_size
-#         splitted = single_tensor.split(chunk_size, dim=dim)
-#         chunk_size = [splitted[0].size()]
-
-#     torch.distributed.broadcast_object_list(chunk_size, 0, group=group)
-#     result = torch.zeros(*chunk_size[0], dtype=tensor.dtype)
-#     torch.distributed.scatter(result, splitted, src=0, group=group)
-#     return result
 
 
 class Gemma2ModelWithMPU(Gemma2Model):
