@@ -22,12 +22,7 @@ class SimpleModel(torch.nn.Module):
 
 @app.command(name='with-seq-p')
 def run_with_seq_p():
-    dataset = SimpleDataset(
-        [
-            {'x': torch.tensor([i])}
-            for i in range(2)
-        ]
-    )
+    dataset = SimpleDataset([{'x': torch.tensor([i])} for i in range(2)])
     with patch_acclerator():
         args = TrainingArguments(
             output_dir='.',
@@ -53,12 +48,7 @@ def run_with_seq_p():
 
 @app.command('without-seq-p')
 def run_without_seq_p():
-    dataset = SimpleDataset(
-        [
-            {'x': torch.tensor([i])}
-            for i in range(2)
-        ]
-    )
+    dataset = SimpleDataset([{'x': torch.tensor([i])} for i in range(2)])
     with patch_acclerator():
         args = TrainingArguments(
             output_dir='.',
@@ -92,7 +82,7 @@ def main():
     [
         pytest.param('with-seq-p', id='with-seq-p'),
         pytest.param('without-seq-p', id='without-seq-p'),
-    ]
+    ],
 )
 def test_data_loader(cmd_name):
     return launch_with_name(cmd_name, 2)

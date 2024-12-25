@@ -21,7 +21,7 @@ tests: tests-unit tests-integration tests-cli
 lint: black flake pylint mypy
 
 black:
-	black --target-version py310 --check --skip-string-normalization --line-length $(MAX_LINE_LENGTH) $(CODE)
+	black --target-version py310 --check --skip-string-normalization --line-length $(MAX_LINE_LENGTH) $(CODE) --diff
 
 flake:
 	flake8 --max-line-length 119 --jobs $(JOBS) --statistics $${CI:+--format=gl-codeclimate --output=codeclimate-flake8.json} $(CODE)
