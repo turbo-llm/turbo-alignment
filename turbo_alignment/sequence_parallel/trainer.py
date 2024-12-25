@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 import contextlib
 import functools
 import logging
@@ -127,7 +129,11 @@ class TrainerWithSeqP(Trainer):
         # total number of training steps to execute: max_steps
 
         # BEGIN OF PATCH
-        total_train_batch_size = self._train_batch_size * args.gradient_accumulation_steps * args.world_size // parallel_states.get_sequence_parallel_world_size_or_one()
+        total_train_batch_size = (
+            self._train_batch_size
+            * args.gradient_accumulation_steps
+            * (args.world_size // parallel_states.get_sequence_parallel_world_size_or_one())
+        )
         # END OF PATCH
 
         len_dataloader = None
@@ -480,7 +486,8 @@ class TrainerWithSeqP(Trainer):
                             'train',
                             start,
                             num_samples=len(inputs),
-                            num_tokens=num_items_in_batch.item() if num_items_in_batch is not None else None)
+                            num_tokens=num_items_in_batch.item() if num_items_in_batch is not None else None,
+                        )
 
                     if (
                         args.logging_nan_inf_filter
@@ -492,7 +499,7 @@ class TrainerWithSeqP(Trainer):
                     else:
                         if tr_loss.device != tr_loss_step.device:
                             raise ValueError(
-                                f"Calculated loss must be on the original device: {tr_loss.device} but device in use is {tr_loss_step.device}"
+                                f"Calculated loss must be on the original device: {tr_loss.device} but device in use is {tr_loss_step.device}"  # pylint: disable
                             )
                         tr_loss = tr_loss + tr_loss_step
 
@@ -663,28 +670,12 @@ class TrainerWithSeqP(Trainer):
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            ### BEGIN OF THEN PATCH
-            # tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-
-            # we assume, that the loss for an example if sum of losses on each worker in the sequence parallel group
-            if parallel_states.sequence_parallel_is_initialized():
-                # tr_loss_scalar = (self._nested_gather(tr_loss).sum() / parallel_states.get_data_parallel_world_size()).item()
-                tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-            else:
-                tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-            ### END OF THE PATCH
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
 
             # reset tr_loss to zero
-            old_tr_loss = tr_loss.clone()
             tr_loss -= tr_loss
 
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
-
-            r = dist.get_rank()
-            for i in range(dist.get_world_size()):
-                if r == i:
-                    print(f'{dist.get_rank()=} {tr_loss_scalar=} {logs["loss"]=} {old_tr_loss=}')
-                dist.barrier()
 
             if grad_norm is not None:
                 logs["grad_norm"] = grad_norm.detach().item() if isinstance(grad_norm, torch.Tensor) else grad_norm
@@ -697,11 +688,6 @@ class TrainerWithSeqP(Trainer):
             if metrics:
                 logs.update(metrics)
 
-            if dist.get_rank() == 0:
-                print(f'{logs=}')
-
-            dist.barrier()
-
             self.log(logs)
 
         metrics = None
@@ -711,4 +697,3 @@ class TrainerWithSeqP(Trainer):
         if self.control.should_save:
             self._save_checkpoint(model, trial, metrics=metrics)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
-
