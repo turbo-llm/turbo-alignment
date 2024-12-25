@@ -13,8 +13,8 @@ from transformers import (
 
 from turbo_alignment.common.registry import Registrable
 from turbo_alignment.settings.model import ModelType
-# from turbo_alignment.modeling.gemma2.little_gemma import Gemma2ForCausalLMUlysses
 from turbo_alignment.modeling.gemma import Gemma2ForCausalLMWithMPU
+
 
 class TransformersAutoModelRegistry(Registrable):
     ...
