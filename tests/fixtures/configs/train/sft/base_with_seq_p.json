@@ -109,7 +109,7 @@
         "lr_scheduler_type": "cosine",
         "warmup_steps": 2,
         "fp16": false,
-        "bf16": true,
+        "bf16": false,
         "optim": "adamw_torch",
         "save_total_limit": 1,
         "no_cuda": false,
