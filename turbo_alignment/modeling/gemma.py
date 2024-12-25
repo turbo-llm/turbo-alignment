@@ -256,7 +256,6 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
                     )
 
             loss = self.loss_function(logits, labels, self.vocab_size, **loss_kwargs)
-            print(f'{dist.get_rank()=} {loss=}')
 
             if parallel_states.sequence_parallel_is_initialized():
                 logits = old_logits

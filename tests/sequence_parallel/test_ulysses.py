@@ -1,3 +1,4 @@
+import pytest
 import torch
 import torch.distributed
 from transformers import Trainer, TrainingArguments
@@ -10,7 +11,8 @@ from turbo_alignment.common import set_random_seed
 
 from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
 from tests.sequence_parallel.dataset import SimpleDataset
-from tests.sequence_parallel.launcher import app
+from tests.sequence_parallel.launcher import app, launch_with_name
+from tests.sequence_parallel.marks import has_two_gpus
 
 
 CONFIG = Gemma2Config()
@@ -153,6 +155,18 @@ def with_flash():
 @app.command('ulysses-without-flash')
 def without_flash():
     run_with_seq_p(attn_cls=Gemma2AttentionUlysses)
+
+
+@pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
+@pytest.mark.parametrize(
+    'cmd_name',
+    [
+        pytest.param('ulysses-with-flash', id='flash'),
+        pytest.param('ulysses-without-flash', id='eager'),
+    ],
+)
+def test_ulysses_attention(cmd_name):
+    return launch_with_name(cmd_name, 2)
 
 
 def main():

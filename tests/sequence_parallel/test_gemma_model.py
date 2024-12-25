@@ -1,5 +1,6 @@
 import os
 
+import deepspeed
 import deepspeed.comm as dist
 import pytest
 import torch
@@ -20,15 +21,14 @@ from turbo_alignment.sequence_parallel.collator import (
 from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 
-from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
+from tests.sequence_parallel.consts import DEEPSPEED_CONFIG, MODEL_PATH
 from tests.sequence_parallel.dataset import SimpleDataset
-from tests.sequence_parallel.launcher import app
+from tests.sequence_parallel.launcher import app, launch_with_name
+from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
 
 
 @app.command(name='gemma-model')
-def gemma_model(
-    model_path: str = '/mnt/models/google/gemma2-2b'
-):
+def gemma_model(model_path: str = MODEL_PATH):
     if not os.path.exists(model_path):
         pytest.skip(f'directory {model_path} not found')
         return
@@ -60,8 +60,6 @@ def gemma_model(
         # torch_dtype=torch.bfloat16,
         torch_dtype=torch.float32,
     ).to(current_device)
-
-    import deepspeed
 
     config = DEEPSPEED_CONFIG
     config['bf16']['enabled'] = False
@@ -190,6 +188,18 @@ def _test_dataloader(
         for batch in trainer.get_train_dataloader():
             generated = model.generate(**batch, max_new_tokens=1, use_cache=False)
             print(generated)
+
+
+@pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
+@pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
+def test_dataloader():
+    return launch_with_name('test-dataloader', 2)
+
+
+@pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
+@pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
+def test_gemma_model():
+    return launch_with_name('gemma-model', 2)
 
 
 if __name__ == '__main__':
