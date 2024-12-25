@@ -41,7 +41,7 @@ def fix_attention_mask(
     target_length = attention_mask.shape[-1] if attention_mask is not None else input_tensor.shape[1]
 
     # In case the provided `attention` mask is 2D, we generate a causal mask here (4D).
-    causal_mask = Gemma2Model._prepare_4d_causal_attention_mask_with_cache_position(
+    causal_mask = Gemma2Model._prepare_4d_causal_attention_mask_with_cache_position( # pylint: disable[W0212]
         attention_mask,
         sequence_length=sequence_length,
         target_length=target_length,
@@ -61,7 +61,7 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, attn_cls=Gemma
     dataset = SimpleDataset(
         [
             {
-                'q': torch.randn((seq_len, config.hidden_size, ), dtype=dtype),
+                'q': torch.randn((seq_len, config.hidden_size), dtype=dtype),
                 'attention_mask': torch.tensor([True] * num_items + [False] * (seq_len - num_items)),
             }
             for _ in range(2)
@@ -102,11 +102,9 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, attn_cls=Gemma
             args=args,
         )
 
-        for i, batch in enumerate(trainer.get_train_dataloader()):
+        for batch in trainer.get_train_dataloader():
             q = batch['q']
-            cache_position = torch.arange(
-                0, q.shape[1], device=q.device,
-            )
+            cache_position = torch.arange(0, q.shape[1], device=q.device)
             position_ids = cache_position.unsqueeze(0)
 
             start = (seq_len // 2) * parallel_states.get_sequence_parallel_rank()
@@ -134,7 +132,7 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, attn_cls=Gemma
             vanilla_loss.backward()
 
             vanilla_subset = vanilla_output[:, start : min(end, num_items)]
-            output_subset = output[:, :min(end, num_items - start)]
+            output_subset = output[:, : min(end, num_items - start)]
 
             assert vanilla_subset.size() == output_subset.size(), (vanilla_subset.size(), output_subset.size())
             torch.testing.assert_close(output_subset, vanilla_subset, atol=0.3, rtol=2)
