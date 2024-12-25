@@ -27,7 +27,7 @@ def launch_with_name(name: str, num_gpus: int, env: dict[str, str] | None = None
             logger.info('CUDA_VISIBLE_DEVICES is set, so do not pass --num_gpus argument, but create hostfile')
             temp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             host_file = os.path.join(temp_dir, 'hostfile')
-            with open(host_file, 'w') as output:
+            with open(host_file, 'w', encoding='utf-8') as output:
                 output.write(f'localhost slots={torch.cuda.device_count()}\n')
 
             args.extend(['--hostfile', host_file, '--no_ssh_check', '--master_addr', 'localhost'])
@@ -35,7 +35,7 @@ def launch_with_name(name: str, num_gpus: int, env: dict[str, str] | None = None
         else:
             args.extend(['--num_gpus', str(num_gpus)])
 
-        args.extend([__file__, name,])
+        args.extend([__file__, name])
 
         subprocess.check_call(
             args,

@@ -47,6 +47,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SlicHfLossSettings,
     SyncRefModelSettings,
 )
+from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
     concatenated_inputs,
@@ -683,9 +684,6 @@ class DPOTrainer(TrainerWithSeqP):
             precomputed_margins=precomputed_margins,
         )
 
-    def train(self, resume_from_checkpoint = None, trial = None, ignore_keys_for_eval = None, **kwargs):
-        return super().train(resume_from_checkpoint, trial, ignore_keys_for_eval, **kwargs)
-
     def _get_batch_logps(
         self,
         logits: torch.Tensor,
@@ -741,19 +739,22 @@ class DPOTrainer(TrainerWithSeqP):
 
         add_kwargs = {}
 
-        from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
         if parallel_states.sequence_parallel_is_initialized():
             input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
             seq_len = input_ids.size(1)
             labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
-            attention_mask = pad_for_sequence_parallel(attention_mask, parallel_states.get_sequence_parallel_world_size(), 0)
+            attention_mask = pad_for_sequence_parallel(
+                attention_mask,
+                parallel_states.get_sequence_parallel_world_size(),
+                0,
+            )
             assert input_ids.size(-1) == labels.size(-1), (input_ids.size(), labels.size())
             chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
             start = chunk_size * parallel_states.get_sequence_parallel_rank()
             end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
             input_ids = input_ids[:, start:end].clone()
 
-            labels = labels[:, start + 1: end + 1]
+            labels = labels[:, start + 1 : end + 1]
 
             if require_position_ids(model):
                 position_ids = torch.arange(0, seq_len, device=input_ids.device).unsqueeze(0)
@@ -764,9 +765,6 @@ class DPOTrainer(TrainerWithSeqP):
             attention_mask,
             **add_kwargs,
         ).logits.to(torch.float32)
-
-        # if parallel_states.sequence_parallel_is_initialized():
-            # all_logits = GatherAllLogits.apply(all_logits, parallel_states.get_sequence_parallel_group())
 
         all_logps = self._get_batch_logps(
             all_logits,
@@ -918,11 +916,7 @@ class DPOTrainer(TrainerWithSeqP):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        final_losses = losses.mean()
-        # if parallel_states.sequence_parallel_is_initialized():
-            # final_losses = final_losses * parallel_states.get_sequence_parallel_world_size()
-
-        return final_losses, metrics
+        return losses.mean(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor

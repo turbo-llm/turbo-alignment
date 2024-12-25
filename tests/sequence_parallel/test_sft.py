@@ -14,7 +14,7 @@ SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'peft_with_seq_p.j
 
 
 class AttnType(str, enum.Enum):
-    EAGER = 'eager',
+    EAGER = 'eager'
     FLASH = 'flash_attention_2'
 
 

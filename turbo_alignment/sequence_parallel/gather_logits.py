@@ -35,5 +35,5 @@ class GatherAllLogits(torch.autograd.Function):
     def backward(ctx, grad_output):
         step_seqlen = ctx.seqlen // ctx.sp_world_size
         sp_rank = ctx.sp_rank
-        grad_output_part = grad_output[:, step_seqlen * sp_rank:step_seqlen * (sp_rank + 1), :]
+        grad_output_part = grad_output[:, step_seqlen * sp_rank : step_seqlen * (sp_rank + 1), :]
         return grad_output_part, None
