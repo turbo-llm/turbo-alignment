@@ -155,6 +155,8 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             self.model = self._load_model(experiment_settings, self.tokenizer)
             logger.info('Model is loaded!')
 
+            training_args = self._get_training_args(experiment_settings)
+
             special_tokens_setter.setup_model_config(self.model)
 
             train_dataset: ConcatDataset = ConcatDataset(
@@ -173,7 +175,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                 )
             )
 
-            training_args = self._get_training_args(experiment_settings)
+
             data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
             if experiment_settings.trainer_settings.sequence_parallel > 1:
                 logger.info('Wrap data collator to support sequence parallelism')
