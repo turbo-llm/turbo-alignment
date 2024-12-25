@@ -1,3 +1,4 @@
+import pytest
 import torch
 from transformers import Trainer, TrainingArguments
 
@@ -6,7 +7,8 @@ from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 
 from tests.sequence_parallel.consts import DEEPSPEED_CONFIG
 from tests.sequence_parallel.dataset import SimpleDataset
-from tests.sequence_parallel.launcher import app
+from tests.sequence_parallel.launcher import app, launch_with_name
+from tests.sequence_parallel.marks import has_two_gpus
 
 
 class SimpleModel(torch.nn.Module):
@@ -76,12 +78,24 @@ def run_without_seq_p():
             args=args,
         )
 
-        for i, batch in enumerate(trainer.get_train_dataloader()):
+        for batch in trainer.get_train_dataloader():
             assert batch['x'].item() == torch.distributed.get_rank(), batch
 
 
 def main():
     return app()
+
+
+@pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
+@pytest.mark.parametrize(
+    'cmd_name',
+    [
+        pytest.param('with-seq-p', id='with-seq-p'),
+        pytest.param('without-seq-p', id='without-seq-p'),
+    ]
+)
+def test_data_loader(cmd_name):
+    return launch_with_name(cmd_name, 2)
 
 
 if __name__ == '__main__':

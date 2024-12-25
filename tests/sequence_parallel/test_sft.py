@@ -10,6 +10,7 @@ from tests.constants import FIXTURES_PATH
 from tests.sequence_parallel.launcher import app
 
 SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'base_with_seq_p.json'
+SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'peft_with_seq_p.json'
 
 
 class AttnType(str, enum.Enum):
