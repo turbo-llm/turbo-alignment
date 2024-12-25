@@ -16,11 +16,10 @@ def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, di
         return tensor
 
     pad_num = seq_parallel_world_size - (length % seq_parallel_world_size)
-    pad_shape = (*tensor.shape[:dim], pad_num,
-                 *tensor.shape[dim + 1:]) if dim != -1 else (
-                     *tensor.shape[:dim], pad_num)
-    pad = torch.full(
-        pad_shape, padding_value, dtype=tensor.dtype, device=tensor.device)
+    pad_shape = (
+        (*tensor.shape[:dim], pad_num, *tensor.shape[dim + 1 :]) if dim != -1 else (*tensor.shape[:dim], pad_num)
+    )
+    pad = torch.full(pad_shape, padding_value, dtype=tensor.dtype, device=tensor.device)
     tensor = torch.cat([tensor, pad], dim=dim)
     return tensor
 
@@ -33,7 +32,7 @@ DEFAULT_PAD_VALUES = {
 
 
 def tensor_dim_slice(tensor, dim, s):
-    return tensor[(slice(None),) * (dim if dim >= 0 else dim + tensor.dim()) + (s, )]
+    return tensor[(slice(None),) * (dim if dim >= 0 else dim + tensor.dim()) + (s,)]
 
 
 @lru_cache
@@ -61,9 +60,7 @@ class DataCollatorForSequenceParallism:
         self.add_cache_positions = add_cache_positions
 
     def _get_cache_position(self, input_ids: torch.Tensor) -> torch.Tensor:
-        return torch.arange(
-            0, input_ids.shape[1], device=input_ids.device,
-        )
+        return torch.arange(0, input_ids.shape[1], device=input_ids.device)
 
     def __call__(self, *args, **kwargs):
         collated = self.base_collate_fn(*args, **kwargs)
@@ -85,10 +82,7 @@ class DataCollatorForSequenceParallism:
                 position_ids = cache_position.unsqueeze(0)
                 collated['position_ids'] = position_ids
 
-            return {
-                key: self.prepare_value(key, value)
-                for key, value in collated.items()
-            }
+            return {key: self.prepare_value(key, value) for key, value in collated.items()}
 
         return self._split_value(collated)
 
@@ -96,7 +90,12 @@ class DataCollatorForSequenceParallism:
         return key not in self.fields_not_to_split
 
     def prepare_value(self, key: str, value: torch.Tensor):
-        padded = pad_for_sequence_parallel(value, self.seq_p_world_size, self.pad_values_for_fields.get(key, 0), dim=-1)
+        padded = pad_for_sequence_parallel(
+            value,
+            self.seq_p_world_size,
+            self.pad_values_for_fields.get(key, 0),
+            dim=-1,
+        )
         if self.should_be_splitted(key):
             if not isinstance(padded, torch.Tensor):
                 raise ValueError(f'{key=} {value=} {padded=}')
@@ -110,6 +109,8 @@ class DataCollatorForSequenceParallism:
         return tensor_dim_slice(value, dim, slice(start, end))
 
     def _get_slice_for_length(self, length: int) -> tuple[int, int]:
-        assert length % self.seq_p_world_size == 0, f'Expect length {length} divide by world size {self.seq_p_world_size}'
+        assert (
+            length % self.seq_p_world_size == 0
+        ), f'Expect length {length} divide by world size {self.seq_p_world_size}'
         chunk_size = length // self.seq_p_world_size
         return chunk_size * self.seq_p_rank, chunk_size * (self.seq_p_rank + 1)

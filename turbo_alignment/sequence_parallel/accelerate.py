@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 import math
 from typing import Callable, List, Optional, Union
 
@@ -25,8 +27,9 @@ from accelerate.data_loader import (
     DataLoaderDispatcher,
     DataLoaderShard,
 )
-# from transformers import Trainer
+
 from accelerate.logging import get_logger
+from transformers.integrations.deepspeed import HfTrainerDeepSpeedConfig
 from turbo_alignment.modeling import parallel_states as mpu
 
 if is_torch_xla_available():
@@ -200,10 +203,12 @@ def prepare_data_loader(
         dataloader.sampler.sampler if sampler_is_batch_sampler else dataloader.sampler, DistributedSampler
     )
 
-    # print(f'{dist.get_rank()=} is_distributed_sampler: {is_distributed_sampler=}')
-
     # No change if no multiprocess
-    if (num_processes != 1 or state.distributed_type == DistributedType.MEGATRON_LM) and not dispatch_batches and not is_distributed_sampler:
+    if (
+        (num_processes != 1 or state.distributed_type == DistributedType.MEGATRON_LM)
+        and not dispatch_batches
+        and not is_distributed_sampler
+    ):
         # print(f'{dist.get_rank()=} Line 206')
         if isinstance(new_dataset, IterableDataset):
             if getattr(dataloader.dataset, "generator", None) is not None:
@@ -301,9 +306,6 @@ def prepare_data_loader(
     return dataloader
 
 
-from transformers.integrations.deepspeed import HfTrainerDeepSpeedConfig
-
-
 class HfTrainerDeepSpeedSeqPConfig(HfTrainerDeepSpeedConfig):
     def trainer_config_process(self, args, auto_find_batch_size=False):
         """
@@ -313,7 +315,11 @@ class HfTrainerDeepSpeedSeqPConfig(HfTrainerDeepSpeedConfig):
         # DeepSpeed does:
         # train_batch_size = world_size * train_micro_batch_size_per_gpu * gradient_accumulation_steps
         # train_batch_size = args.world_size * args.per_device_train_batch_size * args.gradient_accumulation_steps
-        train_batch_size = args.world_size // getattr(args, 'sequence_parallel', 1) * args.per_device_train_batch_size * args.gradient_accumulation_steps
+        train_batch_size = (
+            (args.world_size // getattr(args, 'sequence_parallel', 1))
+            * args.per_device_train_batch_size
+            * args.gradient_accumulation_steps
+        )
         self.fill_match(
             "train_micro_batch_size_per_gpu",
             args.per_device_train_batch_size,
@@ -454,12 +460,12 @@ class AcceleratorWithSequenceParallelism(Accelerator):
             for obj in args
         ]
 
-        ### BEGIN OF PATCH
+        # BEGIN OF PATCH
         if mpu.sequence_parallel_is_initialized():
             world_size = mpu.get_data_parallel_world_size()
         else:
             world_size = self.num_processes
-        ### ENF OF PATCH
+        # ENF OF PATCH
 
         if deepspeed_plugin.is_auto("train_micro_batch_size_per_gpu"):
             if is_dataloader_present:
@@ -471,7 +477,7 @@ class AcceleratorWithSequenceParallelism(Accelerator):
                         "or assign integer value to `AcceleratorState().deepspeed_plugin.deepspeed_config['train_micro_batch_size_per_gpu']`."
                     )
                 if self.split_batches:
-                    batch_sizes = [batch_size // world_size for batch_size in batch_sizes]  ## PATCH
+                    batch_sizes = [batch_size // world_size for batch_size in batch_sizes]  # PATCH
 
                 batch_size_per_device = min(batch_sizes) if deepspeed_plugin.is_train_batch_min else max(batch_sizes)
                 if len(batch_sizes) > 1:
@@ -500,7 +506,7 @@ class AcceleratorWithSequenceParallelism(Accelerator):
             "train_micro_batch_size_per_gpu": batch_size_per_device,
             "train_batch_size": batch_size_per_device
             * deepspeed_plugin.get_value("gradient_accumulation_steps")
-            * world_size,  ### PATCHED
+            * world_size,  # PATCHED
             "gradient_clipping": 1.0,
             "zero_optimization.stage3_gather_16bit_weights_on_model_save": False,
         }
@@ -620,13 +626,13 @@ class AcceleratorWithSequenceParallelism(Accelerator):
             self.deepspeed_config = deepspeed_plugin.deepspeed_config
             kwargs = dict(model=model, config_params=self.deepspeed_config)
 
-            #### BEGIN OF PATCH
+            # BEGIN OF PATCH
             if mpu.sequence_parallel_is_initialized():
                 logger.info('Set mpu')
                 kwargs["mpu"] = mpu
             else:
                 logger.info('Does not set mpu')
-            #### END OF PATCH
+            # END OF PATCH
 
             if optimizer is not None:
                 if isinstance(optimizer, (DummyOptim)):

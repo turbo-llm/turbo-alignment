@@ -1,8 +1,10 @@
-from typing import Optional, Tuple
+# pylint: skip-file
+
+from typing import Optional, Tuple, TYPE_CHECKING
 
 import torch
 from torch import nn
-from deepspeed.sequence.layer import DistributedAttention  # , _SeqAllToAll
+from deepspeed.sequence.layer import DistributedAttention
 import torch.distributed as dist
 from transformers.cache_utils import Cache
 from transformers.models.gemma2.modeling_gemma2 import (
@@ -24,10 +26,16 @@ from turbo_alignment.modeling.parallel_states import (
     sequence_parallel_is_enabled,
     get_sequence_parallel_rank,
 )
+
 # from turbo_alignment.modeling.gemma2.verbose_attn import DistributedAttention
 
 if is_flash_attn_2_available():
     from transformers.modeling_flash_attention_utils import _flash_attention_forward
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from torch import Tensor
 
 
 logger = logging.get_logger(__name__)
@@ -40,7 +48,6 @@ class _SeqAllToAll(torch.autograd.Function):
         ctx.scatter_idx = scatter_idx
         ctx.gather_idx = gather_idx
 
-        import deepspeed.comm as dist
         seq_world_size = dist.get_world_size(group)
 
         input_list = [t.contiguous() for t in torch.tensor_split(input, seq_world_size, scatter_idx)]
@@ -113,38 +120,9 @@ class Gemma2AttentionUlysses(torch.nn.Module):
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
 
-        if sequence_parallel_is_enabled():
-            filename = f'/mnt/p.geyn/key_weight_{dist.get_rank()}.npy'
-        else:
-            filename = f'/mnt/p.geyn/key_weight.npy'
-
-        import os
-        if not os.path.exists(filename):
-            self.k_proj.weight.detach().float().cpu().numpy().tofile(filename)
-
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-
-        # print(f'{dist.get_rank()=} {position_ids=}')
-
-        # if sequence_parallel_is_enabled():
-        #     filename = f'/mnt/p.geyn/query_states_before_rank_{dist.get_rank()}.npy'
-        # else:
-        #     filename = f'/mnt/p.geyn/query_states_before.npy'
-
-        # import os
-        # if not os.path.exists(filename):
-        #     query_states.detach().float().cpu().numpy().tofile(filename)
-
-        # if sequence_parallel_is_enabled():
-        #     filename = f'/mnt/p.geyn/key_states_before_rank_{dist.get_rank()}.npy'
-        # else:
-        #     filename = f'/mnt/p.geyn/key_states_before.npy'
-
-        # import os
-        # if not os.path.exists(filename):
-        #     key_states.detach().float().cpu().numpy().tofile(filename)
 
         cos, sin = self.rotary_emb(value_states, position_ids)
 
@@ -179,25 +157,6 @@ class Gemma2AttentionUlysses(torch.nn.Module):
         query_states = _SeqAllToAll().apply(spg, query_states, scatter_idx, gather_idx)
         key_states = _SeqAllToAll().apply(spg, key_states, scatter_idx, gather_idx)
         value_states = _SeqAllToAll().apply(spg, value_states, scatter_idx, gather_idx)
-
-        # if sequence_parallel_is_enabled():
-        #     filename = f'/mnt/p.geyn/query_states_rank_{dist.get_rank()}.npy'
-        # else:
-        #     filename = f'/mnt/p.geyn/query_states.npy'
-
-        # import os
-        # if not os.path.exists(filename):
-        #     query_states.detach().float().cpu().numpy().tofile(filename)
-
-        # if sequence_parallel_is_enabled():
-        #     filename = f'/mnt/p.geyn/keys_states_rank_{dist.get_rank()}.npy'
-        # else:
-        #     filename = f'/mnt/p.geyn/keys_states.npy'
-
-        # if not os.path.exists(filename):
-        #     key_states.detach().float().cpu().numpy().tofile(filename)
-
-        # print(f'{query_states.size()=} {key_states.size()=}')
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) * self.scaling
 
@@ -335,7 +294,9 @@ class Gemma2FlashAttention2Ulysses(Gemma2Attention):
             key_states = key_states.to(target_dtype)
             value_states = value_states.to(target_dtype)
 
-        logger.debug(f'Before attention class: {dist.get_rank()=} {query_states.size()=} {key_states.size()=} {value_states.size()=}')
+        logger.debug(
+            f'Before attention class: {dist.get_rank()=} {query_states.size()=} {key_states.size()=} {value_states.size()=}'
+        )
         _forward = DistributedAttention(
             _flash_attention_forward,
             get_sequence_parallel_group(),
