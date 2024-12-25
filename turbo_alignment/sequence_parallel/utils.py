@@ -13,7 +13,7 @@ def print_once(msg):
 
 
 def write_shape(ar, filename):
-    with open(filename, 'w') as output:
+    with open(filename, 'w', encoding='utf-8') as output:
         output.write(' '.join(map(str, ar.shape)))
         output.write('\n')
         output.write(str(ar.dtype))
@@ -38,7 +38,7 @@ def create_hook(name: str, output_dir: str = '/mnt/p.geyn/gradients', seq_p_init
     return hook
 
 
-def process_forward_output(output_dir, name, middle_name, output, module=None, args=None) -> bool:
+def process_forward_output(output_dir, name, middle_name, output) -> bool:
     shape_filename = os.path.join(output_dir, name + middle_name + '.shape')
     filename = os.path.join(output_dir, name + middle_name + '.npy')
     if os.path.exists(filename):
@@ -76,14 +76,14 @@ class ForwardHook:
         set_flag = False
         if isinstance(output, tuple):
             for ind, local_output in enumerate(output):
-                if process_forward_output(self.output_dir, f'{self.name}_{ind}', self.middle_name, local_output, module, args):
+                if process_forward_output(self.output_dir, f'{self.name}_{ind}', self.middle_name, local_output):
                     if not self.written:
                         with open(self.forward_file, 'a') as o:
                             o.write(f'{self.name}_{ind}\n')
 
                         set_flag = True
         else:
-            if process_forward_output(self.output_dir, self.name, self.middle_name, output, module, args):
+            if process_forward_output(self.output_dir, self.name, self.middle_name, output):
                 if not self.written:
                     with open(self.forward_file, 'a') as o:
                         o.write(f'{self.name}\n')

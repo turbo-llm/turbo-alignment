@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 import copy
 import inspect
 import json
@@ -97,9 +99,7 @@ class Gemma2ModelWithMPU(Gemma2Model):
         else:
             target_length = attention_mask.shape[-1] if attention_mask is not None else sequence_length
             # HACK
-            cache_position = torch.arange(
-                0, sequence_length, device=input_tensor.device
-            )
+            cache_position = torch.arange(0, sequence_length, device=input_tensor.device)
 
         # In case the provided `attention` mask is 2D, we generate a causal mask here (4D).
         causal_mask = self._prepare_4d_causal_attention_mask_with_cache_position(
@@ -138,7 +138,7 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
         streamer=None,
         negative_prompt_ids=None,
         negative_prompt_attention_mask=None,
-        **kwargs
+        **kwargs,
     ):
         try:
             self._rearrage_in_forward = True
@@ -1422,14 +1422,15 @@ class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
         return model
 
     @classmethod
-    def _autoset_attn_implementation(cls, config, use_flash_attention_2 = False, torch_dtype = None, device_map = None, check_device_map = True):
+    def _autoset_attn_implementation(
+        cls, config, use_flash_attention_2=False, torch_dtype=None, device_map=None, check_device_map=True
+    ):
         old = config._attn_implementation
         if old.endswith('_ulysses'):
-            config._attn_implementation = old[:-len('_ulysses')]
+            config._attn_implementation = old[: -len('_ulysses')]
 
-        # if old == 'flash_attention_2_ulysses':
-        #     config._attn_implementation = 'flash_attention_2'
-
-        res = super()._autoset_attn_implementation(config, use_flash_attention_2, torch_dtype, device_map, check_device_map)
+        res = super()._autoset_attn_implementation(
+            config, use_flash_attention_2, torch_dtype, device_map, check_device_map
+        )
         res._attn_implementation = old
         return res

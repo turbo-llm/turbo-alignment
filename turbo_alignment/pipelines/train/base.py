@@ -11,23 +11,27 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
-
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
+from turbo_alignment.common import set_random_seed
 from turbo_alignment.common.data.io import write_json
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders.model import load_model
 from turbo_alignment.common.tf.loaders.tokenizer import load_tokenizer
 from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.dataset.loader import DatasetLoader
+from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
+from turbo_alignment.modeling.parallel_states import (
+    get_sequence_parallel_rank,
+    get_sequence_parallel_world_size,
+)
 from turbo_alignment.pipelines.base import BaseStrategy
 from turbo_alignment.pipelines.mixin import S3Mixin
 from turbo_alignment.pipelines.mixin.logging import LoggingRegistry
+from turbo_alignment.sequence_parallel.collator import DataCollatorForSequenceParallism
+from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.s3 import ExperimentMetadata, S3HandlerParameters
-from turbo_alignment.modeling.parallel_states import get_sequence_parallel_rank, get_sequence_parallel_world_size
-from turbo_alignment.sequence_parallel.collator import DataCollatorForSequenceParallism
-from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 
 logger = get_project_logger()
 
@@ -137,9 +141,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             )
 
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
-        from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
         patch_gemma_attn_dict()
-        from turbo_alignment.common import set_random_seed
         set_random_seed(experiment_settings.seed)
 
         with patch_acclerator():
@@ -176,7 +178,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                     seed=experiment_settings.seed,
                 )
             )
-
 
             data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
             if experiment_settings.trainer_settings.sequence_parallel > 1:
