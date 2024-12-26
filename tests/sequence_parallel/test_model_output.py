@@ -7,6 +7,7 @@ import pytest
 from tests.constants import FIXTURES_PATH
 from tests.sequence_parallel.compare_gradients import compare as compare_gradients
 from tests.sequence_parallel.compare_values import compare as compare_values
+from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
 
 DPO_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'dpo' / 'dpo_with_seq_p.json'
 SFT_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'base_with_seq_p.json'
@@ -23,6 +24,8 @@ DIR = pathlib.Path(__file__).parent
         pytest.param('sft', SFT_PEFT_SETTINGS_PATH, id='sft_lora', marks=pytest.mark.xfail),
     ],
 )
+@pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
+@pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
 def test_model_output(task_type: str, settings_path: pathlib.Path, tmp_path_factory: pytest.TempPathFactory):
     env = os.environ
 
