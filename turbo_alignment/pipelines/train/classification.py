@@ -26,6 +26,8 @@ from turbo_alignment.trainers.classification import (
     auto_class_weights,
 )
 
+from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
+
 logger = get_project_logger()
 
 
@@ -68,7 +70,7 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
 
     @staticmethod
     def _get_training_args(experiment_settings: ClassificationTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
+        return TrainingArgumentsWithSeqP(
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=['labels'],
             remove_unused_columns=False,

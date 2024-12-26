@@ -24,12 +24,13 @@ from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.trainers.dpo import DPOTrainer
 from turbo_alignment.trainers.utils import concatenated_inputs, prepare_model
+from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 
 logger = get_project_logger()
 
 
 @dataclass
-class DDPOTrainingArguments(TrainingArguments):
+class DDPOTrainingArguments(TrainingArgumentsWithSeqP):
     use_ref_model: bool = True
     average_log_prob: bool = False
 
