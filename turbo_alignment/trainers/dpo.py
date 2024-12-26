@@ -658,8 +658,6 @@ class DPOTrainer(TrainerWithSeqP):
             logits = logits[:, :-1, :]
             labels = labels[:, 1:]
 
-        print(f'{dist.get_rank()=} {logits.size()=} {labels.size()=}')
-
         if logits.shape[:-1] != labels.shape:
             raise ValueError('Logits (batch and sequence length dim) and labels must have the same shape.')
 
