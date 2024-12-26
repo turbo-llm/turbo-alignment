@@ -18,6 +18,7 @@ from turbo_alignment.metrics.reward import compute_metrics as compute_rm_metrics
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets import DatasetStrategy
 from turbo_alignment.settings.pipelines import RMTrainExperimentSettings
+from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 from turbo_alignment.trainers.rm import RMTrainer
 
 logger = get_project_logger()
@@ -62,7 +63,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
 
     @staticmethod
     def _get_training_args(experiment_settings: RMTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
+        return TrainingArgumentsWithSeqP(
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             label_names=[],
             remove_unused_columns=False,

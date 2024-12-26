@@ -16,7 +16,7 @@ app = typer.Typer(
 )
 
 
-def launch_with_name(name: str, num_gpus: int, env: dict[str, str] | None = None):
+def launch_with_name(name: str, num_gpus: int, env: dict[str, str] | None = None, cmd_args: list[str] | None = None):
     args = [
         'deepspeed',
         '--no_local_rank',
@@ -36,6 +36,9 @@ def launch_with_name(name: str, num_gpus: int, env: dict[str, str] | None = None
             args.extend(['--num_gpus', str(num_gpus)])
 
         args.extend([__file__, name])
+
+        if cmd_args:
+            args.extend(cmd_args)
 
         subprocess.check_call(
             args,
