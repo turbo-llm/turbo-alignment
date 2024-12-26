@@ -60,7 +60,6 @@ def sft_model_vanilla(
     experiment_settings = SftTrainExperimentSettings.parse_file(SETTINGS_PATH)
 
     vanilla_settings = experiment_settings.copy(deep=True)
-    vanilla_settings.model_settings.sequence_parallel_degree = 1
     vanilla_settings.trainer_settings.sequence_parallel = 1
     vanilla_settings.model_settings.model_kwargs['attn_implementation'] = attn_type.value
     vanilla_settings.model_settings.model_type = 'causal'

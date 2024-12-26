@@ -53,10 +53,10 @@ def process_forward_output(output_dir, name, middle_name, output) -> bool:
 
     write_shape(output, shape_filename)
 
-    print(f'{dist.get_rank()=} {name=} {output.min().item()=} {output.max().item()=} {output.dtype=}')
+    print(f'{dist.get_rank()=} {name=} {output.min().item()=} {output.max().item()=} {output.dtype=} {output.size()=}')
 
     np_output = output.float().cpu().detach().numpy()
-    print(f'{dist.get_rank()=} {name=} {np_output.min().item()=} {np_output.max().item()=}')
+    # print(f'{dist.get_rank()=} {name=} {np_output.min().item()=} {np_output.max().item()=}')
     np_output.tofile(filename)
     return True
 
@@ -67,7 +67,7 @@ class ForwardHook:
         self.output_dir = output_dir
         suff = f'_{dist.get_rank()}' if seq_p_inited else ''
         self.forward_file = os.path.join(output_dir, f'forward_order{suff}.txt')
-        self.written = False
+        self.written = dist.get_rank() != 0
         self.middle_name = f'_rank_{dist.get_rank()}' if seq_p_inited else ''
 
         os.makedirs(self.output_dir, exist_ok=True)
