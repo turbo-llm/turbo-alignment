@@ -48,11 +48,12 @@
     "model_settings": {
         "model_path": "/mnt/models/google/gemma-2-2b",
         "model_type": "gemma_with_ulysses",
-        "transformers_settings": {},
+        "transformers_settings": {
+            "torch_dtype": "float32"
+        },
         "model_kwargs": {
             "attn_implementation": "eager_ulysses"
-        },
-        "sequence_parallel_degree": 2
+        }
     },
     "cherry_pick_settings": {
         "generator_transformers_settings": {

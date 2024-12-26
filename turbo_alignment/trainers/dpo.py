@@ -947,58 +947,8 @@ class DPOTrainer(TrainerWithSeqP):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        final_losses = losses.mean()
-        if train_eval == 'train':
-            if dist.is_initialized():
-                print(f'{dist.get_rank()=} {final_losses=}')
-            else:
-                print(f'{final_losses=}')
-
-        if parallel_states.sequence_parallel_is_initialized():
-            if parallel_states.get_sequence_parallel_rank() == 0:
-                pass
-            else:
-                final_losses = final_losses * 0
-
-            # final_losses = final_losses / parallel_states.get_sequence_parallel_world_size()
-
-        return final_losses, metrics
-
-    def _get_train_sampler(self):
-        from transformers.trainer_utils import has_length
-        from transformers.utils.import_utils import is_datasets_available
-        from transformers.trainer_pt_utils import LengthGroupedSampler
-
-        if is_datasets_available():
-            import datasets
-
-        if self.train_dataset is None or not has_length(self.train_dataset):
-            return None
-
-        # Build the sampler.
-        if self.args.group_by_length:
-            if is_datasets_available() and isinstance(self.train_dataset, datasets.Dataset):
-                lengths = (
-                    self.train_dataset[self.args.length_column_name]
-                    if self.args.length_column_name in self.train_dataset.column_names
-                    else None
-                )
-            else:
-                lengths = None
-            model_input_name = (
-                self.processing_class.model_input_names[0] if self.processing_class is not None else None
-            )
-            return LengthGroupedSampler(
-                self.args.train_batch_size * self.args.gradient_accumulation_steps,
-                dataset=self.train_dataset,
-                lengths=lengths,
-                model_input_name=model_input_name,
-            )
-
-        else:
-            generator = torch.Generator()
-            generator.manual_seed(self.args.seed)
-            return RandomSampler(self.train_dataset, generator=generator)
+        # print(f'{dist.get_rank()=} {parallel_states.get_sequence_parallel_world_size_or_one()=} {parallel_states.get_sequence_parallel_world_size()=}')
+        return losses.mean() / parallel_states.get_sequence_parallel_world_size_or_one(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor

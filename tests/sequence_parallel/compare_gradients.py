@@ -17,7 +17,7 @@ def compare(root_dir: pathlib.Path):
             continue
 
         print('Process file', file.name)
-        param_name = file.name[: -len('.shape')]
+        param_name = file.name[:-len('.shape')]
         print('Param name', param_name)
 
         all_shapes = set()

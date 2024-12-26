@@ -9,7 +9,7 @@ def get_shape_suffix(rank: int | None) -> str:
 
 
 def read_first_line(p: pathlib.Path) -> str:
-    with open(p, 'r', encoding='utf-8') as input_:
+    with open(p, 'r') as input_:
         return next(iter(input_))
 
 

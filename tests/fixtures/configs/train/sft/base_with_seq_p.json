@@ -48,7 +48,7 @@
             "torch_dtype": "float32"
         },
         "model_kwargs": {
-            "attn_implementation": "eager"
+            "attn_implementation": "eager_ulysses"
         },
         "embeddings_initialization_strategy": {
             "<RS>": "<s>",
