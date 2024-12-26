@@ -1,56 +1,51 @@
-import os
+import argparse
+import pathlib
 
-from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
 from turbo_alignment.pipelines.train.dpo import TrainDPOStrategy
+from turbo_alignment.pipelines.train.sft import TrainSFTStrategy
 from turbo_alignment.settings.pipelines.train.dpo import DPOTrainExperimentSettings
+from turbo_alignment.settings.pipelines.train.sft import SftTrainExperimentSettings
 
-from tests.constants import FIXTURES_PATH
-from tests.sequence_parallel.launcher import app
-
-SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'dpo' / 'dpo_with_seq_p.json'
-
-
-def run_pipeline(experiment_settings: DPOTrainExperimentSettings):
-    print(experiment_settings)
-    pipeline = TrainDPOStrategy()
-    pipeline.run(experiment_settings)
+TASK_TYPE_TO_STRATEGY = {
+    'dpo': (TrainDPOStrategy, DPOTrainExperimentSettings),
+    'sft': (TrainSFTStrategy, SftTrainExperimentSettings),
+}
 
 
-@app.command(name='dpo_model_ulysses')
-def dpo_model(model_path: str = '/mnt/models/google/gemma2-2b'):
-    if not os.path.exists(model_path):
-        return
+def run_pipeline(
+    settings: DPOTrainExperimentSettings | SftTrainExperimentSettings,
+    pipeline_cls: TrainDPOStrategy | TrainSFTStrategy
+):
+    print(settings)
+    pipeline_cls().run(settings)
 
-    if not os.path.isdir(model_path):
-        raise ValueError(f'Model path {model_path} is not a directory')
 
-    experiment_settings = DPOTrainExperimentSettings.parse_file(SETTINGS_PATH)
+def run(task_type: str, settings_path: pathlib.Path, make_model_vanilla: bool):
+    strategy_cls, settings_cls = TASK_TYPE_TO_STRATEGY[task_type]
+
+    experiment_settings = settings_cls.parse_file(settings_path)
+    if make_model_vanilla:
+        vanilla_settings = experiment_settings.copy(deep=True)
+        vanilla_settings.trainer_settings.sequence_parallel = 1
+        vanilla_settings.model_settings.model_kwargs["attn_implementation"] = "eager"
+        vanilla_settings.model_settings.model_type = 'causal'
+
+        experiment_settings = vanilla_settings
+
     experiment_settings.trainer_settings.load_best_model_at_end = False
-    run_pipeline(experiment_settings)
+
+    run_pipeline(experiment_settings, strategy_cls)
 
 
-@app.command(name='dpo_model_vanilla')
-def dpo_model_vanilla(model_path: str = '/mnt/models/google/gemma2-2b'):
-    if not os.path.exists(model_path):
-        return
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--task-type', required=True, choices=list(TASK_TYPE_TO_STRATEGY.keys()))
+    parser.add_argument('--settings-path', required=True, type=pathlib.Path)
+    parser.add_argument('--make-model-vanilla', action='store_true')
+    args = parser.parse_args()
 
-    if not os.path.isdir(model_path):
-        raise ValueError(f'Model path {model_path} is not a directory')
-
-    patch_gemma_attn_dict()
-
-    experiment_settings = DPOTrainExperimentSettings.parse_file(SETTINGS_PATH)
-
-    vanilla_settings = experiment_settings.copy(deep=True)
-    vanilla_settings.model_settings.sequence_parallel_degree = 1
-    vanilla_settings.trainer_settings.sequence_parallel = 1
-    vanilla_settings.model_settings.model_kwargs["attn_implementation"] = "eager"
-    vanilla_settings.model_settings.model_type = 'causal'
-    vanilla_settings.trainer_settings.load_best_model_at_end = False
-
-    print('##### RUN VANILLA')
-    run_pipeline(vanilla_settings)
+    run(args.task_type, args.settings_path, args.make_model_vanilla)
 
 
 if __name__ == '__main__':
-    app()
+    main()
