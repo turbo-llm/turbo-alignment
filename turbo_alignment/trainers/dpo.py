@@ -916,7 +916,8 @@ class DPOTrainer(TrainerWithSeqP):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        return losses.mean(), metrics
+        # print(f'{dist.get_rank()=} {parallel_states.get_sequence_parallel_world_size_or_one()=} {parallel_states.get_sequence_parallel_world_size()=}')
+        return losses.mean() / parallel_states.get_sequence_parallel_world_size_or_one(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor

@@ -48,8 +48,6 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
 
     liger_kernels_settings: LigerKernelSettings | None = None
 
-    sequence_parallel_degree: int | None = None
-
 
 class PreTrainedAdaptersModelSettings(PreTrainedModelSettings):
     adapter_path: Path
