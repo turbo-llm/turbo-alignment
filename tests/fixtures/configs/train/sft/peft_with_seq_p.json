@@ -57,7 +57,19 @@
             "<user>": "<unk>",
             "<system>": "<unk>"
         },
-        "resize_token_embeddings": true
+        "resize_token_embeddings": true,
+        "peft_settings": {
+            "r": 8,
+            "lora_alpha": 16,
+            "lora_dropout": 0.08,
+            "target_modules": [
+                "q_proj",
+                "v_proj"
+            ],
+            "task_type": "CAUSAL_LM",
+            "modules_to_save": ["embed_tokens", "lm_head"],
+            "name": "LORA"
+        }
     },
     "cherry_pick_settings": {
         "generator_transformers_settings": {

@@ -24,6 +24,7 @@ from transformers.integrations import get_reporting_integration_callbacks
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.settings.pipelines.train.dpo import SyncRefModelSettings
+from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 from turbo_alignment.trainers.dpo import DPOTrainer
 from turbo_alignment.trainers.utils import prepare_model
 
@@ -31,7 +32,7 @@ logger = get_project_logger()
 
 
 @dataclass
-class KTOTrainingArguments(TrainingArguments):
+class KTOTrainingArguments(TrainingArgumentsWithSeqP):
     beta: float = 0.1
     sync_ref_settings: SyncRefModelSettings = field(
         default_factory=SyncRefModelSettings()
