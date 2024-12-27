@@ -10,7 +10,7 @@ logger = get_project_logger()
 
 
 # adapted from https://github.com/InternLM/xtuner/blob/90192ffe42612b0f88409432e7b4860294432bcc/xtuner/parallel/sequence/data_collate.py#L7
-def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, dim=-1):
+def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, dim=-1, padding_side='right'):
     length = tensor.shape[dim]
     if length % seq_parallel_world_size == 0:
         return tensor
@@ -20,7 +20,9 @@ def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, di
         (*tensor.shape[:dim], pad_num, *tensor.shape[dim + 1 :]) if dim != -1 else (*tensor.shape[:dim], pad_num)
     )
     pad = torch.full(pad_shape, padding_value, dtype=tensor.dtype, device=tensor.device)
-    tensor = torch.cat([tensor, pad], dim=dim)
+
+    lst_to_pad = [tensor, pad] if padding_side == 'right' else [pad,tensor]
+    tensor = torch.cat(lst_to_pad, dim=dim)
     return tensor
 
 
@@ -89,12 +91,13 @@ class DataCollatorForSequenceParallism:
     def should_be_splitted(self, key):
         return key not in self.fields_not_to_split
 
-    def prepare_value(self, key: str, value: torch.Tensor):
+    def prepare_value(self, key: str, value: torch.Tensor, pad_value=None):
         padded = pad_for_sequence_parallel(
             value,
             self.seq_p_world_size,
-            self.pad_values_for_fields.get(key, 0),
+            pad_value if pad_value is not None else self.pad_values_for_fields.get(key, 0),
             dim=-1,
+            padding_side='left',
         )
         if self.should_be_splitted(key):
             if not isinstance(padded, torch.Tensor):

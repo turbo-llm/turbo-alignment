@@ -61,6 +61,7 @@ from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2
 
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
+from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
 
 
 class Gemma2ModelWithMPU(Gemma2Model):
@@ -114,49 +115,15 @@ class Gemma2ModelWithMPU(Gemma2Model):
         return causal_mask
 
 
-class Gemma2ForCausalLMWithMPU(Gemma2ForCausalLM):
+class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, Gemma2ForCausalLM):
     def __init__(self, config):
         super().__init__(config)
         self.model = Gemma2ModelWithMPU(config)
         self.vocab_size = config.vocab_size
         self.lm_head = torch.nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        self._rearrage_in_forward = False
-
         # Initialize weights and apply final processing
         self.post_init()
-
-    def generate(
-        self,
-        inputs=None,
-        generation_config=None,
-        logits_processor=None,
-        stopping_criteria=None,
-        prefix_allowed_tokens_fn=None,
-        synced_gpus=None,
-        assistant_model=None,
-        streamer=None,
-        negative_prompt_ids=None,
-        negative_prompt_attention_mask=None,
-        **kwargs,
-    ):
-        try:
-            self._rearrage_in_forward = True
-            return super().generate(
-                inputs,
-                generation_config,
-                logits_processor,
-                stopping_criteria,
-                prefix_allowed_tokens_fn,
-                synced_gpus,
-                assistant_model,
-                streamer,
-                negative_prompt_ids,
-                negative_prompt_attention_mask,
-                **kwargs,
-            )
-        finally:
-            self._rearrage_in_forward = False
 
     def forward(
         self,
