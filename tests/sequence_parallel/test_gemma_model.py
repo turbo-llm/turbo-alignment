@@ -9,6 +9,7 @@ import turbo_alignment.modeling.parallel_states as parallel_states
 from transformers import AutoTokenizer, Trainer
 from transformers.data.data_collator import default_data_collator
 
+from turbo_alignment.dist_utils.gather_and_split import all_gather_variable
 from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
 from turbo_alignment.modeling.gemma import (
     Gemma2ForCausalLM,
@@ -25,6 +26,27 @@ from tests.sequence_parallel.consts import DEEPSPEED_CONFIG, MODEL_PATH
 from tests.sequence_parallel.dataset import SimpleDataset
 from tests.sequence_parallel.launcher import app, launch_with_name
 from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
+
+
+import functools
+
+
+def run_in_order(group=None):
+    def inner(f):
+        @functools.wraps(f)
+        def wrapped(*args, **kwargs):
+            rank = dist.get_rank(group)
+            for i in range(dist.get_world_size(group)):
+                if i == rank:
+                    res = f(*args, **kwargs)
+
+                dist.barrier(group)
+
+            return res
+
+        return wrapped
+
+    return inner
 
 
 @app.command(name='gemma-model')
@@ -134,13 +156,6 @@ def gemma_model(model_path: str = MODEL_PATH):
 
 @app.command(name='test-dataloader')
 def _test_dataloader(model_path: str = MODEL_PATH):
-    if not os.path.exists(model_path):
-        pytest.skip(f'directory {model_path} not found')
-        return
-
-    if not os.path.isdir(model_path):
-        raise ValueError(f'Model path {model_path} is not a directory')
-
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     texts = [
         'Мама мыла раму',
@@ -153,6 +168,12 @@ def _test_dataloader(model_path: str = MODEL_PATH):
         model = Gemma2ForCausalLMWithMPU.from_pretrained(
             model_path,
             attn_implementation="flash_attention_2_ulysses",
+            torch_dtype=torch.bfloat16,
+        )
+
+        vanilla_model = Gemma2ForCausalLM.from_pretrained(
+            model_path,
+            attn_implementation="flash_attention_2",
             torch_dtype=torch.bfloat16,
         )
 
@@ -170,6 +191,8 @@ def _test_dataloader(model_path: str = MODEL_PATH):
 
         model = model.to(args.device)
 
+        vanilla_model = vanilla_model.to(args.device)
+
         trainer = Trainer(
             model=model,
             train_dataset=dataset,
@@ -181,9 +204,26 @@ def _test_dataloader(model_path: str = MODEL_PATH):
             ),
         )
 
+        print('Alive')
         for batch in trainer.get_train_dataloader():
-            generated = model.generate(**batch, max_new_tokens=1, use_cache=False)
-            print(generated)
+            print(batch)
+            generated = model.generate(**batch, max_new_tokens=2, use_cache=False)
+            # run_in_order()(print)('rank:', dist.get_rank(), 'result:', generated)
+            all_generated = torch.cat(
+                all_gather_variable(generated, parallel_states.get_sequence_parallel_group()),
+                dim=-1,
+            )
+
+            run_in_order()(print)('rank:', dist.get_rank(), all_generated)
+            all_input_ids = torch.cat(
+                all_gather_variable(batch['input_ids'], parallel_states.get_sequence_parallel_group()),
+                dim=-1,
+            )
+            vanilla_result = vanilla_model.generate(all_input_ids, max_new_tokens=2)
+            run_in_order()(print)('rank:', dist.get_rank(), vanilla_result)
+            assert torch.equal(all_generated, vanilla_result), (all_generated, vanilla_result)
+
+
 
 
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
@@ -199,4 +239,11 @@ def test_gemma_model():
 
 
 if __name__ == '__main__':
+    def set_prctl():
+        import prctl
+        prctl.set_ptracer(prctl.SET_PTRACER_ANY)
+
+    import os
+    set_prctl()
+    os.register_at_fork(after_in_child=set_prctl)
     app()
