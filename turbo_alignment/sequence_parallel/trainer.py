@@ -383,7 +383,8 @@ class TrainerWithSeqP(Trainer):
                         name,
                         seq_p_inited=self.args.sequence_parallel > 1,
                         output_dir=os.getenv('FORWARD_HOOK_OUTPUT_DIR', '/mnt/p.geyn/forward'),
-                    )
+                    ),
+                    with_kwargs=True,
                 )
 
         for epoch in range(epochs_trained, num_train_epochs):

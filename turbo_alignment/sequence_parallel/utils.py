@@ -6,6 +6,8 @@ import torch.distributed as dist
 
 from transformers.modeling_outputs import CausalLMOutput, CausalLMOutputWithPast, CausalLMOutputWithCrossAttentions
 
+from turbo_alignment.modeling.gemma2.ulysses_attn import Gemma2Attention
+
 
 @functools.lru_cache()
 def print_once(msg):
@@ -65,14 +67,14 @@ class ForwardHook:
     def __init__(self, name: str, output_dir: str, seq_p_inited: bool = False):
         self.name = name
         self.output_dir = output_dir
-        suff = f'_{dist.get_rank()}' if seq_p_inited else ''
-        self.forward_file = os.path.join(output_dir, f'forward_order{suff}.txt')
+        self.suff = f'_{dist.get_rank()}' if seq_p_inited else ''
+        self.forward_file = os.path.join(output_dir, f'forward_order{self.suff}.txt')
         self.written = dist.get_rank() != 0
         self.middle_name = f'_rank_{dist.get_rank()}' if seq_p_inited else ''
 
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def __call__(self, module, args, output):
+    def __call__(self, module, args, kwargs, output):
         set_flag = False
         if isinstance(output, tuple):
             for ind, local_output in enumerate(output):
@@ -89,6 +91,13 @@ class ForwardHook:
                         o.write(f'{self.name}\n')
 
                     set_flag = True
+
+        attention_mask = kwargs.get('attention_mask')
+        if self.name == 'model' and attention_mask is not None and dist.get_rank() == 0:
+            write_shape(attention_mask, os.path.join(self.output_dir, f'attention_mask{self.suff}.shape'))
+            attention_mask.cpu().numpy().tofile(
+                os.path.join(self.output_dir, f'attention_mask{self.suff}.npy')
+            )
 
         if set_flag:
             self.written = True
