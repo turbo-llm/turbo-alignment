@@ -5,7 +5,7 @@ import inspect
 import json
 import os
 import warnings
-from typing import Any, Optional, Union, Tuple
+from typing import Optional, Union, Tuple
 
 import torch
 import torch.distributed as dist
@@ -56,7 +56,7 @@ from transformers.modeling_utils import (
     WEIGHTS_INDEX_NAME,
 )
 
-from transformers.modeling_outputs import CausalLMOutputWithPast
+from transformers.modeling_outputs import CausalLMOutputWithPast, BaseModelOutputWithPast
 from transformers.models.gemma2.modeling_gemma2 import Gemma2ForCausalLM, Gemma2Model, HybridCache
 
 from turbo_alignment.modeling import parallel_states
@@ -113,6 +113,39 @@ class Gemma2ModelWithMPU(Gemma2Model):
             batch_size=input_tensor.shape[0],
         )
         return causal_mask
+
+    def forward(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[HybridCache] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPast]:
+        if position_ids is None:
+            if attention_mask is not None:
+                position_ids = attention_mask.long().cumsum(-1) - 1
+                position_ids.masked_fill_(attention_mask == 0, 0)
+            else:
+                raise RuntimeError()
+
+        return super().forward(
+            input_ids,
+            attention_mask,
+            position_ids,
+            past_key_values,
+            inputs_embeds,
+            use_cache,
+            output_attentions,
+            output_hidden_states,
+            return_dict,
+            cache_position,
+        )
 
 
 class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, Gemma2ForCausalLM):
