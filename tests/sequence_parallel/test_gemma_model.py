@@ -237,11 +237,4 @@ def test_gemma_model():
 
 
 if __name__ == '__main__':
-    def set_prctl():
-        import prctl
-        prctl.set_ptracer(prctl.SET_PTRACER_ANY)
-
-    import os
-    set_prctl()
-    os.register_at_fork(after_in_child=set_prctl)
     app()
