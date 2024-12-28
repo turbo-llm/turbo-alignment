@@ -85,7 +85,7 @@ def main():
     ],
 )
 def test_data_loader(cmd_name):
-    return launch_with_name(cmd_name, 2)
+    return launch_with_name(__file__, cmd_name, 2)
 
 
 if __name__ == '__main__':
