@@ -691,7 +691,6 @@ class DPOTrainer(TrainerWithSeqP):
         average_log_prob: bool = False,
     ) -> torch.Tensor:
         if parallel_states.sequence_parallel_is_initialized():
-            # print(f'{}')
             if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
                 logits = logits[:, :-1]
 
