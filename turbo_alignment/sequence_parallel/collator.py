@@ -50,7 +50,6 @@ class DataCollatorForSequenceParallism:
         seq_p_world_size: int,
         fields_not_to_split: list[str] | None = None,
         pad_values_for_fields: dict[str, tp.Any] | None = None,
-        add_position_ids: bool = True,
         add_cache_positions: bool = True,
     ):
         self.base_collate_fn = base_collate_fn
@@ -58,7 +57,6 @@ class DataCollatorForSequenceParallism:
         self.seq_p_world_size = seq_p_world_size
         self.fields_not_to_split = fields_not_to_split or ['attention_mask', 'position_ids']
         self.pad_values_for_fields = pad_values_for_fields or DEFAULT_PAD_VALUES
-        self.add_position_ids = add_position_ids
         self.add_cache_positions = add_cache_positions
 
     def _get_cache_position(self, input_ids: torch.Tensor) -> torch.Tensor:
@@ -76,13 +74,6 @@ class DataCollatorForSequenceParallism:
             if self.add_cache_positions:
                 cache_position = self._get_cache_position(input_ids)
                 collated['cache_position'] = cache_position
-
-            if self.add_position_ids and 'position_ids' not in collated:
-                if cache_position is None:
-                    cache_position = self._get_cache_position(input_ids)
-
-                position_ids = cache_position.unsqueeze(0)
-                collated['position_ids'] = position_ids
 
             return {key: self.prepare_value(key, value) for key, value in collated.items()}
 
