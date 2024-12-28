@@ -67,11 +67,19 @@ class GenerationMixinWithSeqP(GenerationMixin):
         past_key_values = None
         cache_position = None
 
-        input_ids = gather_and_split(input_ids, group=parallel_states.get_sequence_parallel_group(), pad_value=0, padding_side='left')
+        input_ids = gather_and_split(
+            input_ids,
+            group=parallel_states.get_sequence_parallel_group(),
+            pad_value=0,
+            padding_side='left',
+        )
         if attention_mask is not None:
-            attention_mask = pad_for_sequence_parallel(attention_mask, parallel_states.get_sequence_parallel_world_size(), padding_value=0, padding_side='left')
-
-        print(f'{attention_mask=}')
+            attention_mask = pad_for_sequence_parallel(
+                attention_mask,
+                parallel_states.get_sequence_parallel_world_size(),
+                padding_value=0,
+                padding_side='left',
+            )
 
         # END OF THE PATCH
 
@@ -116,7 +124,7 @@ class GenerationMixinWithSeqP(GenerationMixin):
         # 4. Create missing `position_ids` on the fly
         if (
             attention_mask is not None
-            # and kwargs.get("position_ids") is None
+            and kwargs.get("position_ids") is None
             and "position_ids" in set(inspect.signature(self.forward).parameters.keys())
         ):
             position_ids = attention_mask.long().cumsum(-1) - 1
