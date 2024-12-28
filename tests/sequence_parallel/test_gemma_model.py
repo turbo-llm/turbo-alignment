@@ -204,7 +204,6 @@ def _test_dataloader(model_path: str = MODEL_PATH):
             ),
         )
 
-        print('Alive')
         for batch in trainer.get_train_dataloader():
             print(batch)
             generated = model.generate(**batch, max_new_tokens=2, use_cache=False)
@@ -225,17 +224,16 @@ def _test_dataloader(model_path: str = MODEL_PATH):
 
 
 
-
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
 @pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
-def test_dataloader():
-    return launch_with_name('test-dataloader', 2)
+def test_genaration():
+    return launch_with_name(__file__, 'test-dataloader', 2)
 
 
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
 @pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
 def test_gemma_model():
-    return launch_with_name('gemma-model', 2)
+    return launch_with_name(__file__, 'gemma-model', 2)
 
 
 if __name__ == '__main__':
