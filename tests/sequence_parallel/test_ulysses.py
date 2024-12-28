@@ -164,7 +164,7 @@ def without_flash():
     ],
 )
 def test_ulysses_attention(cmd_name):
-    return launch_with_name(cmd_name, 2)
+    return launch_with_name(__file__, cmd_name, 2)
 
 
 def main():
