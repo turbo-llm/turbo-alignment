@@ -11,6 +11,7 @@ from turbo_alignment.dataset.base.models import DatasetRecord
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.base import BaseInferenceOutput
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
+from turbo_alignment.modeling import parallel_states
 
 InferenceOutputT = TypeVar('InferenceOutputT', bound=BaseInferenceOutput)
 DatasetRecordT = TypeVar('DatasetRecordT', bound=DatasetRecord)
@@ -58,7 +59,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
             [dataset.get_original_record_by_id(r['id']) for r in batch] for batch in records_batches
         ]
 
-        if self._accelerator is None:
+        if self._accelerator is None or parallel_states.sequence_parallel_is_initialized():
             generations = []
             for i, (records_batch, original_records_batch) in enumerate(
                 zip(records_batches, original_records_batches)

@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import deepspeed
 import deepspeed.comm as dist
@@ -10,6 +11,7 @@ from transformers import AutoTokenizer, GenerationConfig, Trainer
 from transformers.data.data_collator import default_data_collator
 
 from turbo_alignment.dist_utils.gather_and_split import all_gather_variable
+from turbo_alignment.dist_utils.order import run_in_order
 from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
 from turbo_alignment.modeling.gemma import (
     Gemma2ForCausalLM,
@@ -26,27 +28,6 @@ from tests.sequence_parallel.consts import DEEPSPEED_CONFIG, MODEL_PATH
 from tests.sequence_parallel.dataset import SimpleDataset
 from tests.sequence_parallel.launcher import app, launch_with_name
 from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
-
-
-import functools
-
-
-def run_in_order(group=None):
-    def inner(f):
-        @functools.wraps(f)
-        def wrapped(*args, **kwargs):
-            rank = dist.get_rank(group)
-            for i in range(dist.get_world_size(group)):
-                if i == rank:
-                    res = f(*args, **kwargs)
-
-                dist.barrier(group)
-
-            return res
-
-        return wrapped
-
-    return inner
 
 
 @app.command(name='gemma-model')
@@ -123,18 +104,7 @@ def gemma_model(model_path: str = MODEL_PATH):
     torch.testing.assert_close(result, vanilla_result[:, start:end], atol=0.01, rtol=0.01)
 
     if dist.get_rank() == 0 or True:
-        print('####BEGIN')
-        for name, param in model.module.lm_head.named_parameters():
-            print(name, param)
-        print('#####END')
-
-        for param in model.module.lm_head.parameters():
-            print(param)
-
-        print('#####END 2')
-
         for name, param in vanilla_model.named_parameters():
-            print(name)
             if name.startswith('module'):
                 name = name[len('module.') :]
 
@@ -170,7 +140,7 @@ def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
 
     patch_gemma_attn_dict()
 
-    with patch_acclerator():
+    with patch_acclerator(), tempfile.TemporaryDirectory() as temp_dir:
         model = Gemma2ForCausalLMWithMPU.from_pretrained(
             model_path,
             attn_implementation="flash_attention_2_ulysses",
@@ -184,7 +154,7 @@ def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
         )
 
         args = TrainingArgumentsWithSeqP(
-            output_dir='/mnt/models/p.geyn/',
+            output_dir=temp_dir,
             do_train=True,
             per_device_train_batch_size=2,
             gradient_accumulation_steps=1,
@@ -226,8 +196,7 @@ def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
                 generation_config=generation_config,
             )
             run_in_order()(print)('rank:', dist.get_rank(), vanilla_result)
-            if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
-                assert torch.equal(generated, vanilla_result), (generated, vanilla_result)
+            assert torch.equal(generated, vanilla_result), (generated, vanilla_result)
 
 
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
