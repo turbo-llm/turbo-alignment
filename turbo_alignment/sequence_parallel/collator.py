@@ -9,7 +9,8 @@ from turbo_alignment.common.logging import get_project_logger
 logger = get_project_logger()
 
 
-# adapted from https://github.com/InternLM/xtuner/blob/90192ffe42612b0f88409432e7b4860294432bcc/xtuner/parallel/sequence/data_collate.py#L7
+# adapted from
+# https://github.com/InternLM/xtuner/blob/90192ffe42612b0f88409432e7b4860294432bcc/xtuner/parallel/sequence/data_collate.py#L7
 def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, dim=-1, padding_side='right'):
     length = tensor.shape[dim]
     if length % seq_parallel_world_size == 0:
@@ -21,7 +22,7 @@ def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, di
     )
     pad = torch.full(pad_shape, padding_value, dtype=tensor.dtype, device=tensor.device)
 
-    lst_to_pad = [tensor, pad] if padding_side == 'right' else [pad,tensor]
+    lst_to_pad = [tensor, pad] if padding_side == 'right' else [pad, tensor]
     tensor = torch.cat(lst_to_pad, dim=dim)
     return tensor
 

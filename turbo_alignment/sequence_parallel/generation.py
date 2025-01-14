@@ -1,3 +1,6 @@
+# flake8: noqa
+# pylint: skip-file
+
 import inspect
 import warnings
 from functools import cached_property
@@ -620,7 +623,11 @@ class GenerationMixinWithSeqP(GenerationMixin):
         input_ids_length = input_ids.shape[-1]
         if parallel_states.sequence_parallel_is_initialized():
             length_as_tensor = torch.as_tensor(input_ids_length, device=input_ids.device)
-            dist.all_reduce(length_as_tensor, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
+            dist.all_reduce(
+                length_as_tensor,
+                op=dist.ReduceOp.SUM,
+                group=parallel_states.get_sequence_parallel_group(),
+            )
             input_ids_length = length_as_tensor.item()
 
         has_default_max_length = kwargs.get("max_length") is None and generation_config.max_length is not None
@@ -939,6 +946,7 @@ class GenerationMixinWithSeqP(GenerationMixin):
             # handle BC (convert by default if he user hasn't passed a cache AND the cache is of the default type)
             should_convert_cache = generation_config.return_legacy_cache
             is_user_defined_cache = user_defined_cache is not None
+            # fmt: off
             is_default_cache_type = (
                 type(result.past_key_values) == DynamicCache  # noqa E721
                 or (
@@ -947,6 +955,7 @@ class GenerationMixinWithSeqP(GenerationMixin):
                     and type(result.past_key_values.cross_attention_cache) == DynamicCache  # noqa E721
                 )
             )
+            # fmt: on
             if not is_user_defined_cache and is_default_cache_type:
                 logger.warning_once(
                     "From v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` "
@@ -1111,7 +1120,7 @@ class GenerationMixinWithSeqP(GenerationMixin):
                 outputs = stack_model_outputs(outputs_per_sub_batch, self.config.get_text_config())
 
             else:  # Unchanged original behavior
-                outputs = self(**model_inputs, return_dict=True)
+                outputs = self(**model_inputs, return_dict=True)  # pylint: disable=not-callable
 
             # synced_gpus: don't waste resources running the code we don't need; kwargs must be updated before skipping
             model_kwargs = self._update_model_kwargs_for_generation(
@@ -1122,17 +1131,6 @@ class GenerationMixinWithSeqP(GenerationMixin):
             if synced_gpus and this_peer_finished:
                 cur_len = cur_len + 1
                 continue
-
-            input_ids_placeholder = None
-            if self.last_in_sequence_paralle_group:
-                input_ids_placeholder = [model_inputs['input_ids'].clone() for _ in range(parallel_states.get_sequence_parallel_world_size())]
-
-            dist.gather(
-                model_inputs['input_ids'],
-                input_ids_placeholder,
-                dst=parallel_states.get_sequence_parallel_world_size() - 1,
-                group=parallel_states.get_sequence_parallel_group(),
-            )
 
             # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
             # (the clone itself is always small)
