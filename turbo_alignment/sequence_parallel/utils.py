@@ -6,8 +6,6 @@ import torch.distributed as dist
 
 from transformers.modeling_outputs import CausalLMOutput, CausalLMOutputWithPast, CausalLMOutputWithCrossAttentions
 
-from turbo_alignment.modeling.gemma2.ulysses_attn import Gemma2Attention
-
 
 @functools.lru_cache()
 def print_once(msg):
@@ -80,14 +78,14 @@ class ForwardHook:
             for ind, local_output in enumerate(output):
                 if process_forward_output(self.output_dir, f'{self.name}_{ind}', self.middle_name, local_output):
                     if not self.written:
-                        with open(self.forward_file, 'a') as o:
+                        with open(self.forward_file, 'a', encoding='utf-8') as o:
                             o.write(f'{self.name}_{ind}\n')
 
                         set_flag = True
         else:
             if process_forward_output(self.output_dir, self.name, self.middle_name, output):
                 if not self.written:
-                    with open(self.forward_file, 'a') as o:
+                    with open(self.forward_file, 'a', encoding='utf-8') as o:
                         o.write(f'{self.name}\n')
 
                     set_flag = True
@@ -95,9 +93,7 @@ class ForwardHook:
         attention_mask = kwargs.get('attention_mask')
         if self.name == 'model' and attention_mask is not None and dist.get_rank() == 0:
             write_shape(attention_mask, os.path.join(self.output_dir, f'attention_mask{self.suff}.shape'))
-            attention_mask.cpu().numpy().tofile(
-                os.path.join(self.output_dir, f'attention_mask{self.suff}.npy')
-            )
+            attention_mask.cpu().numpy().tofile(os.path.join(self.output_dir, f'attention_mask{self.suff}.npy'))
 
         if set_flag:
             self.written = True
