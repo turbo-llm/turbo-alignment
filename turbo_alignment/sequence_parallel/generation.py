@@ -36,6 +36,7 @@ from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.integrations.fsdp import is_fsdp_managed_module
 from transformers.utils import is_torchdynamo_compiling, logging
 
+from turbo_alignment.dist_utils.comm import create_and_broadcast
 from turbo_alignment.dist_utils.gather_and_split import (
     all_gather_variable,
     gather_and_split,
@@ -61,6 +62,13 @@ class GenerationMixinWithSeqP(GenerationMixin):
             return 0
 
         return seq_len - (seq_len % world_size)
+
+    @cached_property
+    def global_rank_of_last_in_sequence_group(self) -> int:
+        return dist.get_global_rank(
+            parallel_states.get_sequence_parallel_group(),
+            parallel_states.get_sequence_parallel_world_size() - 1,
+        )
 
     @cached_property
     def last_in_sequence_paralle_group(self) -> bool:
@@ -385,6 +393,12 @@ class GenerationMixinWithSeqP(GenerationMixin):
             # unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(all_input_ids, scores)
             this_peer_finished = unfinished_sequences.max() == 0
+            if parallel_states.sequence_data_parallel_is_initialized():
+                dist.broadcast(
+                    this_peer_finished,
+                    src=self.global_rank_of_last_in_sequence_group,
+                    group=parallel_states.get_sequence_parallel_group(),
+                )
 
             cur_len += 1
 
@@ -942,6 +956,18 @@ class GenerationMixinWithSeqP(GenerationMixin):
                 should_convert_cache = True
             if should_convert_cache:
                 result.past_key_values = result.past_key_values.to_legacy_cache()
+
+        if parallel_states.sequence_parallel_is_initialized():
+            if not isinstance(result, torch.Tensor):
+                result = result.sequences
+
+            result = create_and_broadcast(
+                result,
+                src=self.global_rank_of_last_in_sequence_group,
+                group=parallel_states.get_sequence_parallel_group(),
+                device=result.device,
+            )
+
         return result
 
     def _beam_search(
@@ -1220,7 +1246,7 @@ class GenerationMixinWithSeqP(GenerationMixin):
                 this_peer_finished_tensor = torch.as_tensor(this_peer_finished, device=input_ids.device)
                 dist.broadcast(
                     this_peer_finished_tensor,
-                    src=parallel_states.get_sequence_parallel_world_size() - 1,
+                    src=self.global_rank_of_last_in_sequence_group,
                     group=parallel_states.get_sequence_parallel_group(),
                 )
 
