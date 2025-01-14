@@ -77,9 +77,9 @@ def test_model_output(task_type: str, settings_path: pathlib.Path, tmp_path_fact
     ]
 
     print('Run with ulessys')
-    subprocess.check_call(common_cmd_line + ['--num_gpus','2'] + script_args)
+    subprocess.check_call(common_cmd_line + ['--num_gpus', '2'] + script_args)
     print('Run vanilla')
-    subprocess.check_call(common_cmd_line + ['--num_gpus','1'] + script_args + ['--make-model-vanilla'])
+    subprocess.check_call(common_cmd_line + ['--num_gpus', '1'] + script_args + ['--make-model-vanilla'])
 
     attention_mask_shape_file = forward_dir / 'attention_mask.shape'
     attention_mask = None

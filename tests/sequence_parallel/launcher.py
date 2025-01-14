@@ -16,7 +16,13 @@ app = typer.Typer(
 )
 
 
-def launch_with_name(script_path: str, name: str, num_gpus: int, env: dict[str, str] | None = None, cmd_args: list[str] | None = None):
+def launch_with_name(
+    script_path: str,
+    name: str,
+    num_gpus: int,
+    env: dict[str, str] | None = None,
+    cmd_args: list[str] | None = None,
+):
     args = [
         'deepspeed',
         '--no_local_rank',

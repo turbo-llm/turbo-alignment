@@ -14,7 +14,7 @@ TASK_TYPE_TO_STRATEGY = {
 
 def run_pipeline(
     settings: DPOTrainExperimentSettings | SftTrainExperimentSettings,
-    pipeline_cls: TrainDPOStrategy | TrainSFTStrategy
+    pipeline_cls: TrainDPOStrategy | TrainSFTStrategy,
 ):
     print(settings)
     pipeline_cls().run(settings)
