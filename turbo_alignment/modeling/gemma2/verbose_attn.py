@@ -25,7 +25,7 @@ class _SeqAllToAll(torch.autograd.Function):
 
         input_list = [t.contiguous() for t in torch.tensor_split(input, seq_world_size, scatter_idx)]
         rank0_print(
-            f'BeginOfSeq2Seq {dist.get_rank()=} {input.size()=} {scatter_idx=} {input_list[0].size()=} {input_list[1].size()=}'
+            f'BeginOfSeq2Seq {dist.get_rank()=} {input.size()=} {scatter_idx=} {input_list[0].size()=} {input_list[1].size()=}'  # noqa: E501
         )
         output_list = [torch.empty_like(input_list[0]) for _ in range(seq_world_size)]
         # TODO Use all_to_all_single instead
