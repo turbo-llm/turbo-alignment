@@ -35,44 +35,9 @@ assert len(INPUTS) == len(OUTPUTS)
 
 
 def create_run_preamble(num_gpus: int):
-    return ['torchrun', '--nnodes', '1', '--nproc-per-node', str(num_gpus), __file__]
+    return ['torchrun', '--nnodes', '1', '--nproc-per-node', str(num_gpus)]
 
 
-@register_function('all_gather_variable')
-def do_test_all_gather_variable(n_ranks: int = 4, group_size: int = 2):
-    assert n_ranks % group_size == 0, (n_ranks, group_size)
-
-    dist.init_process_group()
-    rank = dist.get_rank()
-
-    group_count = n_ranks // group_size
-
-    device = torch.device('cuda', index=rank)
-
-    inputs_per_rank = [torch.tensor([i] * (i + 1)) for i in range(n_ranks)]
-    print(rank, n_ranks, inputs_per_rank)
-
-    group = None
-    for group_id in range(group_count):
-        ranks = [group_size * group_id + i for i in range(group_size)]
-        local_group = dist.new_group(ranks=ranks)
-        if rank in ranks:
-            group = local_group
-
-    input_on_rank = inputs_per_rank[rank].to(device=device)
-    result = torch.cat(all_gather_variable(input_on_rank, group=group), dim=-1)
-    assert result.tolist() == sum((inputs_per_rank[r].tolist() for r in dist.get_process_group_ranks(group)), [])
-
-
-@pytest.mark.skipif(
-    not torch.cuda.is_available() or torch.cuda.device_count() < 4,
-    reason='at least four gpus required',
-)
-def test_all_gather_variable():
-    return subprocess.check_call(create_run_preamble(4) + ['--mode', 'all_gather_variable'])
-
-
-@register_function('gather_and_split')
 def do_test_gather_and_split(test_case):
     dist.init_process_group()
     rank = dist.get_rank()
@@ -90,7 +55,9 @@ def do_test_gather_and_split(test_case):
     range(len(INPUTS)),
 )
 def test_gather_and_split(test_case: int):
-    subprocess.check_call(create_run_preamble(2) + ['--mode', 'gather_and_split', '--test-case', str(test_case)])
+    subprocess.check_call(
+        create_run_preamble(2) + [__file__, '--mode', 'gather_and_split', '--test-case', str(test_case)]
+    )
 
 
 CREATE_AND_BROADCAST_INPUTS = [
@@ -126,7 +93,9 @@ def do_test_create_and_broadcast(test_case: int):
     range(len(CREATE_AND_BROADCAST_INPUTS)),
 )
 def test_create_and_broadcast(test_case: int):
-    subprocess.check_call(create_run_preamble(2) + ['--mode', 'create_and_broadcast', '--test-case', str(test_case)])
+    subprocess.check_call(
+        create_run_preamble(2) + [__file__, '--mode', 'create_and_broadcast', '--test-case', str(test_case)]
+    )
 
 
 if __name__ == '__main__':

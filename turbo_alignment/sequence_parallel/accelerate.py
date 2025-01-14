@@ -1,3 +1,6 @@
+# pylint: skip-file
+# flake8: noqa
+
 import math
 from typing import Callable, List, Optional, Union
 

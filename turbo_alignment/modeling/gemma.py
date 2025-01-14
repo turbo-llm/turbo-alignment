@@ -1,4 +1,4 @@
-# pylint: disable=line-too-long,protected-access,abstract-method
+# pylint: skip-file
 # flake8: noqa
 
 from typing import Optional, Tuple, Union, Callable

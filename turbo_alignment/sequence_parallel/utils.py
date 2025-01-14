@@ -92,10 +92,8 @@ class ForwardHook:
 
         attention_mask = kwargs.get('attention_mask')
         if self.name == 'model' and attention_mask is not None and dist.get_rank() == 0:
-            shape_file = os.path.join(self.output_dir, f'attention_mask{self.suff}.shape')
-            if not os.path.exists(shape_file):
-                write_shape(attention_mask, os.path.join(self.output_dir, f'attention_mask{self.suff}.shape'))
-                attention_mask.cpu().numpy().tofile(os.path.join(self.output_dir, f'attention_mask{self.suff}.npy'))
+            write_shape(attention_mask, os.path.join(self.output_dir, f'attention_mask{self.suff}.shape'))
+            attention_mask.cpu().numpy().tofile(os.path.join(self.output_dir, f'attention_mask{self.suff}.npy'))
 
         if set_flag:
             self.written = True

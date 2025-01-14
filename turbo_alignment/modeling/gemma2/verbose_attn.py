@@ -27,20 +27,9 @@ class _SeqAllToAll(torch.autograd.Function):
 
         # global i
         input_list = [t.contiguous() for t in torch.tensor_split(input, seq_world_size, scatter_idx)]
-        rank0_print(f'BeginOfSeq2Seq {dist.get_rank()=} {input.size()=} {scatter_idx=} {input_list[0].size()=} {input_list[1].size()=}')
-
-        # with open(f'/app/sizes_{dist.get_rank()}_{i}.txt', 'w') as output:
-        #     output.write(f'{dist.get_rank()=} {i=} {group.group_name=} {group.name()=} {group.rank()=} {group.size()=}\n')
-        #     output.write('Input size: ')
-        #     output.write(' '.join(map(str, input.size())))
-        #     output.write('\n')
-        #     output.write(' '.join(map(str, (item.size() for item in input_list))))
-        #     output.write('\n')
-        #     output.write(' '.join(map(str, input[0].tolist())))
-        #     output.write('\n')
-
-        # i += 1
-
+        rank0_print(
+            f'BeginOfSeq2Seq {dist.get_rank()=} {input.size()=} {scatter_idx=} {input_list[0].size()=} {input_list[1].size()=}'  # noqa: E501
+        )
         output_list = [torch.empty_like(input_list[0]) for _ in range(seq_world_size)]
         # TODO Use all_to_all_single instead
         dist.all_to_all(output_list, input_list, group=group)

@@ -10,7 +10,7 @@ from tests.sequence_parallel.utils import (
 )
 
 
-def compare(root_dir):
+def compare(root_dir, attention_mask=None):
     module_file = root_dir / 'forward_order.txt'
     failed = []
     with module_file.open('r', encoding='utf-8') as input_:
@@ -58,7 +58,39 @@ def compare(root_dir):
 
                 combined_weights = np.concatenate([weights[0], weights[1]], axis=dim_to_merge)
             try:
-                np.testing.assert_allclose(weights[None], combined_weights, atol=0.01, rtol=0.01)
+                # if attention_mask is None or 'rotary_emb' in param_name:
+                if attention_mask is None:
+                    np.testing.assert_allclose(weights[None], combined_weights, atol=0.01, rtol=0.01)
+
+                else:
+                    if 'rotary_emb' not in param_name:
+                        assert combined_weights.shape[0] == attention_mask.shape[0], (
+                            combined_weights.shape[0],
+                            attention_mask.shape[0],
+                        )
+
+                        for i in range(combined_weights.shape[0]):
+                            attention_row = attention_mask[i]
+                            np.testing.assert_allclose(
+                                weights[None][i, attention_row],
+                                combined_weights[i, attention_row],
+                                atol=0.01,
+                                rtol=0.01,
+                            )
+
+                    else:
+                        assert (
+                            combined_weights.shape[0] == 1
+                        ), f'Unexpected shape in rotary_emb: {combined_weights.shape}'
+                        for i in range(combined_weights.shape[0]):
+                            attention_row = attention_mask[i]
+                            np.testing.assert_allclose(
+                                weights[None][0, attention_row],
+                                combined_weights[i, attention_row],
+                                atol=0.01,
+                                rtol=0.01,
+                            )
+
             except AssertionError as e:
                 print(e.args[0])
                 failed.append(param_name)
