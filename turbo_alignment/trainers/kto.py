@@ -17,7 +17,6 @@ from transformers import (
     ProgressCallback,
     TrainerCallback,
     TrainerControl,
-    TrainingArguments,
 )
 from transformers.integrations import get_reporting_integration_callbacks
 

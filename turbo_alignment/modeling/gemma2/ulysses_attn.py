@@ -166,7 +166,6 @@ class Gemma2AttentionUlysses(torch.nn.Module):
             attn_weights = attn_weights * self.config.attn_logit_softcapping
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
-            # print(f'{attn_weights.size()=} {key_states.size()=} {causal_mask.size()=} {attention_mask.size()=} {key_states.size()=}')
             attn_weights = attn_weights + causal_mask
 
         # upcast attention to fp32
@@ -176,7 +175,8 @@ class Gemma2AttentionUlysses(torch.nn.Module):
 
         if attn_output.size() != (bsz, self.num_heads // get_sequence_parallel_world_size(), seq_len, self.head_dim):
             raise ValueError(
-                f"`attn_output` should be of size {(bsz, self.num_heads // get_sequence_parallel_world_size(), seq_len, self.head_dim)}, but is"
+                f"`attn_output` should be of size"
+                f" {(bsz, self.num_heads // get_sequence_parallel_world_size(), seq_len, self.head_dim)}, but is"
                 f" {attn_output.size()}"
             )
 
@@ -194,17 +194,17 @@ class Gemma2AttentionUlysses(torch.nn.Module):
 
 class Gemma2FlashAttention2Ulysses(Gemma2Attention):
     """
-    Gemma2 flash attention module with DeepSpeed Ulysses. This module inherits from `Gemma2Attention` as the weights of the module stays
-    untouched. The only required change would be on the forward pass where it needs to correctly call the public API of
-    flash attention and deal with padding tokens in case the input contains any of them.
+    Gemma2 flash attention module with DeepSpeed Ulysses. This module inherits from `Gemma2Attention` as the weights of
+    the module stays untouched. The only required change would be on the forward pass where it needs to correctly call
+    the public API of flash attention and deal with padding tokens in case the input contains any of them.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # TODO: Should be removed once Flash Attention for RoCm is bumped to 2.1.
-        # flash_attn<2.1 generates top-left aligned causal mask, while what is needed here is bottom-right alignement, that was made default for flash_attn>=2.1. This attribute is used to handle this difference. Reference: https://github.com/Dao-AILab/flash-attention/releases/tag/v2.1.0.
-        # Beware that with flash_attn<2.1, using q_seqlen != k_seqlen (except for the case q_seqlen == 1) produces a wrong mask (top-left).
+        # flash_attn<2.1 generates top-left aligned causal mask, while what is needed here is bottom-right alignement, that was made default for flash_attn>=2.1. This attribute is used to handle this difference. Reference: https://github.com/Dao-AILab/flash-attention/releases/tag/v2.1.0. # noqa: E501
+        # Beware that with flash_attn<2.1, using q_seqlen != k_seqlen (except for the case q_seqlen == 1) produces a wrong mask (top-left).  # noqa: E501
         self._flash_attn_uses_top_left_mask = not is_flash_attn_greater_or_equal_2_10()
 
     def forward(
@@ -260,7 +260,7 @@ class Gemma2FlashAttention2Ulysses(Gemma2Attention):
             key_states = key_states[:, :, :seq_len]
             value_states = value_states[:, :, :seq_len]
 
-        # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
+        # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache # noqa: E501
         # to be able to avoid many of these transpose/reshape/view.
         query_states = query_states.transpose(1, 2)
         key_states = key_states.transpose(1, 2)
@@ -286,7 +286,7 @@ class Gemma2FlashAttention2Ulysses(Gemma2Attention):
 
             logger.warning_once(
                 f"The input hidden states seems to be silently casted in float32, this might be related to"
-                f" the fact you have upcasted embedding or layer norm layers in float32. We will cast back the input in"
+                f" the fact you have upcasted embedding or layer norm layers in float32. We will cast back the input in"  # noqa: E501
                 f" {target_dtype}."
             )
 
@@ -295,7 +295,7 @@ class Gemma2FlashAttention2Ulysses(Gemma2Attention):
             value_states = value_states.to(target_dtype)
 
         logger.debug(
-            f'Before attention class: {dist.get_rank()=} {query_states.size()=} {key_states.size()=} {value_states.size()=}'
+            f'Before attention class: {dist.get_rank()=} {query_states.size()=} {key_states.size()=} {value_states.size()=}'  # noqa: E501
         )
         _forward = DistributedAttention(
             _flash_attention_forward,
