@@ -6,7 +6,7 @@ import pytest
 import torch
 import torch.distributed
 import turbo_alignment.modeling.parallel_states as parallel_states
-from transformers import AutoTokenizer, Trainer
+from transformers import AutoTokenizer, GenerationConfig, Trainer
 from transformers.data.data_collator import default_data_collator
 
 from turbo_alignment.dist_utils.gather_and_split import all_gather_variable
@@ -154,8 +154,14 @@ def gemma_model(model_path: str = MODEL_PATH):
                 print('Skip', name)
 
 
-@app.command(name='test-dataloader')
-def _test_dataloader(model_path: str = MODEL_PATH):
+GENERATION_CONFIGS = [
+    None,
+    GenerationConfig(num_beams=2),
+]
+
+
+@app.command(name='test-generation')
+def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     texts = [
         'Мама мыла раму',
@@ -204,30 +210,35 @@ def _test_dataloader(model_path: str = MODEL_PATH):
             ),
         )
 
+        generation_config = GENERATION_CONFIGS[test_case]
+
         for batch in trainer.get_train_dataloader():
             print(batch)
-            generated = model.generate(**batch, max_new_tokens=2, use_cache=False)
-            # run_in_order()(print)('rank:', dist.get_rank(), 'result:', generated)
-            all_generated = torch.cat(
-                all_gather_variable(generated, parallel_states.get_sequence_parallel_group()),
-                dim=-1,
-            )
-
-            run_in_order()(print)('rank:', dist.get_rank(), all_generated)
+            generated = model.generate(**batch, max_new_tokens=2, use_cache=False, generation_config=generation_config)
+            run_in_order()(print)('rank:', dist.get_rank(), 'result:', generated)
             all_input_ids = torch.cat(
                 all_gather_variable(batch['input_ids'], parallel_states.get_sequence_parallel_group()),
                 dim=-1,
             )
-            vanilla_result = vanilla_model.generate(all_input_ids, max_new_tokens=2)
+            vanilla_result = vanilla_model.generate(
+                all_input_ids,
+                max_new_tokens=2,
+                generation_config=generation_config,
+            )
             run_in_order()(print)('rank:', dist.get_rank(), vanilla_result)
-            assert torch.equal(all_generated, vanilla_result), (all_generated, vanilla_result)
-
+            if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
+                assert torch.equal(generated, vanilla_result), (generated, vanilla_result)
 
 
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
 @pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
-def test_genaration():
-    return launch_with_name(__file__, 'test-dataloader', 2)
+@pytest.mark.parametrize(
+    'test_case',
+    list(range(len(GENERATION_CONFIGS))),
+)
+def test_generation(test_case):
+    cmd_args = ['--test-case', str(test_case), '--model-path', MODEL_PATH]
+    return launch_with_name(__file__, 'test-generation', 2, cmd_args=cmd_args)
 
 
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
@@ -236,5 +247,17 @@ def test_gemma_model():
     return launch_with_name(__file__, 'gemma-model', 2)
 
 
+def set_prctl():
+    try:
+        import prctl
+
+        prctl.set_ptracer(prctl.SET_PTRACER_ANY)
+
+    except ImportError:
+        print('prctl unavailable')
+
+
 if __name__ == '__main__':
+    set_prctl()
+    os.register_at_fork(after_in_child=set_prctl)
     app()
