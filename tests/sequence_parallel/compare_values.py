@@ -10,7 +10,7 @@ from tests.sequence_parallel.utils import (
 )
 
 
-def compare(root_dir, attention_mask = None):
+def compare(root_dir, attention_mask=None):
     module_file = root_dir / 'forward_order.txt'
     failed = []
     with module_file.open('r', encoding='utf-8') as input_:
@@ -64,7 +64,10 @@ def compare(root_dir, attention_mask = None):
 
                 else:
                     if 'rotary_emb' not in param_name:
-                        assert combined_weights.shape[0] == attention_mask.shape[0], (combined_weights.shape[0], attention_mask.shape[0])
+                        assert combined_weights.shape[0] == attention_mask.shape[0], (
+                            combined_weights.shape[0],
+                            attention_mask.shape[0],
+                        )
 
                         for i in range(combined_weights.shape[0]):
                             attention_row = attention_mask[i]
@@ -76,7 +79,9 @@ def compare(root_dir, attention_mask = None):
                             )
 
                     else:
-                        assert combined_weights.shape[0] == 1, f'Unexpected shape in rotary_emb: {combined_weights.shape}'
+                        assert (
+                            combined_weights.shape[0] == 1
+                        ), f'Unexpected shape in rotary_emb: {combined_weights.shape}'
                         for i in range(combined_weights.shape[0]):
                             attention_row = attention_mask[i]
                             np.testing.assert_allclose(

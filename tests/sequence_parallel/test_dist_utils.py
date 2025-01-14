@@ -24,6 +24,10 @@ OUTPUTS = [
 assert len(INPUTS) == len(OUTPUTS)
 
 
+def create_run_preamble(num_gpus: int):
+    return ['torchrun', '--nnodes', '1', '--nproc-per-node', str(num_gpus)]
+
+
 def do_test_gather_and_split(test_case):
     dist.init_process_group()
     rank = dist.get_rank()
@@ -42,7 +46,7 @@ def do_test_gather_and_split(test_case):
 )
 def test_gather_and_split(test_case: int):
     subprocess.check_call(
-        ['torchrun', '--nnodes', '1', '--nproc-per-node', '2', __file__, '--mode', 'gather_and_split', '--test-case', str(test_case)]
+        create_run_preamble(2) + [__file__, '--mode', 'gather_and_split', '--test-case', str(test_case)]
     )
 
 
@@ -85,7 +89,7 @@ MODE_TO_FUNCTION = {
 )
 def test_create_and_broadcast(test_case: int):
     subprocess.check_call(
-        ['torchrun', '--nnodes', '1', '--nproc-per-node', '2', __file__, '--mode', 'create_and_broadcast', '--test-case', str(test_case)]
+        create_run_preamble(2) + [__file__, '--mode', 'create_and_broadcast', '--test-case', str(test_case)]
     )
 
 

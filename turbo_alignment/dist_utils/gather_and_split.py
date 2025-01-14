@@ -14,10 +14,7 @@ def all_gather_variable(tensor: torch.Tensor, group=None) -> list[torch.Tensor]:
     dist.all_gather(shapes, shape, group=group)
     # Gather data
     inputs = [tensor] * world_size
-    outputs = [
-        torch.empty(*_shape, dtype=tensor.dtype, device=tensor.device)
-        for _shape in shapes
-    ]
+    outputs = [torch.empty(*_shape, dtype=tensor.dtype, device=tensor.device) for _shape in shapes]
     dist.all_to_all(outputs, inputs, group=group)
     return outputs
 
