@@ -20,6 +20,15 @@ This is achieved by patching dataset sharding.
 1. Loss functions are adapted to account for the changes.
 1. Parameters dependent on the number of workers (e.g., total batch size, number of steps) are adjusted accordingly.
 1. We have to be sure, that all random generators of all workers inside group are perfectly synchronized.
+1. Each example should be padded, so all workers inside group have the sub-example of the same length.
+
+## Generation.
+Generation process should be ajusted as well. Since only last worker inside group has newly generated tokens, all the generation control happens on the last worker. To achive this, we store all the sequence on it, and apply stopping criterias on it. Note, that we do not infer model on the whole sequence on the last node, we compute only stopping criterais and next token selection.
+After the generation process finished, we send sequnces from last worker to all workers inside group.
+
+Because of padding, we have to rearrange inputs on each generation step.
+
+Currently, only sampling and Beam search generation methods are supported.
 
 ## Tests
 Tests for this code can be found in directory `tests/sequence_parallel`.
