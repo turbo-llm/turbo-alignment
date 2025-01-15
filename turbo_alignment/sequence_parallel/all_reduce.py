@@ -1,11 +1,13 @@
 from torch.autograd.function import Function
 
-import deepspeed.comm as dist
+import torch.distributed as dist
 
 
 class _AllReduce(Function):
+    # pylint: disable=abstract-method
+
     @staticmethod
-    def forward(ctx, op, group, tensor):
+    def forward(ctx, op, group, tensor):  # pylint: disable=arguments-differ
         ctx.group = group
         ctx.op = op
         tensor = tensor.clone()
@@ -13,7 +15,7 @@ class _AllReduce(Function):
         return tensor
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output):  # pylint: disable=arguments-differ
         return (None, None) + (_AllReduce.apply(ctx.op, ctx.group, grad_output),)
 
 
