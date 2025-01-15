@@ -832,15 +832,7 @@ class DPOTrainer(TrainerWithSeqP):
             policy_chosen_logits,
             policy_rejected_logits,
             precomputed_margins,
-        ) = self.concatenated_forward(
-            model, batch
-        )  # pylit: disable=unbalanced-tuple-unpacking
-
-        # if parallel_states.sequence_parallel_is_initialized():
-        #     spg: dist.ProcessGroup = parallel_states.get_sequence_parallel_group()
-        #     print(f'{dist.get_rank()=} {spg.name()=} {spg.group_name=} {policy_chosen_logps=} {policy_rejected_logps=} ')
-        # else:
-        #     print(f'{policy_chosen_logps=} {policy_rejected_logps=} ')
+        ) = self.concatenated_forward(model, batch)  # pylit: disable=unbalanced-tuple-unpacking
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
