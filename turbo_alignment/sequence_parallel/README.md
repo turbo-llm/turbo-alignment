@@ -23,4 +23,4 @@ This is achieved by patching dataset sharding.
 
 ## Tests
 Tests for this code can be found in directory `tests/sequence_parallel`.
-Most of them requires two GPUs and Gemma model.
+Most tests require two GPUs and Gemma model.
