@@ -21,8 +21,14 @@ class ClassificationCherryPickCallback(CherryPickCallbackBase[InferenceClassific
         cherry_pick_settings: ClassificationCherryPickSettings,
         datasets: Iterable[InferenceClassificationDataset],
         metrics: list[Metric],
+        tokenizer: PreTrainedTokenizerBase,
     ) -> None:
-        super().__init__(cherry_pick_settings=cherry_pick_settings, datasets=datasets, metrics=metrics)
+        super().__init__(
+            cherry_pick_settings=cherry_pick_settings,
+            datasets=datasets,
+            metrics=metrics,
+            tokenizer=tokenizer,
+        )
 
     def _get_dataset_metrics(
         self,

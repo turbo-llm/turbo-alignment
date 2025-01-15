@@ -64,6 +64,7 @@ class TrainRAGStrategy(BaseTrainStrategy[RAGTrainExperimentSettings]):
             cherry_pick_settings=cherry_pick_settings,
             datasets=cherry_pick_datasets,
             metrics=metrics,
+            tokenizer=tokenizer,
         )
 
     @staticmethod
