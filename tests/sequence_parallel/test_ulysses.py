@@ -41,7 +41,8 @@ def fix_attention_mask(
     target_length = attention_mask.shape[-1] if attention_mask is not None else input_tensor.shape[1]
 
     # In case the provided `attention` mask is 2D, we generate a causal mask here (4D).
-    causal_mask = Gemma2Model._prepare_4d_causal_attention_mask_with_cache_position(  # pylint: disable[W0212]
+    # pylint: disable=protected-access
+    causal_mask = Gemma2Model._prepare_4d_causal_attention_mask_with_cache_position(
         attention_mask,
         sequence_length=sequence_length,
         target_length=target_length,
