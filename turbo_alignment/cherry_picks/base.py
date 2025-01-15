@@ -25,11 +25,13 @@ class CherryPickCallbackBase(TrainerCallback, Generic[InferenceDatasetT]):
         cherry_pick_settings: CherryPickSettings,
         datasets: Iterable[InferenceDatasetT],
         metrics: list[Metric],
+        tokenizer: PreTrainedTokenizerBase,
     ):
         super().__init__()
         self._cherry_pick_settings = cherry_pick_settings
         self._metrics = metrics
         self._datasets = datasets
+        self.tokenizer = tokenizer
 
     @abstractmethod
     def _get_dataset_metrics(
