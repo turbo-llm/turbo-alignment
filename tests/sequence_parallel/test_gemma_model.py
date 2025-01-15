@@ -1,22 +1,19 @@
 import os
 import tempfile
+from typing import Callable
 
 import deepspeed
 import deepspeed.comm as dist
 import pytest
 import torch
 import torch.distributed
-import turbo_alignment.modeling.parallel_states as parallel_states
 from transformers import AutoTokenizer, GenerationConfig, Trainer
 from transformers.data.data_collator import default_data_collator
-
 from turbo_alignment.dist_utils.gather_and_split import all_gather_variable
 from turbo_alignment.dist_utils.order import run_in_order
+from turbo_alignment.modeling import parallel_states
+from turbo_alignment.modeling.gemma import Gemma2ForCausalLM, Gemma2ForCausalLMWithMPU
 from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
-from turbo_alignment.modeling.gemma import (
-    Gemma2ForCausalLM,
-    Gemma2ForCausalLMWithMPU,
-)
 from turbo_alignment.sequence_parallel.collator import (
     DataCollatorForSequenceParallism,
     pad_for_sequence_parallel,
@@ -28,6 +25,13 @@ from tests.sequence_parallel.consts import DEEPSPEED_CONFIG, MODEL_PATH
 from tests.sequence_parallel.dataset import SimpleDataset
 from tests.sequence_parallel.launcher import app, launch_with_name
 from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
+
+
+def create_printer(name: str) -> Callable[[str], str]:
+    def printer(msg: str) -> str:
+        return '\n'.join([name, msg])
+
+    return printer
 
 
 @app.command(name='gemma-model')
@@ -103,25 +107,24 @@ def gemma_model(model_path: str = MODEL_PATH):
 
     torch.testing.assert_close(result, vanilla_result[:, start:end], atol=0.01, rtol=0.01)
 
-    if dist.get_rank() == 0 or True:
-        for name, param in vanilla_model.named_parameters():
-            if name.startswith('module'):
-                name = name[len('module.') :]
+    for name, param in vanilla_model.named_parameters():
+        if name.startswith('module'):
+            name = name[len('module.') :]
 
-            v_param = vanilla_model.get_parameter(name)
-            assert param.requires_grad == v_param.requires_grad
-            if param.requires_grad:
-                print('Do for', name)
+        v_param = vanilla_model.get_parameter(name)
+        assert param.requires_grad == v_param.requires_grad
+        if param.requires_grad:
+            print('Do for', name)
 
-                torch.testing.assert_close(
-                    param.grad,
-                    v_param.grad,
-                    atol=0.5,
-                    rtol=0.2,
-                    msg=lambda msg: '\n'.join([name, msg]),
-                )
-            else:
-                print('Skip', name)
+            torch.testing.assert_close(
+                param.grad,
+                v_param.grad,
+                atol=0.5,
+                rtol=0.2,
+                msg=create_printer(name),
+            )
+        else:
+            print('Skip', name)
 
 
 GENERATION_CONFIGS = [
