@@ -605,12 +605,14 @@ class DPOTrainer(Trainer):
         policy_rejected_logps: torch.Tensor,
         reference_chosen_logps: torch.Tensor,
         reference_rejected_logps: torch.Tensor,
+        precomputed_margins: torch.Tensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return self.dpo_loss_registry.compute_loss(
             policy_chosen_logps=policy_chosen_logps,
             policy_rejected_logps=policy_rejected_logps,
             reference_chosen_logps=reference_chosen_logps,
             reference_rejected_logps=reference_rejected_logps,
+            precomputed_margins=precomputed_margins,
         )
 
     def _get_batch_logps(

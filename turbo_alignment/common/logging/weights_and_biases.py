@@ -1,9 +1,9 @@
 from typing import Any
 
-import wandb
 from wandb.sdk.lib.disabled import RunDisabled
 from wandb.sdk.wandb_run import Run
 
+import wandb
 from turbo_alignment.settings.logging.weights_and_biases import WandbSettings
 
 
