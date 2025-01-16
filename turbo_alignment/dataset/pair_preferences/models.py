@@ -12,5 +12,3 @@ class PairPreferenceRecord(DatasetRecord):
     answer_w: ChatMessage
     answer_l: ChatMessage
     precomputed_margin: float | None = None
-    ref_chosen_logps: float | None = None
-    ref_rejected_logps: float | None = None

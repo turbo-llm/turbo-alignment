@@ -52,10 +52,4 @@ class PairPreferenceDataCollator:
         if 'precomputed_margin' in examples[0] and examples[0]['precomputed_margin'] is not None:
             batch['precomputed_margin'] = torch.tensor([ex['precomputed_margin'] for ex in examples])
 
-        if 'ref_chosen_logps' in examples[0] and examples[0]['ref_chosen_logps'] is not None:
-            batch['ref_chosen_logps'] = torch.tensor([ex['ref_chosen_logps'] for ex in examples])
-
-        if 'ref_rejected_logps' in examples[0] and examples[0]['ref_rejected_logps'] is not None:
-            batch['ref_rejected_logps'] = torch.tensor([ex['ref_rejected_logps'] for ex in examples])
-
         return batch

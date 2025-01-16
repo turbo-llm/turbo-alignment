@@ -4,6 +4,5 @@ from .dpo import TrainDPOStrategy
 from .kto import TrainKTOStrategy
 from .multimodal import TrainMultimodalStrategy
 from .rag import TrainRAGStrategy
-from .ref_model import ref_model_DPOStrategy
 from .rm import TrainRMStrategy
 from .sft import TrainSFTStrategy

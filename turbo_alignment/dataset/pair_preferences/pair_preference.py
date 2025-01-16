@@ -72,7 +72,7 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
             if not (chosen_record and rejected_record):
                 continue
 
-            ignore_keys = ['precomputed_margin', 'ref_chosen_logps', 'ref_rejected_logps']
+            ignore_keys = ['precomputed_margin']
             if not self._add_labels:
                 ignore_keys.append('labels')
 
@@ -85,8 +85,6 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
                     'inputs_w': chosen_tokens,
                     'inputs_l': rejected_tokens,
                     'precomputed_margin': record.precomputed_margin,
-                    'ref_chosen_logps': record.ref_chosen_logps,
-                    'ref_rejected_logps': record.ref_rejected_logps,
                 }
             )
 

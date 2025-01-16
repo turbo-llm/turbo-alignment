@@ -10,7 +10,6 @@ from turbo_alignment.settings.pipelines.inference.base import (
 from turbo_alignment.settings.pipelines.inference.chat import (
     ChatInferenceExperimentSettings,
 )
-from turbo_alignment.settings.pipelines.inference.metrics import MetricsSettings
 from turbo_alignment.settings.pipelines.inference.multimodal import (
     MultimodalInferenceExperimentSettings,
 )
@@ -67,13 +66,3 @@ def infer_rag_entrypoint(
 ) -> None:
     inference_settings = RAGInferenceExperimentSettings.parse_file(inference_settings_path)
     pipelines.RAGInferenceStrategy().run(inference_settings)
-
-
-@app.command(name='run_metrics', help='Run metrics evaluation')
-def infer_metrics(
-    inference_settings_path: Path = typer.Option(
-        ..., '--inference_settings_path', exists=True, help='Path to inference config file'
-    )
-):
-    inference_settings = MetricsSettings.parse_file(inference_settings_path)
-    pipelines.MetricsInferenceStrategy().run(inference_settings)
