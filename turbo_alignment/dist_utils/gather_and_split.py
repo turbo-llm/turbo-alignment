@@ -7,7 +7,7 @@ from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
 
 
 def all_gather_variable(tensor: torch.Tensor, group=None) -> list[torch.Tensor]:
-    world_size = dist.get_world_size()
+    world_size = dist.get_world_size(group)
     # Gather shapes first
     shape = torch.as_tensor(tensor.shape, device=tensor.device)
     shapes = [torch.empty_like(shape) for _ in range(world_size)]
