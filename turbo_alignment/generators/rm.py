@@ -59,15 +59,21 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
         if len(merged_inputs) == 0:
             return []
 
-        assert self._micro_batch == 1, 'batch size should be 1'
-
         rewards = []
         with torch.no_grad():
-            input_ids = [item['input_ids'].unsqueeze(0) for item in merged_inputs]
-            attn_mask = [item['attention_mask'].unsqueeze(0) for item in merged_inputs]
+            input_ids = nn.utils.rnn.pad_sequence(
+                [item['input_ids'] for item in merged_inputs],
+                padding_value=self._tokenizer.pad_token_id,
+                batch_first=True,
+            )
+            attn_mask = nn.utils.rnn.pad_sequence(
+                [item['attention_mask'] for item in merged_inputs],
+                padding_value=0,
+                batch_first=True,
+            )
             for i in range(0, len(input_ids), self._micro_batch):
-                input_ids_batch = input_ids[i].to(self.device)
-                attn_mask_batch = attn_mask[i].to(self.device)
+                input_ids_batch = input_ids[i : i + self._micro_batch].to(self.device)
+                attn_mask_batch = attn_mask[i : i + self._micro_batch].to(self.device)
                 rewards.extend(self._model(input_ids=input_ids_batch, attention_mask=attn_mask_batch).logits.cpu())
 
         rewards = torch.cat(rewards, dim=0)

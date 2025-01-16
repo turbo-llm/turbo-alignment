@@ -247,8 +247,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             input_ids = input_ids[cut_index:]
 
         labels = labels[-len(input_ids) :]
-        # input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
-        # labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
+        if self.tokenizer.bos_token_id is not None:
+            input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
+            labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
 
         return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
 
@@ -299,8 +300,6 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     inference=inference,
                     random_cut=random_cut,
                 )
-                if len(input_ids) >= 8000:
-                    raise ValueError(f'{len(input_ids)=}, which is >=8000')
 
             except ValueError as ex:
                 output.append(None)

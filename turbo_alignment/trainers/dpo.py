@@ -809,9 +809,6 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix_name}grad_term'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().mean().item()
         )
-        # metrics[f'{prefix_name}grad_term_std'] = (
-        #     (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
-        # )
 
         return metrics
 
