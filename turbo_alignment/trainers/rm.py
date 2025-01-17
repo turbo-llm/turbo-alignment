@@ -36,7 +36,7 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
         model,
         inputs,
         return_outputs=False,
-        num_items_in_batch=None,
+        _num_items_in_batch=None,
     ) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
         rewards_w, rewards_l = self.concatenated_forward(model, inputs)
 
