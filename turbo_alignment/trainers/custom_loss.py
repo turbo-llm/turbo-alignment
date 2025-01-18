@@ -53,7 +53,7 @@ class CustomLossTrainer(MultiGPUCherryPicksTrainer):
         model,
         inputs,
         return_outputs=False,
-        _num_items_in_batch=None,
+        num_items_in_batch=None,  # pylint: disable=unused-argument
     ):
         """
         Modified original version, without manual label smoothing

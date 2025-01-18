@@ -36,7 +36,7 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
         model,
         inputs,
         return_outputs=False,
-        _num_items_in_batch=None,
+        num_items_in_batch=None,  # pylint: disable=unused-argument
     ) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
         rewards_w, rewards_l = self.concatenated_forward(model, inputs)
 
@@ -76,7 +76,7 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
 
         return loss, logits, labels
 
-    def _save_checkpoint(self, model, trial, metrics=None):
+    def _save_checkpoint(self, model, trial):
         if isinstance(model, PeftModel) and is_deepspeed_zero3_enabled():
             logger.info('Running custom _save_checkpoint')
             checkpoint_folder = f'{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}'
@@ -87,4 +87,4 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
 
             torch.save(model.base_model.model.score.state_dict(), output_dir / 'cls_head' / 'cls_head.pt')
 
-        return super()._save_checkpoint(model=model, trial=trial, metrics=metrics)  # pylint: disable=no-member
+        return super()._save_checkpoint(model=model, trial=trial)  # pylint: disable=no-member
