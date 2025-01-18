@@ -23,7 +23,10 @@ from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
-from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelSettings
+from turbo_alignment.common.tf.callbacks.sync_ref_model import (
+    SyncRefModelCallback,
+    SyncRefModelSettings,
+)
 from turbo_alignment.trainers.dpo import DPOTrainer
 from turbo_alignment.trainers.utils import prepare_model
 
@@ -100,6 +103,9 @@ class KTOTrainer(DPOTrainer):
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else ProgressCallback)
         self.control: TrainerControl = self.callback_handler.on_init_end(self.args, self.state, self.control)
+
+        if self.sync_ref_settings['sync_ref_model']:  # type: ignore[index]
+            self.add_callback(SyncRefModelCallback(sync_ref_settings=self.sync_ref_settings))
 
     def kto_loss(
         self,
