@@ -46,8 +46,10 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         experiment_settings: ClassificationTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **_kwargs,
-    ) -> ClassificationCherryPickCallback:
+    ) -> ClassificationCherryPickCallback | None:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
+        if cherry_pick_settings is None:
+            return None
 
         cherry_pick_datasets = DatasetLoader[InferenceClassificationDataset](
             InferenceClassificationDataset
