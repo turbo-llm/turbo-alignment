@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 
 from turbo_alignment.settings.logging.common import LoggingSettings, LoggingType
@@ -20,5 +21,10 @@ class WandbSettings(LoggingSettings):
 
     __name__ = 'WandbSettings'
 
-    class Config:
-        env_prefix: str = 'WANDB_'
+    def __init__(self, **kwargs) -> None:
+        mode_from_env = os.getenv('WANDB_MODE', None)
+
+        if mode_from_env:
+            kwargs['mode'] = WandbMode(mode_from_env)
+
+        super().__init__(**kwargs)

@@ -17,6 +17,8 @@ class DPOLossesType(str, Enum):
     APO_ZERO = 'apo_zero'
     APO_DOWN = 'apo_down'
     ASFT = 'asft'
+    DPOP = 'dpop'
+    NCA_PAIR = 'nca_pair'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -77,3 +79,12 @@ class APOZeroLossSettings(DPOLossSettings):
 
 class APODownLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.APO_DOWN]
+
+
+class DPOPLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.DPOP]
+    lam: float = 0.1
+
+
+class NCAPairLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.NCA_PAIR]

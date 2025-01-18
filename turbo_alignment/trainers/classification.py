@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -66,7 +68,13 @@ class ClassificationTrainer(MultiGPUCherryPicksTrainer):
             **kwargs,
         )
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        return_outputs=False,
+        num_items_in_batch=None,  # pylint: disable=unused-argument
+    ) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
         """
         Modified original version, without manual label smoothing
         """
@@ -79,7 +87,7 @@ class ClassificationTrainer(MultiGPUCherryPicksTrainer):
         logits = outputs['logits'] if isinstance(outputs, dict) else outputs[0]
 
         loss = classification_loss(
-            logits=logits, labels=labels, alpha=self.loss_settings['alpha'], gamma=self.loss_settings['gamma']
+            logits=logits, labels=labels, alpha=self.loss_settings.alpha, gamma=self.loss_settings.gamma
         )
 
         return (loss, outputs) if return_outputs else loss

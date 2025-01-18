@@ -13,7 +13,7 @@ class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: KTOMultiDatasetSettings
     val_dataset_settings: KTOMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
+    cherry_pick_settings: ChatCherryPickSettings | None = None
 
     training_arguments: KTOTrainingArguments
 
@@ -22,5 +22,3 @@ class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
         return KTOTrainingArguments(
             **values, output_dir=TRAINER_LOGS_FOLDER, report_to=[], label_names=[], remove_unused_columns=False
         )
-
-    cherry_pick_settings: ChatCherryPickSettings | None = None

@@ -8,6 +8,3 @@ class ClearMLSettings(LoggingSettings):
     tags: list[str] = []
 
     __name__ = 'ClearMLSettings'
-
-    class Config:
-        env_prefix: str = 'CLEARML_'

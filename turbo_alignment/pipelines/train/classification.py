@@ -6,7 +6,6 @@ from transformers.data.data_collator import DataCollatorMixin, DataCollatorWithP
 
 from turbo_alignment.cherry_picks.classification import ClassificationCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.classification.classification import (
     InferenceClassificationDataset,
 )

@@ -35,9 +35,11 @@ from turbo_alignment.settings.pipelines.train.utils import (
     ASFTLossSettings,
     CPOLossSettings,
     DPOLossesType,
+    DPOPLossSettings,
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
+    NCAPairLossSettings,
     ORPOLossSettings,
     SigmoidLossSettings,
     SigmoidLossWithMarginSettings,
@@ -505,6 +507,8 @@ class DPOTrainingArguments(TrainingArguments):
         | SigmoidLossWithMarginSettings
         | APOZeroLossSettings
         | APODownLossSettings
+        | NCAPairLossSettings
+        | DPOPLossSettings
     ) = SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     sync_ref_settings: SyncRefModelSettings = SyncRefModelSettings()
     use_ref_model: bool = True

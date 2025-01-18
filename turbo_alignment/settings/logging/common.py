@@ -4,8 +4,8 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class LoggingType(str, Enum):
-    WANDB: str = 'wandb'
-    CLEARML: str = 'clearml'
+    WANDB = 'wandb'
+    CLEARML = 'clearml'
 
 
 class LoggingSettings(ExtraFieldsNotAllowedBaseModel):
