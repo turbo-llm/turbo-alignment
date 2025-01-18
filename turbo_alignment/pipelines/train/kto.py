@@ -89,7 +89,7 @@ class TrainKTOStrategy(BaseTrainStrategy[KTOTrainExperimentSettings]):
             eval_dataset=val_dataset,
             callbacks=[],
             data_collator=data_collator,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             **extra_args,
         )
 

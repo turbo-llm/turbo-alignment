@@ -6,10 +6,13 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
+    BaseImageProcessor,
     DefaultFlowCallback,
+    FeatureExtractionMixin,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     PrinterCallback,
+    ProcessorMixin,
     ProgressCallback,
     TrainerCallback,
     TrainerControl,
@@ -49,7 +52,11 @@ class DDPOTrainer(DPOTrainer):
         eval_dataset: Dataset,
         rm: PreTrainedModel | nn.Module,
         ref_model: PreTrainedModel | nn.Module | None = None,
-        tokenizer: PreTrainedTokenizerBase | None = None,
+        processing_class: PreTrainedTokenizerBase
+        | BaseImageProcessor
+        | FeatureExtractionMixin
+        | ProcessorMixin
+        | None = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
@@ -67,7 +74,7 @@ class DDPOTrainer(DPOTrainer):
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             callbacks=callbacks,
             **kwargs,
         )
@@ -75,7 +82,7 @@ class DDPOTrainer(DPOTrainer):
         default_callbacks = [DefaultFlowCallback] + get_reporting_integration_callbacks(self.args.report_to)
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
         self.callback_handler = MetricsCallbackHandler(
-            callbacks, model, tokenizer, None, None, ref_model=ref_model, accelerator=self.accelerator
+            callbacks, model, processing_class, None, None, ref_model=ref_model, accelerator=self.accelerator
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else ProgressCallback)
         self.control: TrainerControl = self.callback_handler.on_init_end(self.args, self.state, self.control)

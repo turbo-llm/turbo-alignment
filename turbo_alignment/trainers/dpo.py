@@ -7,10 +7,13 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
+    BaseImageProcessor,
     DefaultFlowCallback,
+    FeatureExtractionMixin,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     PrinterCallback,
+    ProcessorMixin,
     ProgressCallback,
     Trainer,
     TrainerCallback,
@@ -33,6 +36,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     HingeLossSettings,
     IPOLossSettings,
     KTOLossSettings,
+    NCAPairLossSettings,
     ORPOLossSettings,
     SigmoidLossSettings,
     SigmoidLossWithMarginSettings,
@@ -456,6 +460,35 @@ class DPOPLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.NCA_PAIR)
+class NCAPairLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_logratios = policy_chosen_logps - reference_chosen_logps
+        rejected_logratios = policy_rejected_logps - reference_rejected_logps
+
+        chosen_rewards = self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
+
+        loss = (
+            -F.logsigmoid(chosen_logratios * self.beta)
+            - 0.5 * F.logsigmoid(-chosen_logratios * self.beta)
+            - 0.5 * F.logsigmoid(-rejected_logratios * self.beta)
+        )
+
+        return loss, chosen_rewards, rejected_rewards
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
     loss_settings: (
@@ -473,6 +506,7 @@ class DPOTrainingArguments(TrainingArguments):
         | APOZeroLossSettings
         | APODownLossSettings
         | DPOPLossSettings
+        | NCAPairLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
@@ -499,7 +533,11 @@ class DPOTrainer(Trainer):
         eval_dataset: Dataset,
         ref_model: PreTrainedModel | nn.Module | None = None,
         sft_model: PreTrainedModel | nn.Module | None = None,
-        tokenizer: PreTrainedTokenizerBase | None = None,
+        processing_class: PreTrainedTokenizerBase
+        | BaseImageProcessor
+        | FeatureExtractionMixin
+        | ProcessorMixin
+        | None = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
@@ -529,7 +567,7 @@ class DPOTrainer(Trainer):
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             callbacks=callbacks,
             **kwargs,
         )
@@ -555,7 +593,7 @@ class DPOTrainer(Trainer):
         self.callback_handler = MetricsCallbackHandler(
             callbacks,
             model,
-            tokenizer,
+            processing_class,
             None,
             None,
             ref_model=self.ref_model,
@@ -780,9 +818,6 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix_name}grad_term'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().mean().item()
         )
-        metrics[f'{prefix_name}grad_term_std'] = (
-            (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().std().item()
-        )
 
         return metrics
 
@@ -822,6 +857,7 @@ class DPOTrainer(Trainer):
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, torch.Tensor | Any],
         return_outputs=False,
+        _num_items_in_batch=None,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
         loss, metrics = self.get_batch_metrics(model, inputs, train_eval='train')
 
@@ -866,7 +902,7 @@ class DPOTrainer(Trainer):
         for key, value in metrics.items():
             self._stored_metrics[train_eval][key].append(value)
 
-    def log(self, logs: dict[str, float]) -> None:
+    def log(self, logs: dict[str, float], _start_time: float | None = None) -> None:
         train_eval = 'train' if 'loss' in logs else 'eval'
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = torch.tensor(metrics).cpu().mean().item()
