@@ -32,7 +32,7 @@ class ClassificationTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: ClassificationMultiDatasetSettings
     val_dataset_settings: ClassificationMultiDatasetSettings
 
-    cherry_pick_settings: ClassificationCherryPickSettings
+    cherry_pick_settings: ClassificationCherryPickSettings | None
 
     @field_validator('training_arguments', mode='before')
     def create_training_arguments(cls, values: dict[str, Any]) -> ClassificationTrainingArguments:

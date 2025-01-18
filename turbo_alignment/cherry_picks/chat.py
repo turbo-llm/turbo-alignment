@@ -1,3 +1,4 @@
+import math
 from typing import Iterable
 
 from accelerate import Accelerator
@@ -41,11 +42,16 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
             tokenizer=tokenizer,
             generation_config=self._generation_config,
             custom_generation_settings=self._custom_generation_settings,
-            accelerator=accelerator,
             return_logits=True,
         )
 
         batch_size = self._generation_config.num_return_sequences
+
+        if accelerator is not None:
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
 
         generations = generator.generate_from_dataset(dataset)
 
@@ -104,3 +110,10 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
             metric_outputs.extend(metric_results)
         return metric_outputs
+
+    @staticmethod
+    def _get_sharded_dataset(dataset: InferenceChatDataset, accelerator: Accelerator) -> InferenceChatDataset:
+        rank_device = accelerator.process_index
+        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
+
+        return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)

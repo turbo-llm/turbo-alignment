@@ -22,3 +22,5 @@ class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
         return KTOTrainingArguments(
             **values, output_dir=TRAINER_LOGS_FOLDER, report_to=[], label_names=[], remove_unused_columns=False
         )
+
+    cherry_pick_settings: ChatCherryPickSettings | None = None

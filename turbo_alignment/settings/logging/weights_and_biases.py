@@ -4,9 +4,9 @@ from turbo_alignment.settings.logging.common import LoggingSettings, LoggingType
 
 
 class WandbMode(str, Enum):
-    ONLINE: str = 'online'
-    OFFLINE: str = 'offline'
-    DISABLED: str = 'disabled'
+    ONLINE = 'online'
+    OFFLINE = 'offline'
+    DISABLED = 'disabled'
 
 
 class WandbSettings(LoggingSettings):

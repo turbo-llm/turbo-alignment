@@ -1,6 +1,8 @@
 from enum import Enum
 from pathlib import Path
 
+from pydantic import model_validator
+
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.tf.model import ModelTransformersSettings
 from turbo_alignment.settings.tf.peft import PEFT_TYPE
@@ -14,9 +16,21 @@ class ModelType(str, Enum):
 
 
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
-    use_rope: bool = True
-    use_cross_entropy: bool = True
-    use_geglu: bool = True
+    use_rope: bool = False
+    use_cross_entropy: bool = False
+    use_fused_linear_cross_entropy: bool = False
+    use_mlp: bool = False
+    use_rms_norm: bool = False
+
+    @model_validator(mode='after')
+    def check_cross_entopy_kernels(self) -> 'LigerKernelSettings':
+        if self.use_fused_linear_cross_entropy and self.use_cross_entropy:
+            raise ValueError(
+                'You cannot use both FusedLinearCrossEntropy and CrossEntropy kernels. '
+                'FusedLinearCrossEntropy is preferred if possible.'
+            )
+
+        return self
 
 
 class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
@@ -26,6 +40,8 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
     model_kwargs: dict = {}
 
     transformers_settings: ModelTransformersSettings
+
+    resize_token_embeddings: bool = False
 
     embeddings_initialization_strategy: dict[str, str] | None = None
 

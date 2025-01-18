@@ -3,10 +3,10 @@ from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 
+from turbo_alignment.common import is_package_available
 from turbo_alignment.common.tf.loaders.model.registry import (
     TransformersAutoModelRegistry,
 )
-from turbo_alignment.modeling.liger_kernels import apply_liger_kernel_to_gemma2
 from turbo_alignment.settings.model import (
     ModelForPeftSettings,
     ModelType,
@@ -40,11 +40,36 @@ def load_model(
     model_settings: PreTrainedModelSettings,
     tokenizer: PreTrainedTokenizerBase,
 ) -> PreTrainedModel:
-    if model_settings.liger_kernels_settings is not None:
+    # pylint: disable=import-error
+    if model_settings.liger_kernels_settings is not None and is_package_available('liger-kernel'):
+        from liger_kernel.transformers import (
+            apply_liger_kernel_to_gemma2,
+            apply_liger_kernel_to_llama,
+            apply_liger_kernel_to_qwen2,
+        )
+
+        apply_liger_kernel_to_llama(
+            rope=model_settings.liger_kernels_settings.use_rope,
+            cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,
+            swiglu=model_settings.liger_kernels_settings.use_mlp,
+            rms_norm=model_settings.liger_kernels_settings.use_rms_norm,
+            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_linear_cross_entropy,
+        )
+
         apply_liger_kernel_to_gemma2(
             rope=model_settings.liger_kernels_settings.use_rope,
             cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,
-            geglu=model_settings.liger_kernels_settings.use_geglu,
+            geglu=model_settings.liger_kernels_settings.use_mlp,
+            rms_norm=model_settings.liger_kernels_settings.use_rms_norm,
+            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_linear_cross_entropy,
+        )
+
+        apply_liger_kernel_to_qwen2(
+            rope=model_settings.liger_kernels_settings.use_rope,
+            cross_entropy=model_settings.liger_kernels_settings.use_cross_entropy,
+            swiglu=model_settings.liger_kernels_settings.use_mlp,
+            rms_norm=model_settings.liger_kernels_settings.use_rms_norm,
+            fused_linear_cross_entropy=model_settings.liger_kernels_settings.use_fused_linear_cross_entropy,
         )
 
     model = TransformersAutoModelRegistry.by_name(model_settings.model_type).from_pretrained(
@@ -57,7 +82,8 @@ def load_model(
     if model_settings.transformers_settings.load_in_8bit:
         model = prepare_model_for_int8_training(model)
 
-    model.resize_token_embeddings(len(tokenizer))
+    if model_settings.resize_token_embeddings:
+        model.resize_token_embeddings(len(tokenizer))
 
     if model_settings.embeddings_initialization_strategy is not None:
         with torch.no_grad():

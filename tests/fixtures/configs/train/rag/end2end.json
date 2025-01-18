@@ -45,6 +45,7 @@
     "generator_settings": {
       "model_path": "tests/fixtures/models/llama2_tiny",
       "model_type": "causal",
+      "resize_token_embeddings": true,
       "transformers_settings": {},
       "embeddings_initialization_strategy": {
         "<RS>": "<s>",

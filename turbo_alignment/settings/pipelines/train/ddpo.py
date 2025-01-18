@@ -20,8 +20,6 @@ class DDPOTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: DDPOMultiDatasetSettings
     val_dataset_settings: DDPOMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
-
     rm_tokenizer_settings: TokenizerSettings
 
     training_arguments: DDPOTrainingArguments
@@ -31,3 +29,4 @@ class DDPOTrainExperimentSettings(BaseTrainExperimentSettings):
         return DDPOTrainingArguments(
             **values, output_dir=TRAINER_LOGS_FOLDER, report_to=[], remove_unused_columns=False, label_names=[]
         )
+    cherry_pick_settings: ChatCherryPickSettings | None = None

@@ -9,4 +9,4 @@ class RMTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: PairPreferenceMultiDatasetSettings
     val_dataset_settings: PairPreferenceMultiDatasetSettings
 
-    cherry_pick_settings: RMCherryPickSettings
+    cherry_pick_settings: RMCherryPickSettings | None = None

@@ -35,8 +35,10 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
         experiment_settings: SftTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> ChatCherryPickCallback:
+    ) -> ChatCherryPickCallback | None:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
+        if cherry_pick_settings is None:
+            return None
 
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
             cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
@@ -73,7 +75,7 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
             eval_dataset=val_dataset,
             callbacks=[],
             data_collator=data_collator,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
         )
 
     def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:

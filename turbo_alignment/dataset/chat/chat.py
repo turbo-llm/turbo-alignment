@@ -8,6 +8,7 @@ import numpy as np
 import numpy.typing as npt
 import torch
 from transformers import PreTrainedTokenizerBase
+from typing_extensions import Self
 
 from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.common.logging import get_project_logger
@@ -247,8 +248,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             input_ids = input_ids[cut_index:]
 
         labels = labels[-len(input_ids) :]
-        input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
-        labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
+        if self.tokenizer.bos_token_id is not None:
+            input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
+            labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
 
         return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
 
@@ -307,7 +309,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
             encoded_record: dict[str, Any] = {
                 # 'id': record.id, FIXME: dont work with collators
-                'input_ids': torch.LongTensor(input_ids),
+                'input_ids': torch.LongTensor(input_ids.astype(np.float32)),
                 'labels': torch.LongTensor(labels),
                 'attention_mask': torch.ones(input_ids.shape, dtype=torch.int64),
             }
@@ -361,3 +363,21 @@ class InferenceChatDataset(ChatDataset):
 
     def convert_records(self, records: list[ChatDatasetRecord]) -> list[dict[str, Any] | None]:
         return self._encode(records, inference=True, random_cut=self._random_cut)
+
+    def get_slice(self, start: int, end: int) -> Self:
+        new_instance = self.__class__(
+            source=self.source,
+            settings=self.settings,
+            tokenizer=self.tokenizer,
+            read=False,
+            random_cut=self._random_cut,
+        )
+
+        dataset_records = [self[idx] for idx in range(len(self))]
+
+        new_instance.records = self.records[start:end]
+        new_instance.original_records_map = {
+            record['id']: self.get_original_record_by_id(record['id']) for record in dataset_records
+        }
+
+        return new_instance

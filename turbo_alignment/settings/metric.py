@@ -7,18 +7,18 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class MetricType(str, Enum):
-    ACCURACY: str = 'accuracy'
-    ROUGE: str = 'rouge'
-    METEOR: str = 'meteor'
-    REWARD: str = 'reward'
-    DIVERSITY: str = 'diversity'
-    PERPLEXITY: str = 'perplexity'
-    SELF_BLEU: str = 'self_bleu'
-    LENGTH: str = 'length'
-    DIST_N: str = 'dist_n'
-    KL: str = 'kl'
-    TOOL_CALL_METRICS: str = 'tool_call_metrics'
-    RETRIEVAL_UTILITY: str = 'retrieval_utility'
+    ACCURACY = 'accuracy'
+    ROUGE = 'rouge'
+    METEOR = 'meteor'
+    REWARD = 'reward'
+    DIVERSITY = 'diversity'
+    PERPLEXITY = 'perplexity'
+    SELF_BLEU = 'self_bleu'
+    LENGTH = 'length'
+    DIST_N = 'dist_n'
+    KL = 'kl'
+    TOOL_CALL_METRICS = 'tool_call_metrics'
+    RETRIEVAL_UTILITY = 'retrieval_utility'
 
 
 class ElementWiseScores(ExtraFieldsNotAllowedBaseModel):

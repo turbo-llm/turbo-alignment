@@ -1,5 +1,7 @@
 from enum import Enum
 
+from pydantic import field_validator
+
 from turbo_alignment.common.registry import Registrable
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.datasets.chat import ChatPromptTemplate
@@ -12,8 +14,8 @@ from turbo_alignment.settings.tf.tokenizer import TokenizerSettings
 
 
 class KLType(str, Enum):
-    SFT_MODEL: str = 'sft'
-    REFERENCE_MODEL: str = 'reference'
+    SFT_MODEL = 'sft'
+    REFERENCE_MODEL = 'reference'
 
 
 class MetricSettingsRegistry(Registrable):
@@ -26,12 +28,18 @@ class MetricSettings(ExtraFieldsNotAllowedBaseModel):
 
 @MetricSettingsRegistry.register(MetricType.DIST_N)
 class DistinctnessSettings(MetricSettings):
-    ...
+    ngram: int = 5
+
+    @field_validator('ngram', mode='before')
+    def check_ngram(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError('ngram should be greater that 0')
+        return value
 
 
 @MetricSettingsRegistry.register(MetricType.DIVERSITY)
 class DiversitySettings(MetricSettings):
-    ...
+    top_k: int | None = None
 
 
 @MetricSettingsRegistry.register(MetricType.LENGTH)
@@ -75,6 +83,12 @@ class RougeSettings(MetricSettings):
 @MetricSettingsRegistry.register(MetricType.SELF_BLEU)
 class SelfBleuSettings(MetricSettings):
     ngram: int = 3
+
+    @field_validator('ngram', mode='before')
+    def check_ngram(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError('ngram should be greater that 0')
+        return value
 
 
 @MetricSettingsRegistry.register(MetricType.TOOL_CALL_METRICS)
