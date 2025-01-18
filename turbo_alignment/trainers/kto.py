@@ -7,10 +7,13 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
+    BaseImageProcessor,
     DefaultFlowCallback,
+    FeatureExtractionMixin,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     PrinterCallback,
+    ProcessorMixin,
     ProgressCallback,
     TrainerCallback,
     TrainerControl,
@@ -53,7 +56,11 @@ class KTOTrainer(DPOTrainer):
         train_dataset: Dataset,
         eval_dataset: Dataset,
         ref_model: PreTrainedModel | nn.Module | None = None,
-        tokenizer: PreTrainedTokenizerBase | None = None,
+        processing_class: PreTrainedTokenizerBase
+        | BaseImageProcessor
+        | FeatureExtractionMixin
+        | ProcessorMixin
+        | None = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
@@ -72,7 +79,7 @@ class KTOTrainer(DPOTrainer):
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             callbacks=callbacks,
             **kwargs,
         )
@@ -87,7 +94,7 @@ class KTOTrainer(DPOTrainer):
         self.callback_handler = MetricsCallbackHandler(
             callbacks,
             model,
-            tokenizer,
+            processing_class,
             None,
             None,
             ref_model=self.ref_model,

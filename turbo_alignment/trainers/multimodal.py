@@ -284,7 +284,7 @@ class MultimodalTrainer(Trainer):
         for key, value in metrics.items():
             self._stored_metrics[train_eval][key].append(value)
 
-    def log(self, logs: Dict[str, float]) -> None:
+    def log(self, logs: dict[str, float], _start_time: float | None = None) -> None:
         train_eval = 'train' if 'loss' in logs else 'eval'
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = torch.tensor(metrics).mean().item()

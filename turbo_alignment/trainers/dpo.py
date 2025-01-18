@@ -7,10 +7,13 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
+    BaseImageProcessor,
     DefaultFlowCallback,
+    FeatureExtractionMixin,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     PrinterCallback,
+    ProcessorMixin,
     ProgressCallback,
     Trainer,
     TrainerCallback,
@@ -530,7 +533,11 @@ class DPOTrainer(Trainer):
         eval_dataset: Dataset,
         ref_model: PreTrainedModel | nn.Module | None = None,
         sft_model: PreTrainedModel | nn.Module | None = None,
-        tokenizer: PreTrainedTokenizerBase | None = None,
+        processing_class: PreTrainedTokenizerBase
+        | BaseImageProcessor
+        | FeatureExtractionMixin
+        | ProcessorMixin
+        | None = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
@@ -560,7 +567,7 @@ class DPOTrainer(Trainer):
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             callbacks=callbacks,
             **kwargs,
         )
@@ -586,7 +593,7 @@ class DPOTrainer(Trainer):
         self.callback_handler = MetricsCallbackHandler(
             callbacks,
             model,
-            tokenizer,
+            processing_class,
             None,
             None,
             ref_model=self.ref_model,
@@ -895,7 +902,7 @@ class DPOTrainer(Trainer):
         for key, value in metrics.items():
             self._stored_metrics[train_eval][key].append(value)
 
-    def log(self, logs: dict[str, float]) -> None:
+    def log(self, logs: dict[str, float], _start_time: float | None = None) -> None:
         train_eval = 'train' if 'loss' in logs else 'eval'
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = torch.tensor(metrics).cpu().mean().item()

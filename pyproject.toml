@@ -13,7 +13,7 @@ keywords = ["alignment", "llm", "dpo", "ppo", "rlhf"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-transformers = ">=4.45"
+transformers = "4.48"
 peft = "0.8.2"
 typer ="^0.9.0"
 wandb ="^0.15.3"
@@ -48,6 +48,7 @@ torchaudio = "^2.0.2"
 soundfile = "^0.12.1"
 albumentations = "^1.3.1"
 opencv-python = "^4.10.0.84"
+boto3 = "1.35.26"
 
 faiss-gpu = { version = "^1.7.2", optional = true }
 deepspeed = { version = "0.12", optional = true }

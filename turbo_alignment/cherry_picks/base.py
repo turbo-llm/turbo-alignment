@@ -47,7 +47,7 @@ class CherryPickCallbackBase(TrainerCallback, Generic[InferenceDatasetT]):
         _control: TrainerControl,
         **kwargs,
     ) -> list[list[MetricResults]]:
-        tokenizer: PreTrainedTokenizerBase = kwargs.pop('tokenizer', None)
+        tokenizer: PreTrainedTokenizerBase = kwargs.pop('processing_class', None)
         if tokenizer is None:
             raise ValueError('Tokenizer is None')
 

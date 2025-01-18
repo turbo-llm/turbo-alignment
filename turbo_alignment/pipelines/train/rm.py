@@ -77,7 +77,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
     ):
         return RMTrainer(
             model=model,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,

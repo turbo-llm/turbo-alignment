@@ -96,7 +96,7 @@ class TrainRAGStrategy(BaseTrainStrategy[RAGTrainExperimentSettings]):
             eval_dataset=val_dataset,
             callbacks=[],
             data_collator=data_collator,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
         )
         generator_parameters = model.rag.generator.parameters()
         question_encoder_parameters = model.rag.question_encoder.parameters()
