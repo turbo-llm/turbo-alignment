@@ -21,4 +21,9 @@ class DPOTrainExperimentSettings(BaseTrainExperimentSettings):
 
     @field_validator('training_arguments', mode='before')
     def create_training_arguments(cls, values: dict[str, Any]) -> DPOTrainingArguments:
-        return DPOTrainingArguments(**values, output_dir=TRAINER_LOGS_FOLDER, report_to=[])
+        return DPOTrainingArguments(
+            **values,
+            output_dir=TRAINER_LOGS_FOLDER,
+            report_to=[],
+            remove_unused_columns=False,
+        )
