@@ -4,10 +4,22 @@ import torch
 
 from turbo_alignment.dataset.chat.models import ChatDatasetRecord
 from turbo_alignment.generators.base import ChatGeneratorBase
+from turbo_alignment.modeling import parallel_states
+from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel, pad_and_slice
 from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
+
+import torch.distributed as dist
+from turbo_alignment.dist_utils.order import run_in_order
+
+
+def slice_tensor(tensor: torch.Tensor, world_size: int, rank: int, dim: int = -1) -> torch.Tensor:
+    dim_size = tensor.size(dim)
+    chunk_size = (dim_size + world_size - 1) // world_size  # round up
+    actual_size = min(chunk_size, dim_size - chunk_size * rank)
+    return tensor.narrow(dim, chunk_size * rank, actual_size)
 
 
 class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
@@ -34,6 +46,31 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         batched_input_ids = batch['input_ids'].to(self.device)
         batched_attention_mask = batch['attention_mask'].to(self.device)
+
+        if parallel_states.sequence_parallel_is_initialized():
+            batched_input_ids = pad_for_sequence_parallel(
+                batched_input_ids,
+                parallel_states.get_sequence_parallel_world_size(),
+                padding_side=self._tokenizer.padding_side,
+                padding_value=0,
+            )
+
+            batched_attention_mask = pad_for_sequence_parallel(
+                batched_attention_mask,
+                parallel_states.get_sequence_parallel_world_size(),
+                padding_side=self._tokenizer.padding_side,
+                padding_value=0,
+            )
+
+            seq_len = batched_input_ids.size(1)
+            chunk_size = seq_len / parallel_states.get_sequence_parallel_world_size()
+            rank = parallel_states.get_sequence_parallel_rank()
+            batched_input_ids = batched_input_ids[:, rank * chunk_size : (rank + 1) * chunk_size]
+
+            run_in_order()(print)(f'{dist.get_rank()=} {batched_input_ids.tolist()=}')
+
+        else:
+            print('WHAT')
 
         output_indices = self._model.generate(
             inputs=batched_input_ids,
@@ -80,8 +117,31 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         input_ids = torch.unsqueeze(record['input_ids'], 0).to(self.device)
         attention_mask = torch.unsqueeze(record['attention_mask'], 0).to(self.device)
 
+        actual_input_ids = input_ids
+
+        if parallel_states.sequence_parallel_is_initialized():
+            run_in_order()(print)(f'Before {dist.get_rank()=} {input_ids.tolist()=}')
+            actual_input_ids = slice_tensor(
+                input_ids,
+                parallel_states.get_sequence_parallel_world_size(),
+                parallel_states.get_sequence_parallel_rank(),
+                dim=-1,
+            )
+
+            # attention_mask = pad_for_sequence_parallel(
+            #     attention_mask,
+            #     parallel_states.get_sequence_parallel_world_size(),
+            #     padding_side='left',
+            #     padding_value=0,
+            # )
+
+            run_in_order()(print)(f'After {dist.get_rank()=} {input_ids.tolist()=}')
+
+        else:
+            print('WHAT')
+
         output_indices = self._model.generate(
-            inputs=input_ids,
+            inputs=actual_input_ids,
             attention_mask=attention_mask,
             generation_config=self._transformers_generator_parameters,
             tokenizer=self._tokenizer,
@@ -102,7 +162,33 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         if self._return_logits:
             with torch.no_grad():
-                logits = self._model(output_indices).logits.cpu()
+                actual_output_indices = output_indices
+                attention_mask = None
+                if parallel_states.sequence_parallel_is_enabled():
+                    attention_mask = torch.full_like(output_indices, fill_value=1)
+                    attention_mask = pad_for_sequence_parallel(
+                        attention_mask,
+                        parallel_states.get_sequence_parallel_world_size(),
+                        0,
+                        padding_side='left',
+                    )
+
+                    actual_output_indices = pad_and_slice(
+                        output_indices,
+                        parallel_states.get_sequence_parallel_world_size(),
+                        parallel_states.get_sequence_parallel_rank(),
+                        self._tokenizer.pad_token_id,
+                        padding_side='left',
+                    )
+
+                logits = self._model(actual_output_indices, attention_mask=attention_mask).logits.cpu()
+                ws = parallel_states.get_sequence_parallel_world_size_or_one()
+                assert logits.size(-2) == actual_output_indices.size(-1), (logits.size(), actual_output_indices.size())
+                if ws != 1:
+                    remainder = output_indices.size(1) % ws
+                    padding = 0 if remainder == 0 else (ws - remainder)
+                    if padding != 0:
+                        logits = logits[:, padding:]
 
             answer_tokens_ids = postprocessed_output_indices
             input_token_ids = input_ids
