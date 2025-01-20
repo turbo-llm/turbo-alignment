@@ -27,6 +27,19 @@ def pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, di
     return tensor
 
 
+def pad_and_slice(
+    tensor: torch.Tensor,
+    seq_parallel_world_size: int,
+    rank: int,
+    padding_value: tp.Any,
+    dim=-1,
+    padding_side='right',
+) -> torch.Tensor:
+    padded = pad_for_sequence_parallel(tensor, seq_parallel_world_size, padding_value, dim, padding_side)
+    chunk_size = padded.size(dim) // seq_parallel_world_size
+    return padded.narrow(dim, rank * chunk_size, chunk_size)
+
+
 DEFAULT_PAD_VALUES = {
     'attention_mask': False,
     'input_ids': 0,
