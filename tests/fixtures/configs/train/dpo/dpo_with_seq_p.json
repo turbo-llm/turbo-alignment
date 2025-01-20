@@ -70,7 +70,7 @@
                 {
                     "name": "chat_test",
                     "records_path": "tests/fixtures/datasets/chat/train_chat.jsonl",
-                    "num_samples": 2
+                    "sample_rate": 1
                 }
             ],
             "prompt_template": {

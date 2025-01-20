@@ -763,7 +763,9 @@ class DPOTrainer(TrainerWithSeqP):
             policy_chosen_logits,
             policy_rejected_logits,
             precomputed_margins,
-        ) = self.concatenated_forward(model, batch)  # pylit: disable=unbalanced-tuple-unpacking
+        ) = self.concatenated_forward(
+            model, batch
+        )  # pylit: disable=unbalanced-tuple-unpacking
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
