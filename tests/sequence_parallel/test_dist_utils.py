@@ -66,7 +66,7 @@ def do_test_all_gather_variable(n_ranks: int = 4, group_size: int = 2):
 
 @pytest.mark.skipif(
     not torch.cuda.is_available() or torch.cuda.device_count() < 4,
-    reason='at least four gpus required'
+    reason='at least four gpus required',
 )
 def test_all_gather_variable():
     return subprocess.check_call(create_run_preamble(4) + ['--mode', 'all_gather_variable'])
@@ -90,9 +90,7 @@ def do_test_gather_and_split(test_case):
     range(len(INPUTS)),
 )
 def test_gather_and_split(test_case: int):
-    subprocess.check_call(
-        create_run_preamble(2) + ['--mode', 'gather_and_split', '--test-case', str(test_case)]
-    )
+    subprocess.check_call(create_run_preamble(2) + ['--mode', 'gather_and_split', '--test-case', str(test_case)])
 
 
 CREATE_AND_BROADCAST_INPUTS = [
@@ -128,9 +126,7 @@ def do_test_create_and_broadcast(test_case: int):
     range(len(CREATE_AND_BROADCAST_INPUTS)),
 )
 def test_create_and_broadcast(test_case: int):
-    subprocess.check_call(
-        create_run_preamble(2) + ['--mode', 'create_and_broadcast', '--test-case', str(test_case)]
-    )
+    subprocess.check_call(create_run_preamble(2) + ['--mode', 'create_and_broadcast', '--test-case', str(test_case)])
 
 
 if __name__ == '__main__':

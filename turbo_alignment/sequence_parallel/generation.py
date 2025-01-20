@@ -103,7 +103,7 @@ class GenerationMixinWithSeqP(GenerationMixin):
         past_key_values = None
         cache_position = None
 
-        print(f'prepare {dist.get_rank()=} {input_ids=}')
+        # print(f'prepare {dist.get_rank()=} {input_ids=}')
         input_ids = gather_and_split(
             input_ids,
             group=parallel_states.get_sequence_parallel_group(),
@@ -118,7 +118,6 @@ class GenerationMixinWithSeqP(GenerationMixin):
                 padding_side='left',
             )
 
-        print(f'prepare II {dist.get_rank()=} {input_ids=}')
         # END OF THE PATCH
 
         # 1. Handle BC:

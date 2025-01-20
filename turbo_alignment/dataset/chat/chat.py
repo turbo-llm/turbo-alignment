@@ -375,6 +375,7 @@ class InferenceChatDataset(ChatDataset):
             tokenizer=self.tokenizer,
             read=False,
             seed=self.seed,
+            random_cut=self._random_cut,
         )
 
         dataset_records = [self[idx] for idx in range(len(self))]
