@@ -172,6 +172,8 @@ def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
 
         vanilla_model = vanilla_model.to(args.device)
 
+        run_in_order()(print)(f'{dist.get_rank()=} {parallel_states.get_data_parallel_rank()=}')
+
         trainer = Trainer(
             model=model,
             train_dataset=dataset,

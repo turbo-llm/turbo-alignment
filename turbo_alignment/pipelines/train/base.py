@@ -161,6 +161,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
 
             special_tokens_setter.setup_model_config(self.model)
 
+            set_random_seed(training_args.seed)
             train_dataset: ConcatDataset = ConcatDataset(
                 datasets=DatasetLoader().load_datasets(
                     experiment_settings.train_dataset_settings,
@@ -169,6 +170,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                 )
             )
 
+            set_random_seed(training_args.seed)
             val_dataset: ConcatDataset = ConcatDataset(
                 datasets=DatasetLoader().load_datasets(
                     experiment_settings.val_dataset_settings,
