@@ -19,3 +19,7 @@ def run_in_order(group: dist.ProcessGroup | None = None):
         return wrapped
 
     return inner
+
+
+def print_in_order(group: dist.ProcessGroup | None = None):
+    return run_in_order(group)(print)
