@@ -11,8 +11,12 @@ from turbo_alignment.generators.chat import ChatGenerator
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.registry import KLType
 from turbo_alignment.metrics.utils import get_logits
+from turbo_alignment.modeling import parallel_states
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults
+
+import torch.distributed as dist
+from turbo_alignment.dist_utils.order import print_in_order, run_in_order
 
 
 class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
@@ -54,11 +58,19 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
         batch_size = self._generator_transformers_settings.num_return_sequences
 
+        @run_in_order()
+        def print_dataset(prefix, dataset):
+            print(f'{prefix} {dist.get_rank()=} {dataset[0]=}')
+
+        print_dataset('Before sharding:', dataset)
+
         if accelerator is not None:
             dataset = self._get_sharded_dataset(
                 dataset=dataset,
                 accelerator=accelerator,
             )
+
+        print_dataset('After sharding:', dataset)
 
         generations = generator.generate_from_dataset(dataset)
 
@@ -121,6 +133,12 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
     @staticmethod
     def _get_sharded_dataset(dataset: InferenceChatDataset, accelerator: Accelerator) -> InferenceChatDataset:
         rank_device = accelerator.process_index
-        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
+        world_size = accelerator.num_processes
+        if parallel_states.sequence_parallel_is_enabled():
+            rank_device = parallel_states.get_data_parallel_rank()
+            world_size = parallel_states.get_data_parallel_world_size()
+
+        print_in_order(None)(f'{dist.get_rank()=} {rank_device=} {world_size=}')
+        slice_size = math.ceil(len(dataset) / world_size)
 
         return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)
