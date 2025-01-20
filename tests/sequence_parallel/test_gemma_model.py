@@ -165,6 +165,10 @@ def _test_dataloader(
 
         model = model.to(args.device)
 
+        vanilla_model = vanilla_model.to(args.device)
+
+        run_in_order()(print)(f'{dist.get_rank()=} {parallel_states.get_data_parallel_rank()=}')
+
         trainer = Trainer(
             model=model,
             train_dataset=dataset,

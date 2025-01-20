@@ -14,6 +14,9 @@ from turbo_alignment.modeling import parallel_states
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults
 
+import torch.distributed as dist
+from turbo_alignment.dist_utils.order import print_in_order, run_in_order
+
 
 class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
     def __init__(
@@ -54,11 +57,19 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
         batch_size = self._generator_transformers_settings.num_return_sequences
 
-        if accelerator is not None and not parallel_states.sequence_parallel_is_initialized():
+        @run_in_order()
+        def print_dataset(prefix, dataset):
+            print(f'{prefix} {dist.get_rank()=} {dataset[0]=}')
+
+        print_dataset('Before sharding:', dataset)
+
+        if accelerator is not None:
             dataset = self._get_sharded_dataset(
                 dataset=dataset,
                 accelerator=accelerator,
             )
+
+        print_dataset('After sharding:', dataset)
 
         generations = generator.generate_from_dataset(dataset)
 
@@ -126,6 +137,7 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
             rank_device = parallel_states.get_data_parallel_rank()
             world_size = parallel_states.get_data_parallel_world_size()
 
+        print_in_order(None)(f'{dist.get_rank()=} {rank_device=} {world_size=}')
         slice_size = math.ceil(len(dataset) / world_size)
 
         return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)

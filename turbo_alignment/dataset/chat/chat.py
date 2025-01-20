@@ -39,10 +39,12 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         tokenizer: PreTrainedTokenizerBase,
         seed: int,
         read: bool = True,
+        cut_seed: int = 42,
     ) -> None:
         super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
-        self.cut_generator = random.Random(self.seed)
+        self.cut_seed = cut_seed
+        self.cut_generator = random.Random(cut_seed)
 
         if read:
             self._read()
@@ -360,10 +362,11 @@ class InferenceChatDataset(ChatDataset):
         seed: int,
         read: bool = True,
         random_cut: bool = False,
+        cut_seed: int = 42,
     ) -> None:
         self._random_cut = random_cut
 
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer, read=read, seed=seed)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, read=read, cut_seed=cut_seed)
 
     def convert_records(self, records: list[ChatDatasetRecord]) -> list[dict[str, Any] | None]:
         return self._encode(records, inference=True, random_cut=self._random_cut)
@@ -376,6 +379,7 @@ class InferenceChatDataset(ChatDataset):
             read=False,
             seed=self.seed,
             random_cut=self._random_cut,
+            cut_seed=self.cut_seed,
         )
 
         dataset_records = [self[idx] for idx in range(len(self))]

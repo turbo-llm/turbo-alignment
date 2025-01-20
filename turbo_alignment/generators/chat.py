@@ -12,6 +12,16 @@ from turbo_alignment.settings.generators.outputs.chat import (
     ChatInferenceOutput,
 )
 
+import torch.distributed as dist
+from turbo_alignment.dist_utils.order import run_in_order
+
+
+def slice_tensor(tensor: torch.Tensor, world_size: int, rank: int, dim: int = -1) -> torch.Tensor:
+    dim_size = tensor.size(dim)
+    chunk_size = (dim_size + world_size - 1) // world_size  # round up
+    actual_size = min(chunk_size, dim_size - chunk_size * rank)
+    return tensor.narrow(dim, chunk_size * rank, actual_size)
+
 
 def slice_tensor(tensor: torch.Tensor, world_size: int, rank: int, dim: int = -1) -> torch.Tensor:
     dim_size = tensor.size(dim)
@@ -65,6 +75,11 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             rank = parallel_states.get_sequence_parallel_rank()
             batched_input_ids = batched_input_ids[:, rank * chunk_size : (rank + 1) * chunk_size]
 
+            run_in_order()(print)(f'{dist.get_rank()=} {batched_input_ids.tolist()=}')
+
+        else:
+            print('WHAT')
+
         output_indices = self._model.generate(
             inputs=batched_input_ids,
             attention_mask=batched_attention_mask,
@@ -113,12 +128,25 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         actual_input_ids = input_ids
 
         if parallel_states.sequence_parallel_is_initialized():
+            run_in_order()(print)(f'Before {dist.get_rank()=} {input_ids.tolist()=}')
             actual_input_ids = slice_tensor(
                 input_ids,
                 parallel_states.get_sequence_parallel_world_size(),
                 parallel_states.get_sequence_parallel_rank(),
                 dim=-1,
             )
+
+            # attention_mask = pad_for_sequence_parallel(
+            #     attention_mask,
+            #     parallel_states.get_sequence_parallel_world_size(),
+            #     padding_side='left',
+            #     padding_value=0,
+            # )
+
+            run_in_order()(print)(f'After {dist.get_rank()=} {input_ids.tolist()=}')
+
+        else:
+            print('WHAT')
 
         output_indices = self._model.generate(
             inputs=actual_input_ids,
@@ -161,22 +189,14 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
                         padding_side='left',
                     )
 
-                logits = self._model(actual_output_indices, attention_mask=attention_mask).logits
+                logits = self._model(actual_output_indices, attention_mask=attention_mask).logits.cpu()
                 ws = parallel_states.get_sequence_parallel_world_size_or_one()
                 assert logits.size(-2) == actual_output_indices.size(-1), (logits.size(), actual_output_indices.size())
                 if ws != 1:
                     remainder = output_indices.size(1) % ws
                     padding = 0 if remainder == 0 else (ws - remainder)
-                    if padding != 0 and parallel_states.get_sequence_parallel_rank() == 0:
+                    if padding != 0:
                         logits = logits[:, padding:]
-
-                if parallel_states.sequence_parallel_is_enabled():
-                    logits = torch.cat(
-                        all_gather_variable(logits, group=parallel_states.get_sequence_parallel_group()),
-                        dim=1,
-                    )
-
-                logits = logits.cpu()
 
             answer_tokens_ids = postprocessed_output_indices
             input_token_ids = input_ids

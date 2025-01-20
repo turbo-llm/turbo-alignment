@@ -165,15 +165,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             # self.model = self._load_model(experiment_settings, self.tokenizer)
             special_tokens_setter.setup_model_config(self.model)
 
-            # if experiment_settings.model_settings.sequence_parallel_degree > 1:
-            #     import turbo_alignment.modeling.parallel_states as parallel_states
-
-            #     parallel_states.initialize_model_parallel(
-            #         sequence_parallel_size=experiment_settings.model_settings.sequence_parallel_degree
-            #     )
-            #     assert parallel_states.sequence_parallel_is_initialized()
-            #     assert parallel_states.get_sequence_parallel_world_size() == experiment_settings.model_settings.sequence_parallel_degree
-
+            set_random_seed(training_args.seed)
             train_dataset: ConcatDataset = ConcatDataset(
                 datasets=DatasetLoader().load_datasets(
                     experiment_settings.train_dataset_settings,
@@ -182,6 +174,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                 )
             )
 
+            set_random_seed(training_args.seed)
             val_dataset: ConcatDataset = ConcatDataset(
                 datasets=DatasetLoader().load_datasets(
                     experiment_settings.val_dataset_settings,

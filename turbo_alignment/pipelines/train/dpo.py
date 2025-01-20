@@ -40,6 +40,8 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         if cherry_pick_settings is None:
             return None
 
+        from turbo_alignment.common import set_random_seed
+
         set_random_seed(experiment_settings.seed)
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
             cherry_pick_settings.dataset_settings,
@@ -47,6 +49,16 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             strategy=DatasetStrategy.INFERENCE,
             seed=experiment_settings.seed,
         )
+
+        import torch.distributed as dist
+        from turbo_alignment.dist_utils.order import run_in_order
+
+        @run_in_order()
+        def print_dataset(prefix, dataset):
+            print(f'{prefix} {dist.get_rank()=} {dataset[0]=}')
+
+        for d in cherry_pick_datasets:
+            print_dataset('After load:', d)
 
         metrics = [
             Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))
