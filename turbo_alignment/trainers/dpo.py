@@ -769,6 +769,9 @@ class DPOTrainer(TrainerWithSeqP):
         chosen_logps = all_logps[:chosen_idxs]
         rejected_logps = all_logps[chosen_idxs : chosen_idxs + rejected_idx]
 
+        chosen_logits = all_logits[:chosen_idxs]
+        rejected_logits = all_logits[chosen_idxs:]
+
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
 
     def _get_logps(self, model: nn.Module | None, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
