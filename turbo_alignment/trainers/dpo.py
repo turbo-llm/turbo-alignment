@@ -655,7 +655,7 @@ class DPOTrainer(TrainerWithSeqP):
 
         else:
             logits = logits[:, :-1, :]
-            labels = labels[:, 1:]
+            labels = labels[:, 1:].clone()
 
         if logits.shape[:-1] != labels.shape:
             raise ValueError('Logits (batch and sequence length dim) and labels must have the same shape.')
