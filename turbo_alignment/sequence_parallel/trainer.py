@@ -102,12 +102,9 @@ class TrainerWithSeqP(Trainer):
         self, batch_size=None, args=None, resume_from_checkpoint=None, trial=None, ignore_keys_for_eval=None
     ):
         self.accelerator.free_memory()
-        print(f'bs I {batch_size=} {self._train_batch_size=}')
         self._train_batch_size = batch_size
         if self.args.auto_find_batch_size:
-            print(f'bs II  {batch_size=} {self._train_batch_size=}')
             if self.state.train_batch_size != self._train_batch_size:
-                print(f'bs III  {batch_size=} {self._train_batch_size=}')
                 from accelerate.utils import release_memory
 
                 (self.model_wrapped,) = release_memory(self.model_wrapped)
@@ -115,7 +112,6 @@ class TrainerWithSeqP(Trainer):
 
                 # Check for DeepSpeed *after* the intial pass and modify the config
                 if self.is_deepspeed_enabled:
-                    print(f'bs IV  {batch_size=} {self._train_batch_size=}')
                     # Temporarily unset `self.args.train_batch_size`
                     original_bs = self.args.per_device_train_batch_size
                     self.args.per_device_train_batch_size = self._train_batch_size // max(1, self.args.n_gpu)
@@ -140,7 +136,6 @@ class TrainerWithSeqP(Trainer):
             * args.gradient_accumulation_steps
             * (args.world_size // parallel_states.get_sequence_parallel_world_size_or_one())
         )
-        print(f'bs V  {batch_size=} {self._train_batch_size=}')
         # END OF PATCH
 
         len_dataloader = None
@@ -489,7 +484,6 @@ class TrainerWithSeqP(Trainer):
 
                     with context():
                         start = time.time()
-                        print(f'{inputs=}')
                         tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
                         num_tokens = None
                         if num_items_in_batch is not None:
