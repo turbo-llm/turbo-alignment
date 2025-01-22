@@ -67,6 +67,7 @@ def compare(root_dir, attention_mask=None):
                         assert combined_weights.shape[0] == attention_mask.shape[0], (
                             combined_weights.shape[0],
                             attention_mask.shape[0],
+                            'shape mismatch',
                         )
 
                         for i in range(combined_weights.shape[0]):
