@@ -69,9 +69,6 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
             run_in_order()(print)(f'{dist.get_rank()=} {batched_input_ids.tolist()=}')
 
-        else:
-            print('WHAT')
-
         output_indices = self._model.generate(
             inputs=batched_input_ids,
             attention_mask=batched_attention_mask,
