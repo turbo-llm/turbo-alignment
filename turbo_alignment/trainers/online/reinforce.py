@@ -196,11 +196,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         self.gen_id = 1
 
-        # Take gradient accumulation into account
+        # TODO: Take gradient accumulation into account
         # In this way, the effective number of gradient
         # updates taken into account stays the same
-        effective_num_previous_samples = 1 / (1 - self.args.mean_baseline_coef)
-        self.args.mean_baseline_coef = 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
+        # effective_num_previous_samples = 1 / (1 - self.args.mean_baseline_coef)
+        # self.args.mean_baseline_coef = 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
 
         self.stop_generation_token_id = tokenizer.encode(args.stop_token, add_special_tokens=False)
         assert len(self.stop_generation_token_id) == 1, self.stop_generation_token_id
@@ -311,6 +311,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         if torch.distributed.get_rank() == 0:
             print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
+            print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
             print(f'Input Example at index [0]: {self.tokenizer.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
 
         if do_broadcast:
