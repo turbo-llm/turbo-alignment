@@ -483,12 +483,20 @@ class TrainerWithSeqP(Trainer):
 
                     with context():
                         start = time.time()
+                        print(f'{inputs=}')
                         tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+                        num_tokens = None
+                        if num_items_in_batch is not None:
+                            if isinstance(num_items_in_batch, torch.Tensor):
+                                num_items_in_batch = num_items_in_batch.item()
+
+                            num_tokens = num_items_in_batch
+
                         speed_metrics_ = speed_metrics(
                             'train',
                             start,
                             num_samples=len(inputs),
-                            num_tokens=num_items_in_batch.item() if num_items_in_batch is not None else None,
+                            num_tokens=num_tokens,
                         )
 
                     if (
@@ -697,5 +705,5 @@ class TrainerWithSeqP(Trainer):
             metrics = self._evaluate(trial, ignore_keys_for_eval)
 
         if self.control.should_save:
-            self._save_checkpoint(model, trial, metrics=metrics)
+            self._save_checkpoint(model, trial)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)

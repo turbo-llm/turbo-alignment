@@ -52,7 +52,7 @@
             "torch_dtype": "float32"
         },
         "model_kwargs": {
-            "attn_implementation": "eager_ulysses"
+            "attn_implementation": "eager"
         }
     },
     "cherry_pick_settings": {
