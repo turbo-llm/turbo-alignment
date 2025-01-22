@@ -39,6 +39,8 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
         **_kwargs,
     ) -> RmCherryPickCallback:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
+        if cherry_pick_settings is None:
+            return None
 
         cherry_pick_datasets = DatasetLoader[PairPreferenceDataset](PairPreferenceDataset).load_datasets(
             cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.TRAIN
@@ -77,7 +79,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
     ):
         return RMTrainer(
             model=model,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,

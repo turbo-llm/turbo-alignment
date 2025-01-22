@@ -3,10 +3,13 @@ from typing import Callable
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
+    BaseImageProcessor,
     DefaultFlowCallback,
+    FeatureExtractionMixin,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     PrinterCallback,
+    ProcessorMixin,
     ProgressCallback,
     Trainer,
     TrainerCallback,
@@ -26,7 +29,11 @@ class MultiGPUCherryPicksTrainer(Trainer):
         args: TrainingArguments,
         train_dataset: Dataset,
         eval_dataset: Dataset,
-        tokenizer: PreTrainedTokenizerBase | None = None,
+        processing_class: PreTrainedTokenizerBase
+        | BaseImageProcessor
+        | FeatureExtractionMixin
+        | ProcessorMixin
+        | None = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
@@ -39,7 +46,7 @@ class MultiGPUCherryPicksTrainer(Trainer):
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             callbacks=callbacks,
             **kwargs,
         )
@@ -49,7 +56,7 @@ class MultiGPUCherryPicksTrainer(Trainer):
         self.callback_handler = MetricsCallbackHandler(
             callbacks,
             model,
-            tokenizer,
+            processing_class,
             None,
             None,
             ref_model=ref_model,

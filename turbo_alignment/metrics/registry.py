@@ -1,4 +1,5 @@
 from enum import Enum
+
 from pydantic import field_validator
 
 from turbo_alignment.common.registry import Registrable
@@ -13,8 +14,8 @@ from turbo_alignment.settings.tf.tokenizer import TokenizerSettings
 
 
 class KLType(str, Enum):
-    SFT_MODEL: str = 'sft'
-    REFERENCE_MODEL: str = 'reference'
+    SFT_MODEL = 'sft'
+    REFERENCE_MODEL = 'reference'
 
 
 class MetricSettingsRegistry(Registrable):

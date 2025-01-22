@@ -1,3 +1,4 @@
+import importlib
 import os
 import random
 
@@ -15,3 +16,14 @@ def set_random_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+
+
+def is_package_available(pkg_name, metadata_name=None):
+    package_exists = importlib.util.find_spec(pkg_name) is not None
+    if package_exists:
+        try:
+            _ = importlib.metadata.metadata(pkg_name if metadata_name is None else metadata_name)
+            return True
+        except importlib.metadata.PackageNotFoundError:
+            return False
+    return False

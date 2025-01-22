@@ -44,6 +44,7 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                     dtype='bfloat16',
                     tensor_parallel_size=model_inference_settings.tensor_parallel_size,
                     enable_lora=enable_lora,
+                    gpu_memory_utilization=0.95,
                 )
 
             else:

@@ -25,6 +25,8 @@ class DPOLossesType(str, Enum):
     APO_ZERO = 'apo_zero'
     APO_DOWN = 'apo_down'
     ASFT = 'asft'
+    DPOP = 'dpop'
+    NCA_PAIR = 'nca_pair'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -87,6 +89,15 @@ class APODownLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.APO_DOWN]
 
 
+class DPOPLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.DPOP]
+    lam: float = 0.1
+
+
+class NCAPairLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.NCA_PAIR]
+
+
 class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
     sync_ref_model: bool = False
     alpha: float = 1.0
@@ -107,6 +118,8 @@ class DPOTrainerSettings(TrainerSettings):
         | SigmoidLossWithMarginSettings
         | APOZeroLossSettings
         | APODownLossSettings
+        | DPOPLossSettings
+        | NCAPairLossSettings
     )
     sync_ref_settings: SyncRefModelSettings
     use_ref_model: bool = True
@@ -118,6 +131,6 @@ class DPOTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: PairPreferenceMultiDatasetSettings
     val_dataset_settings: PairPreferenceMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
-
     trainer_settings: DPOTrainerSettings
+
+    cherry_pick_settings: ChatCherryPickSettings | None = None

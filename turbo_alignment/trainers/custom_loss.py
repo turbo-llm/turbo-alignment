@@ -4,9 +4,12 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 from transformers import (
+    BaseImageProcessor,
     DataCollator,
+    FeatureExtractionMixin,
     PreTrainedModel,
     PreTrainedTokenizerBase,
+    ProcessorMixin,
     TrainerCallback,
     TrainingArguments,
 )
@@ -23,7 +26,11 @@ class CustomLossTrainer(MultiGPUCherryPicksTrainer):
         eval_dataset: Dataset,
         custom_loss: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         data_collator: DataCollator,
-        tokenizer: PreTrainedTokenizerBase | None = None,
+        processing_class: PreTrainedTokenizerBase
+        | BaseImageProcessor
+        | FeatureExtractionMixin
+        | ProcessorMixin
+        | None = None,
         callbacks: list[TrainerCallback] | None = None,
         model_init: Callable[[], PreTrainedModel] | None = None,
         **kwargs,
@@ -35,13 +42,19 @@ class CustomLossTrainer(MultiGPUCherryPicksTrainer):
             data_collator=data_collator,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             model_init=model_init,
             callbacks=callbacks,
             **kwargs,
         )
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        return_outputs=False,
+        num_items_in_batch=None,  # pylint: disable=unused-argument
+    ):
         """
         Modified original version, without manual label smoothing
         """

@@ -18,6 +18,6 @@ class DDPOTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: DDPOMultiDatasetSettings
     val_dataset_settings: DDPOMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
-
     rm_tokenizer_settings: TokenizerSettings
+
+    cherry_pick_settings: ChatCherryPickSettings | None = None

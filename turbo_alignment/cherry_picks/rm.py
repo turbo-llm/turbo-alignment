@@ -1,3 +1,4 @@
+import math
 from typing import Iterable
 
 from accelerate import Accelerator
@@ -36,6 +37,12 @@ class RmCherryPickCallback(CherryPickCallbackBase[PairPreferenceDataset]):
             accelerator=accelerator,
         )
 
+        if accelerator is not None:
+            dataset = self._get_sharded_dataset(
+                dataset=dataset,
+                accelerator=accelerator,
+            )
+
         generations = generator.generate_from_dataset(dataset)
         generations_w = [gen.reward_w for gen in generations]
         generations_l = [gen.reward_l for gen in generations]
@@ -70,3 +77,10 @@ class RmCherryPickCallback(CherryPickCallbackBase[PairPreferenceDataset]):
         ]
 
         return metric_outputs
+
+    @staticmethod
+    def _get_sharded_dataset(dataset: PairPreferenceDataset, accelerator: Accelerator) -> PairPreferenceDataset:
+        rank_device = accelerator.process_index
+        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
+
+        return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)

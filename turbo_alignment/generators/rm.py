@@ -106,15 +106,14 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
 
             max_input_length = max(len(sample) for sample in input_ids_batch)
 
-            records_batch = self._tokenizer.pad(
-                {
-                    'input_ids': input_ids_batch,
-                    'attention_mask': attn_mask_batch,
-                },
-                padding='max_length',
-                max_length=max_input_length,
-                return_tensors='pt',
-            ).to(self.device)
+        reward_index = 0
+        record_rewards = []
+        for record in records:
+            mapped_rewards = {}
+            for key in record['answers'].keys():
+                mapped_rewards[key] = rewards[reward_index].item()
+                reward_index += 1
+            record_rewards.append(mapped_rewards)
 
             rewards.extend(self.generate_from_batch_records(records_batch).tolist())
 

@@ -14,6 +14,8 @@ from turbo_alignment.settings.metric import ElementWiseScores, MetricResults
 
 
 class MultimodalCherryPickCallback(CherryPickCallbackBase[InferenceMultimodalDataset]):
+    # pylint: disable=abstract-method
+    # TODO: add _get_sharded_dataset method
     def __init__(
         self,
         cherry_pick_settings: MultimodalCherryPickSettings,

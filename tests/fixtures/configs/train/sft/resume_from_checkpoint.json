@@ -44,6 +44,7 @@
     "model_settings": {
         "model_path": "tests/fixtures/models/llama2_tiny",
         "model_type": "causal",
+        "resize_token_embeddings": true,
         "transformers_settings": {},
         "adapter_path": "tests/fixtures/checkpoints/llama2_tiny_debug_checkpoint",
         "is_trainable": true

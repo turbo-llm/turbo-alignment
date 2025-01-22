@@ -104,7 +104,7 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             callbacks=[],
-            data_collator=data_collator,
+            processing_class=data_collator,
             tokenizer=tokenizer,
             **extra_args,
         )
