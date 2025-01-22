@@ -11,6 +11,7 @@ from turbo_alignment.dataset.classification.classification import (
 )
 from turbo_alignment.generators.classification import ClassificationGenerator
 from turbo_alignment.metrics.metric import Metric
+from turbo_alignment.modeling import parallel_states
 from turbo_alignment.settings.cherry_pick import ClassificationCherryPickSettings
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults
 
@@ -84,6 +85,11 @@ class ClassificationCherryPickCallback(CherryPickCallbackBase[InferenceClassific
         dataset: InferenceClassificationDataset, accelerator: Accelerator
     ) -> InferenceClassificationDataset:
         rank_device = accelerator.process_index
-        slice_size = math.ceil(len(dataset) / accelerator.num_processes)
+        world_size = accelerator.num_processes
+        if parallel_states.sequence_parallel_is_enabled():
+            rank_device = parallel_states.get_data_parallel_rank()
+            world_size = parallel_states.get_data_parallel_world_size()
+
+        slice_size = math.ceil(len(dataset) / world_size)
 
         return dataset.get_slice(rank_device * slice_size, rank_device * slice_size + slice_size)
