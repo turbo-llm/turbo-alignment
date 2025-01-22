@@ -8,12 +8,12 @@ import pytest
 import torch
 import torch.distributed
 from transformers import AutoTokenizer, GenerationConfig, Trainer
+from transformers.models.gemma2 import Gemma2ForCausalLM
 from transformers.data.data_collator import default_data_collator
 from turbo_alignment.dist_utils.gather_and_split import all_gather_variable
 from turbo_alignment.dist_utils.order import run_in_order
 from turbo_alignment.modeling import parallel_states
-from turbo_alignment.modeling.gemma import Gemma2ForCausalLM, Gemma2ForCausalLMWithMPU
-from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
+from turbo_alignment.modeling.gemma import Gemma2ForCausalLMWithMPU
 from turbo_alignment.sequence_parallel.collator import (
     DataCollatorForSequenceParallism,
     pad_for_sequence_parallel,
@@ -43,8 +43,6 @@ def gemma_model(model_path: str = MODEL_PATH):
     if not os.path.isdir(model_path):
         raise ValueError(f'Model path {model_path} is not a directory')
 
-    patch_gemma_attn_dict()
-
     dist.init_distributed()
 
     parallel_states.initialize_model_parallel(sequence_parallel_size=2)
@@ -60,7 +58,7 @@ def gemma_model(model_path: str = MODEL_PATH):
 
     model = Gemma2ForCausalLMWithMPU.from_pretrained(
         model_path,
-        attn_implementation="eager_ulysses",
+        attn_implementation="eager",
         torch_dtype=torch.float32,
     ).to(current_device)
 
@@ -141,12 +139,10 @@ def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
     ]
     dataset = SimpleDataset([tokenizer(text) for text in texts])
 
-    patch_gemma_attn_dict()
-
     with patch_acclerator(), tempfile.TemporaryDirectory() as temp_dir:
         model = Gemma2ForCausalLMWithMPU.from_pretrained(
             model_path,
-            attn_implementation="flash_attention_2_ulysses",
+            attn_implementation="flash_attention_2",
             torch_dtype=torch.bfloat16,
         )
 
