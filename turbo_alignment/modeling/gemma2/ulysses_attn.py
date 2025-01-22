@@ -3,9 +3,9 @@
 from typing import Optional, Tuple, TYPE_CHECKING
 
 import torch
+import torch.distributed as dist
 from torch import nn
 from deepspeed.sequence.layer import DistributedAttention
-import torch.distributed as dist
 from transformers.cache_utils import Cache
 from transformers.models.gemma2.modeling_gemma2 import (
     Gemma2Config,
