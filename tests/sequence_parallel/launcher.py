@@ -46,7 +46,7 @@ def launch_with_name(
         if cmd_args:
             args.extend(cmd_args)
 
-        print(f'Run cmd: {args}')
+        print(f'Run cmd: {" ".join(args)}')
         subprocess.check_call(
             args,
             stdout=sys.stdout,

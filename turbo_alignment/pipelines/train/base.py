@@ -19,7 +19,6 @@ from turbo_alignment.common.tf.loaders.model import load_model
 from turbo_alignment.common.tf.loaders.tokenizer import load_tokenizer
 from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.dataset.loader import DatasetLoader
-from turbo_alignment.modeling.gemma2.patch import patch_gemma_attn_dict
 from turbo_alignment.modeling.parallel_states import (
     get_sequence_parallel_rank,
     get_sequence_parallel_world_size,
@@ -141,7 +140,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             )
 
     def run(self, experiment_settings: ExperimentSettingsT) -> None:
-        patch_gemma_attn_dict()
         set_random_seed(experiment_settings.seed)
 
         with patch_acclerator():
