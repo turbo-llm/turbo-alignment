@@ -15,9 +15,6 @@ from turbo_alignment.modeling import parallel_states
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.metric import ElementWiseScores, MetricResults
 
-import torch.distributed as dist
-from turbo_alignment.dist_utils.order import run_in_order
-
 
 class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
     def __init__(
@@ -58,20 +55,11 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
 
         batch_size = self._generator_transformers_settings.num_return_sequences
 
-        @run_in_order()
-        def print_dataset(prefix, dataset):
-            if dist.is_initialized():
-                print(f'{prefix} {dist.get_rank()=} {dataset[0]=}')
-
-        print_dataset('Before sharding:', dataset)
-
-        if accelerator is not None:
+        if accelerator is not None and not parallel_states.sequence_parallel_is_initialized():
             dataset = self._get_sharded_dataset(
                 dataset=dataset,
                 accelerator=accelerator,
             )
-
-        print_dataset('After sharding:', dataset)
 
         generations = generator.generate_from_dataset(dataset)
 
@@ -112,22 +100,6 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
                 ]
             ),
         ]
-
-        @run_in_order()
-        def f():
-            def universal_len(x):
-                if isinstance(x, list):
-                    return len(x)
-
-                return x.size()
-
-            print(
-                f'{dist.get_rank()=} {universal_len(logits)=} {universal_len(answer_tokens_ids)=} '
-                f'{universal_len(input_tokens_ids)=}'
-            )
-
-        if dist.is_initialized():
-            f()
 
         for metric in self._metrics:
             metric_results = metric.compute(
