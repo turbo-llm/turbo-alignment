@@ -51,7 +51,8 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
 
         @run_in_order()
         def print_dataset(prefix, dataset):
-            print(f'{prefix} {dist.get_rank()=} {dataset[0]=}')
+            if dist.is_initialized():
+                print(f'{prefix} {dist.get_rank()=} {dataset[0]=}')
 
         for d in cherry_pick_datasets:
             print_dataset('After load:', d)
