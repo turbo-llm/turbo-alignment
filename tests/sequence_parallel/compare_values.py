@@ -93,7 +93,7 @@ def compare(root_dir, attention_mask=None):
                             )
 
             except AssertionError as e:
-                print(e.args[0])
+                print('ERROR', e, *e.args)
                 failed.append(param_name)
             else:
                 print('Check done!')
