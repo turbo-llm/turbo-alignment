@@ -12,8 +12,7 @@ from transformers.modeling_outputs import (
 )
 from transformers.models.gemma2.modeling_gemma2 import (
     apply_rotary_pos_emb,
-    repeat_kv,
-    # eager_attention_forward,
+    eager_attention_forward,
     logger,
     ALL_ATTENTION_FUNCTIONS,
     Cache,
@@ -33,43 +32,6 @@ from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
 from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
 from turbo_alignment.modeling.gemma2.ulysses_attn import _SeqAllToAll
-
-
-def eager_attention_forward(
-    module: nn.Module,
-    query: torch.Tensor,
-    key: torch.Tensor,
-    value: torch.Tensor,
-    attention_mask: Optional[torch.Tensor],
-    dropout: float = 0.0,
-    scaling: Optional[float] = None,
-    softcap: Optional[float] = None,
-    **kwargs,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    if scaling is None:
-        scaling = module.head_dim**-0.5
-
-    # key_states = repeat_kv(key, module.num_key_value_groups)
-    # value_states = repeat_kv(value, module.num_key_value_groups)
-    key_states = key
-    value_states = value
-
-    attn_weights = torch.matmul(query, key_states.transpose(2, 3)) * scaling
-
-    if softcap is not None:
-        attn_weights = attn_weights / softcap
-        attn_weights = torch.tanh(attn_weights)
-        attn_weights = attn_weights * softcap
-    if attention_mask is not None:  # no matter the length, we just slice it
-        causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
-        attn_weights = attn_weights + causal_mask
-
-    # upcast attention to fp32
-    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query.dtype)
-    attn_weights = nn.functional.dropout(attn_weights, p=dropout, training=module.training)
-    attn_output = torch.matmul(attn_weights, value_states)
-    attn_output = attn_output.transpose(1, 2).contiguous()
-    return attn_output, attn_weights
 
 
 class Gemma2Attention(nn.Module):
@@ -150,10 +112,6 @@ class Gemma2Attention(nn.Module):
                 )
             else:
                 attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
-        else:
-            key_states = repeat_kv(key_states, self.num_key_value_groups)
-            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         # print(f'{dist.get_rank()=} before {query_states.size()=} {hidden_states.size()=} {key_states.size()=}')
         query_states = _SeqAllToAll().apply(spg, query_states, scatter_idx, gather_idx)
@@ -288,7 +246,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         )
         return causal_mask
 
-    def forward(
+    def forward(  # pylint: disable=arguments-differ
         self,
         input_ids: torch.LongTensor = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -300,7 +258,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:  # pylint: disable=arguments-differ
+    ) -> Union[Tuple, BaseModelOutputWithPast]:
         if position_ids is None:
             if attention_mask is not None:
                 position_ids = attention_mask.long().cumsum(-1) - 1
@@ -446,17 +404,3 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, Gemma2ForCausalLM):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-    @classmethod
-    def _autoset_attn_implementation(
-        cls, config, use_flash_attention_2=False, torch_dtype=None, device_map=None, check_device_map=True
-    ):
-        old = config._attn_implementation
-        if old.endswith('_ulysses'):
-            config._attn_implementation = old[: -len('_ulysses')]
-
-        res = super()._autoset_attn_implementation(
-            config, use_flash_attention_2, torch_dtype, device_map, check_device_map
-        )
-        res._attn_implementation = old
-        return res
