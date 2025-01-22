@@ -84,7 +84,8 @@
             },
             "dataset_type": "chat",
             "max_tokens_count": 150,
-            "only_answer_loss": true
+            "only_answer_loss": true,
+            "random_cut": true
         },
         "metric_settings": [
             {
