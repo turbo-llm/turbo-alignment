@@ -1,4 +1,4 @@
-# pylint: skip-file
+# pylint: disable=line-too-long,superfluous-parens,abstract-method,raise-missing-from,no-else-raise,protected-access,unnecessary-pass,unbalanced-tuple-unpacking,unexpected-keyword-arg,attribute-defined-outside-init
 # flake8: noqa
 
 import copy
@@ -8,6 +8,7 @@ import os
 import warnings
 from typing import Optional, Union
 
+import torch
 from transformers.modeling_utils import (
     CONFIG_NAME,
     FLAX_WEIGHTS_NAME,
@@ -812,7 +813,7 @@ class PreTrainedModelWithMPU(PreTrainedModel):
             else:
                 logger.info(f"loading weights file {filename} from cache at {resolved_archive_file}")
         elif gguf_file:
-            from .modeling_gguf_pytorch_utils import load_gguf_checkpoint
+            from transformers.modeling_gguf_pytorch_utils import load_gguf_checkpoint
 
             # Case 1: the GGUF file is present locally
             if os.path.isfile(gguf_file):
@@ -1066,7 +1067,7 @@ class PreTrainedModelWithMPU(PreTrainedModel):
             else:
                 # Load from our TensorFlow 2.0 checkpoints
                 try:
-                    from .modeling_tf_pytorch_utils import (
+                    from transformers.modeling_tf_pytorch_utils import (
                         load_tf2_checkpoint_in_pytorch_model,
                     )
 
@@ -1082,7 +1083,7 @@ class PreTrainedModelWithMPU(PreTrainedModel):
                     raise
         elif from_flax:
             try:
-                from .modeling_flax_pytorch_utils import (
+                from transformers.modeling_flax_pytorch_utils import (
                     load_flax_checkpoint_in_pytorch_model,
                 )
 
