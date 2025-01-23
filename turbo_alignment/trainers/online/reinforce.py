@@ -111,7 +111,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self,
         vllm_engines: list,
         args: REINFORCETrainingArguments,
-        tokenizer: PreTrainedTokenizerBase,
+        processing_class: PreTrainedTokenizerBase,
         policy: PreTrainedModel | torch.nn.Module,
         reward_model: PreTrainedModel | torch.nn.Module,
         train_dataset: Dataset,
@@ -126,7 +126,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             args=args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
+            processing_class=processing_class,
             callbacks=callbacks,
             **kwargs,
         )
@@ -202,7 +202,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         # effective_num_previous_samples = 1 / (1 - self.args.mean_baseline_coef)
         # self.args.mean_baseline_coef = 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
 
-        self.stop_generation_token_id = tokenizer.encode(args.stop_token, add_special_tokens=False)
+        self.stop_generation_token_id = processing_class.encode(args.stop_token, add_special_tokens=False)
         assert len(self.stop_generation_token_id) == 1, self.stop_generation_token_id
         
         #TODO separate stop_strings and eos_token
@@ -265,13 +265,13 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             case CriticType.LOCAL_TRANSFORMERS:
                 generator = RMSamplingGenerator(
                     model=reward_model,
-                    tokenizer=self.tokenizer,
+                    tokenizer=self.processing_class,
                     accelerator=self.accelerator,
                 )
             case CriticType.RAY_TRANSFORMERS:
                 generator = RayRMSamplingGenerator(
                     model=reward_model,
-                    tokenizer=self.tokenizer,
+                    tokenizer=self.processing_class,
                     model_replicas=self.args.reward_model_replicas,
                 )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
@@ -286,7 +286,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             case ActorType.LOCAL_TRANSFORMERS:
                 generator = ChatGenerator(
                     model=model,
-                    tokenizer=self.tokenizer,
+                    tokenizer=self.processing_class,
                     transformers_settings=self.generator_transformers_settings,
                     custom_generation_settings=self.generator_custom_settings,
                     accelerator=self.accelerator,
@@ -294,7 +294,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             case ActorType.DISTRIBUTED_VLLM:
                 generator = vLLMChatGenerator(
                     vllm_engines=self.vllm_engines,
-                    tokenizer=self.tokenizer,
+                    tokenizer=self.processing_class,
                     transformers_settings=self.generator_transformers_settings,
                     custom_generation_settings=self.generator_custom_settings,
                 )
@@ -312,7 +312,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
             print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
-            print(f'Input Example at index [0]: {self.tokenizer.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
+            print(f'Input Example at index [0]: {self.processing_class.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
 
         if do_broadcast:
             # TODO: move to generator

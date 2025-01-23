@@ -166,7 +166,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         return REINFORCETrainer(
             vllm_engines=vllm_engines,
             args=training_args,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             policy=model,
             ref_model=ref_model,
             train_dataset=train_dataset,
