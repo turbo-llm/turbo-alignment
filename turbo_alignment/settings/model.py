@@ -16,17 +16,10 @@ class ModelType(str, Enum):
 
 
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
-<<<<<<< HEAD
-    use_rope: bool = True
-    use_cross_entropy: bool = False
-    use_fused_linear_cross_entropy: bool = False
-    use_mlp: bool = True
-=======
     use_rope: bool = False
     use_cross_entropy: bool = False
     use_fused_linear_cross_entropy: bool = False
     use_mlp: bool = False
->>>>>>> origin/main
     use_rms_norm: bool = False
 
     @model_validator(mode='after')
