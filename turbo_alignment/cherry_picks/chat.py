@@ -21,13 +21,11 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         cherry_pick_settings: ChatCherryPickSettings,
         datasets: Iterable[InferenceChatDataset],
         metrics: list[Metric],
-        tokenizer: PreTrainedTokenizerBase,
     ) -> None:
         super().__init__(
             cherry_pick_settings=cherry_pick_settings,
             datasets=datasets,
             metrics=metrics,
-            tokenizer=tokenizer,
         )
         self._custom_generation_settings = cherry_pick_settings.custom_generation_settings
         self._generator_transformers_settings = cherry_pick_settings.generator_transformers_settings
