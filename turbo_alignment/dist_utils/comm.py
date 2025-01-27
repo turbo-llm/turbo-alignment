@@ -1,8 +1,6 @@
 import torch
 import torch.distributed as dist
 
-dist.broadcast
-
 
 def create_and_broadcast(
     tensor: torch.Tensor,
