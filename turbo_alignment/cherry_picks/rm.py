@@ -19,13 +19,11 @@ class RmCherryPickCallback(CherryPickCallbackBase[PairPreferenceDataset]):
         cherry_pick_settings: RMCherryPickSettings,
         datasets: Iterable[PairPreferenceDataset],
         metrics: list[Metric],
-        tokenizer: PreTrainedTokenizerBase,
     ) -> None:
         super().__init__(
             cherry_pick_settings=cherry_pick_settings,
             datasets=datasets,
             metrics=metrics,
-            tokenizer=tokenizer,
         )
 
     def _get_dataset_metrics(
