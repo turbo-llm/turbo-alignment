@@ -15,9 +15,4 @@ def set_prctl():
 if __name__ == '__main__':
     set_prctl()
     os.register_at_fork(after_in_child=set_prctl)
-    import torch
-
-    torch.autograd.set_detect_anomaly(True)
     app()
-
-# app()
