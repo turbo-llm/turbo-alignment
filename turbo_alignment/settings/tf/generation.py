@@ -11,3 +11,7 @@ class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     top_k: int = 50
     temperature: float = 1.0
     stop_strings: str | list[str] = '</s>'
+    num_beam_groups: int = None
+    diversity_penalty: float = 0.0
+    
+
