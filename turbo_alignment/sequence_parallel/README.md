@@ -5,7 +5,12 @@ See also the DeepSpeed team's [blogpost](https://www.deepspeed.ai/tutorials/ds-s
 
 ## Using
 Just set `sequence_parallel` in trainer settings and choose an adapted model.
-Currently, only Gemma2 is supported, adpated version has name `gemma_with_ulysses`. An example of the settings file can be found in [tests](../../tests/fixtures/configs/train/dpo/dpo_with_seq_p.json).
+Currently, we support the following models:
+* Gemma2, adpated version has name `gemma_with_ulysses`;
+* Qwen2, adpated version has name `qwen_with_ulysses`.
+
+
+An example of the settings file can be found in [tests](../../tests/fixtures/configs/train/dpo/dpo_with_seq_p.json).
 
 
 ## Implementation

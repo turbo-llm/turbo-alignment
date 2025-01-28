@@ -21,7 +21,7 @@ from turbo_alignment.sequence_parallel.collator import (
 from turbo_alignment.sequence_parallel.patch_accelerate import patch_acclerator
 from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 
-from tests.sequence_parallel.consts import DEEPSPEED_CONFIG, MODEL_PATH
+from tests.sequence_parallel.consts import DEEPSPEED_CONFIG, GEMMA_MODEL_PATH
 from tests.sequence_parallel.dataset import SimpleDataset
 from tests.sequence_parallel.launcher import app, launch_with_name
 from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
@@ -35,7 +35,7 @@ def create_printer(name: str) -> Callable[[str], str]:
 
 
 @app.command(name='gemma-model')
-def gemma_model(model_path: str = MODEL_PATH):
+def gemma_model(model_path: str = GEMMA_MODEL_PATH):
     if not os.path.exists(model_path):
         pytest.skip(f'directory {model_path} not found')
         return
@@ -132,7 +132,7 @@ GENERATION_CONFIGS = [
 
 
 @app.command(name='test-generation')
-def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
+def _test_genaration(test_case: int = 0, model_path: str = GEMMA_MODEL_PATH):
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     texts = [
         'Мама мыла раму',
@@ -207,7 +207,7 @@ def _test_genaration(test_case: int = 0, model_path: str = MODEL_PATH):
     list(range(len(GENERATION_CONFIGS))),
 )
 def test_generation(test_case):
-    cmd_args = ['--test-case', str(test_case), '--model-path', MODEL_PATH]
+    cmd_args = ['--test-case', str(test_case), '--model-path', GEMMA_MODEL_PATH]
     return launch_with_name(__file__, 'test-generation', 2, cmd_args=cmd_args)
 
 
