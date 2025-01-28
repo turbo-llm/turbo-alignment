@@ -38,12 +38,19 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 if isinstance(model_inference_settings.model_settings, PreTrainedAdaptersModelSettings):
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
                     enable_lora = True
+                
+                # if model_inference_settings.model_settings.speculative_model_path is not None:
+                print(f'Путь до спекулятивы {model_inference_settings.model_settings.speculative_model_path}')
 
                 model = vllm.LLM(
                     model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
+                    speculative_model=model_inference_settings.model_settings.speculative_model_path.absolute().as_posix(),
+                    num_speculative_tokens=model_inference_settings.model_settings.num_speculative_tokens,
                     dtype='bfloat16',
                     tensor_parallel_size=model_inference_settings.tensor_parallel_size,
                     enable_lora=enable_lora,
+                    use_v2_block_manager=True,
+                    speculative_draft_tensor_parallel_size=1
                 )
 
             else:

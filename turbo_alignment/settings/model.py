@@ -37,6 +37,11 @@ class PreTrainedModelSettings(ExtraFieldsNotAllowedBaseModel):
     model_path: Path
     model_type: ModelType
 
+    speculative_model_path: Path
+    speculative_model_type: ModelType
+
+    num_speculative_tokens:int = 5
+
     model_kwargs: dict = {}
 
     transformers_settings: ModelTransformersSettings
