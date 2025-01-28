@@ -78,6 +78,8 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
                     id=str(a.index),
                     content=a.text,
                     sequence_score=a.cumulative_logprob,
+                    token_ids=a.token_ids,
+                    logprobs=[[{token_id: {'logprob': logprob.logprob, 'rank': logprob.rank, 'decoded_token': logprob.decoded_token}} for token_id, logprob in logprobs.items()] for logprobs in a.logprobs]
                 )
                 if self._return_logits:
                     ans_msg.input_token_ids = torch.tensor(request_output.prompt_token_ids).unsqueeze(0)
