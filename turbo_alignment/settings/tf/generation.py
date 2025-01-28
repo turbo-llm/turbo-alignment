@@ -3,6 +3,8 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     num_beams: int = 1
+    num_beam_groups: int = 1
+    diversity_penalty: float = 0.0
     max_new_tokens: int = 15
     repetition_penalty: float = 1.0
     num_return_sequences: int = 1
