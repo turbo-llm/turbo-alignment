@@ -13,6 +13,7 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
     answer_token_ids: torch.Tensor | None = None
     logits: torch.Tensor | None = None
     logprobs: list = None
+    token_ids: list = None
 
     class Config:
         arbitrary_types_allowed = True
