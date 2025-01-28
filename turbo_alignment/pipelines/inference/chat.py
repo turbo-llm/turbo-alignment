@@ -39,9 +39,6 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
                     enable_lora = True
                 
-                # if model_inference_settings.model_settings.speculative_model_path is not None:
-                print(f'Путь до спекулятивы {model_inference_settings.model_settings.speculative_model_path}')
-
                 model = vllm.LLM(
                     model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
                     speculative_model=model_inference_settings.model_settings.speculative_model_path.absolute().as_posix(),
