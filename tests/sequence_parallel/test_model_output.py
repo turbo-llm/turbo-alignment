@@ -8,11 +8,11 @@ import numpy as np
 import pytest
 
 from tests.constants import FIXTURES_PATH
-from tests.sequence_parallel.consts import MODEL_PATH
+from tests.sequence_parallel.consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH
 from tests.sequence_parallel.utils import read_first_line
 from tests.sequence_parallel.compare_gradients import compare as compare_gradients
 from tests.sequence_parallel.compare_values import compare as compare_values
-from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus
+from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus, has_qwen_model
 
 DPO_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'dpo' / 'dpo_with_seq_p.json'
 SFT_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'base_with_seq_p.json'
@@ -21,9 +21,15 @@ SFT_PEFT_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'peft_wit
 DIR = pathlib.Path(__file__).parent
 
 
-def patch_settings(settings: dict[str, Any], checkpoint_dir: pathlib.Path, model_path: str) -> dict[str, Any]:
+def patch_settings(
+    settings: dict[str, Any],
+    checkpoint_dir: pathlib.Path,
+    model_path: str,
+    model_type: str,
+) -> dict[str, Any]:
     settings = settings.copy()
     settings['model_settings']['model_path'] = model_path
+    settings['model_settings']['model_type'] = model_type
     settings['log_path'] = str(checkpoint_dir.absolute())
     return settings
 
@@ -37,9 +43,31 @@ def patch_settings(settings: dict[str, Any], checkpoint_dir: pathlib.Path, model
     ],
 )
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
-@pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
-def test_model_output(task_type: str, settings_path: pathlib.Path, tmp_path_factory: pytest.TempPathFactory):
-    env = os.environ
+@pytest.mark.parametrize(
+    'model_path,model_type',
+    [
+        pytest.param(
+            GEMMA_MODEL_PATH,
+            'gemma_with_ulysses',
+            id='gemma',
+            marks=pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found'),
+        ),
+        pytest.param(
+            QWEN_MODEL_PATH,
+            'qwen_with_ulysses',
+            id='qwen',
+            marks=pytest.mark.skipif(not has_qwen_model(), reason='Qwen model not found'),
+        ),
+    ],
+)
+def test_model_output(
+    task_type: str,
+    settings_path: pathlib.Path,
+    model_path: str,
+    model_type: str,
+    tmp_path_factory: pytest.TempPathFactory,
+):
+    env = os.environ.copy()
 
     script_path = str((DIR / 'test_dpo.py').absolute())
 
@@ -52,7 +80,7 @@ def test_model_output(task_type: str, settings_path: pathlib.Path, tmp_path_fact
     with settings_path.open('r', encoding='utf-8') as input_:
         settings = json.load(input_)
 
-    new_settings = patch_settings(settings, checkpoint_dir, MODEL_PATH)
+    new_settings = patch_settings(settings, checkpoint_dir, model_path, model_type)
 
     with new_settings_path.open('w', encoding='utf-8') as output:
         json.dump(new_settings, output, indent=4, ensure_ascii=False)
@@ -77,9 +105,9 @@ def test_model_output(task_type: str, settings_path: pathlib.Path, tmp_path_fact
     ]
 
     print('Run with ulessys')
-    subprocess.check_call(common_cmd_line + ['--num_gpus', '2'] + script_args)
+    subprocess.check_call(common_cmd_line + ['--num_gpus', '2'] + script_args, env=env)
     print('Run vanilla')
-    subprocess.check_call(common_cmd_line + ['--num_gpus', '1'] + script_args + ['--make-model-vanilla'])
+    subprocess.check_call(common_cmd_line + ['--num_gpus', '1'] + script_args + ['--make-model-vanilla'], env=env)
 
     attention_mask_shape_file = forward_dir / 'attention_mask.shape'
     attention_mask = None
