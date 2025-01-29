@@ -105,12 +105,12 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
         return list(embeddings_initialization_strategy.keys()) if embeddings_initialization_strategy else []
 
     def _add_trainer_callbacks(self, experiment_settings: ExperimentSettingsT, **kwargs) -> None:
-        if self.trainer.accelerator.is_main_process:
-            self.trainer.add_callback(
-                LoggingRegistry.by_name(experiment_settings.logging_settings.__name__).get_logging_callback(
-                    experiment_settings=experiment_settings
-                )
-            )
+        # if self.trainer.accelerator.is_main_process:
+        #     self.trainer.add_callback(
+        #         LoggingRegistry.by_name(experiment_settings.logging_settings.__name__).get_logging_callback(
+        #             experiment_settings=experiment_settings
+        #         )
+        #     )
 
         cherry_pick_callback = self._get_cherry_pick_callback(experiment_settings, self.tokenizer, **kwargs)
 

@@ -112,7 +112,7 @@ def create_vllm_engines(
     return vllm_engines
 
 
-if __name__ == "__main__":
-    llm = LLMRayActor.remote("meta-llama/Llama-2-7b-chat-hf", tensor_parallel_size=4)
-    output = ray.get(llm.generate.remote("San Franciso is a"))
-    print(f"output: {output}")
+# if __name__ == "__main__":
+#     llm = LLMRayActor.remote("meta-llama/Llama-2-7b-chat-hf", tensor_parallel_size=4)
+#     output = ray.get(llm.generate.remote("San Franciso is a"))
+#     print(f"output: {output}")

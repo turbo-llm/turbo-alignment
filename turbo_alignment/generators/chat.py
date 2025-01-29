@@ -74,6 +74,8 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         import logging
         #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
         input_ids = records['input_ids'].tolist()
+
+        print('👀👀👀 VLLM INPUT RECORDS, ', input_ids)
         
         rank = torch.distributed.get_rank()
         llm = self.vllm_engines[rank % len(self.vllm_engines)]
@@ -85,7 +87,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         
         if torch.distributed.get_rank() == 0:
             end = time.time()
-            logging.info(f'Generation elapsed time:{end - start}')
+            # logging.info(f'Generation elapsed time:{end - start}')
             time_profiler.completions_time.append(end - start)
         
         outputs = []

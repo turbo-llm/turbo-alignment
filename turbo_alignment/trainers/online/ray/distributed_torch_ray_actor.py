@@ -33,7 +33,7 @@ class DistributedTorchRayActor:
     @staticmethod
     def _get_current_node_ip():
         address = ray._private.services.get_node_ip_address()
-        print(f'dist ray actor DEBUG: {address=}', flush=True)
+        # print(f'dist ray actor DEBUG: {address=}', flush=True)
         # strip ipv6 address
         return address.strip("[]")
 

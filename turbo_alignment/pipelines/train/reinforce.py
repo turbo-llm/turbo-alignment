@@ -102,25 +102,8 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         experiment_settings: REINFORCETrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> ChatCherryPickCallback:
-        cherry_pick_settings = experiment_settings.cherry_pick_settings
-
-        cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
-            cherry_pick_settings.dataset_settings,
-            tokenizer=tokenizer,
-            strategy=DatasetStrategy.INFERENCE,
-        )
-
-        metrics = [
-            Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))
-            for metric in cherry_pick_settings.metric_settings
-        ]
-
-        return ChatCherryPickCallback(
-            cherry_pick_settings=cherry_pick_settings,
-            datasets=cherry_pick_datasets,
-            metrics=metrics,
-        )
+    ) -> None:
+        return None
 
     @staticmethod
     def _get_training_args(
@@ -171,7 +154,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             ref_model=ref_model,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            data_collator=data_collator,
+            # data_collator=data_collator,
             reward_model=reward_model,
             callbacks=[],
         )
@@ -207,7 +190,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None: #reference_model
         training_args = self._get_training_args(experiment_settings)
 
-        print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
+        # print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
         import torch
         torch.cuda.memory._record_memory_history()
         self.tokenizer = self._load_tokenizer(experiment_settings)
@@ -271,7 +254,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)
 
-        self._add_trainer_callbacks(experiment_settings)
+        # self._add_trainer_callbacks(experiment_settings)
 
         os.makedirs(self.trainer.args.output_dir, exist_ok=True)
         self._save_experiment_config(

@@ -1,7 +1,7 @@
 from abc import ABC
 
 import torch
-from allenai_common import Registrable
+from turbo_alignment.common.registry import Registrable
 
 from turbo_alignment.common.distributed import get_global_mean, get_log_mean_std
 from turbo_alignment.settings.online import RewardProcessorType
@@ -41,6 +41,31 @@ class RewardProcessor(ABC, Registrable):
             self.mean_reward = (
                 self.mean_baseline_coef * self.mean_reward + (1 - self.mean_baseline_coef) * global_mean_reward
             )
+
+
+@RewardProcessor.register(RewardProcessorType.REINFORCE)
+class REINFORCERewardProcessor(RewardProcessor):
+    def baseline_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        return rewards, {}
+
+    def postprocess_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        rewards = rewards[:, 0].unsqueeze(-1)  # values are at 1
+
+        with torch.no_grad():
+            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward')
+
+        return rewards, metrics
+
+
+@RewardProcessor.register(RewardProcessorType.REINFORCE_WITH_BASELINE)
+class REINFORCEWithBaselineRewardProcessor(RewardProcessor):
+    def postprocess_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        rewards = rewards[:, 0].unsqueeze(-1)  # values are at 1
+
+        with torch.no_grad():
+            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward')
+
+        return rewards, metrics
 
 
 @RewardProcessor.register(RewardProcessorType.RLOO)

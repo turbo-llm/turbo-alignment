@@ -106,7 +106,7 @@ class RayGroup:
     
     def reward_forward(self, records: dict[str, torch.Tensor], index: int):
         assert index < len(self._actor_handlers), f'Reward model replicas: {len(self._actor_handlers)}, provided index: {index}'
-
+        # print(' REWARDS FORWARD INPUT RECORDS, ', records)
         return self._actor_handlers[index].forward.remote(records)
     
     def async_forward(self, records: dict[str, torch.Tensor]):

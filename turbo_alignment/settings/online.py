@@ -24,3 +24,5 @@ class CriticType(str, Enum):
 
 class RewardProcessorType(str, Enum):
     RLOO = 'rloo'
+    REINFORCE = 'reinforce'
+    REINFORCE_WITH_BASELINE = 'reinforce_baseline'

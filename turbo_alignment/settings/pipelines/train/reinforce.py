@@ -47,8 +47,6 @@ class REINFORCETrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: ChatMultiDatasetSettings
     val_dataset_settings: ChatMultiDatasetSettings
 
-    cherry_pick_settings: ChatCherryPickSettings
-
     reward_model_settings: PreTrainedModelSettings | PreTrainedAdaptersModelSettings
 
     trainer_settings: REINFORCETrainerSettings

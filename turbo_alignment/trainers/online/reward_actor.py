@@ -18,8 +18,8 @@ class RewardModel(DistributedTorchRayActor):
         self.model.config.pad_token_id = self.model.config.eos_token_id
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        print(f"Reward model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
-        print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
+        # print(f"Reward model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
+        # print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
 
     def tokenize(self, text: str):
         return self.tokenizer(text, return_tensors='pt')

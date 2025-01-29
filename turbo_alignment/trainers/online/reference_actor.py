@@ -5,6 +5,14 @@ import torch
 import torch.nn.functional as F
 import gc
 
+
+def sum_all_parameter_values(model):
+    # if isinstance(model, deepspeed.DeepSpeedEngine):
+        # model = model.module
+    total_sum = sum(p.sum().item() for p in model.parameters())
+    return total_sum
+
+
 @ray.remote(num_gpus=1)
 class ReferenceModel(DistributedTorchRayActor):
     def __init__(self, world_size, rank, local_rank, master_addr, master_port):
@@ -16,8 +24,9 @@ class ReferenceModel(DistributedTorchRayActor):
         self._setup_distributed()
         self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16, attn_implementation='flash_attention_2') #attn_implementation='flash_attention_2'
         self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
-        print(f"Reference model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
-        print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
+        print('IN REFERENCE NODE REF MODEL WEIGHT , ', sum_all_parameter_values(self.model))
+        # print(f"Reference model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
+        # print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
 
     def tokenize(self, text: str):
         return self.tokenizer(text, return_tensors='pt')
@@ -32,32 +41,35 @@ class ReferenceModel(DistributedTorchRayActor):
     @torch.no_grad
     def forward(self, x):
         self.model.eval()
+        print('IN REFERENCE NODE REF MODEL WEIGHT HERE IM FORWARD HERE, ', sum_all_parameter_values(self.model))
         x = {k: v.cuda() for k, v in x.items()}
         return self.model(**x)
     
     @torch.no_grad
-    def reference_forward(self, x, temperature, loss_mask):
+    def reference_forward(self, x):
         torch.cuda.empty_cache()
         self.model.eval()
         x = {k: v.cuda() for k, v in x.items()}
 
-        print(f"{x.keys()}")
-        logits = self.model(**x).logits[:, :-1]
+        # print(f"{x.keys()}")
+        logits = self.model(**x).logits
 
-        logits /= temperature
+        return logits
 
-        '''
-        Memory Efficient implementation of log_softmax using in_place operation
-        equivalent to:
-        logits = F.log_softmax(logits, dim=-1)
-        '''
-        torch.exp(logits, out=logits)
-        summed = torch.sum(logits, dim=-1, keepdim=True)
-        logits /= summed
-        torch.log(logits, out=logits)
+        # logits /= temperature
 
-        logprob = torch.gather(logits, 2, x['input_ids'][:, 1:].unsqueeze(-1)).squeeze(-1)
-        logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
-        out = logprob.sum(-1)
+        # '''
+        # Memory Efficient implementation of log_softmax using in_place operation
+        # equivalent to:
+        # logits = F.log_softmax(logits, dim=-1)
+        # '''
+        # torch.exp(logits, out=logits)
+        # summed = torch.sum(logits, dim=-1, keepdim=True)
+        # logits /= summed
+        # torch.log(logits, out=logits)
 
-        return out
+        # logprob = torch.gather(logits, 2, x['input_ids'][:, 1:].unsqueeze(-1)).squeeze(-1)
+        # logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
+        # out = logprob.sum(-1)
+
+        # return out
