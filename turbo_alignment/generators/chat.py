@@ -75,14 +75,14 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
         input_ids = records['input_ids'].tolist()
 
-        print('👀👀👀 VLLM INPUT RECORDS, ', input_ids)
+        # print('👀👀👀 VLLM INPUT RECORDS, ', input_ids)
         
         rank = torch.distributed.get_rank()
         llm = self.vllm_engines[rank % len(self.vllm_engines)]
 
         if torch.distributed.get_rank() == 0:
             start = time.time()
-        
+
         request_outputs = ray.get(llm.generate.remote(sampling_params=self._sampling_params, prompt_token_ids=input_ids, lora_request=self._lora_request))
         
         if torch.distributed.get_rank() == 0:

@@ -20,6 +20,24 @@ from torch.distributed.distributed_c10d import (
     rendezvous,
 )
 
+def stateless_init_process_group(master_address, master_port, rank, world_size,
+                                 device):
+    """
+    vLLM provides `StatelessProcessGroup` to create a process group
+    without considering the global process group in torch.distributed.
+    It is recommended to create `StatelessProcessGroup`, and then initialize
+    the data-plane communication (NCCL) between external (train processes) 
+    and vLLM workers.
+    """
+    from vllm.distributed.device_communicators.pynccl import PyNcclCommunicator
+    from vllm.distributed.utils import StatelessProcessGroup
+    pg = StatelessProcessGroup.create(host=master_address,
+                                      port=master_port,
+                                      rank=rank,
+                                      world_size=world_size)
+    pynccl = PyNcclCommunicator(pg, device=device)
+    return pynccl
+
 
 # Copy from pytorch to allow creating multiple main groups.
 # https://github.com/pytorch/pytorch/blob/main/torch/distributed/distributed_c10d.py
@@ -81,6 +99,8 @@ def init_process_group(
 
 
 class WorkerWrap(Worker):
+
+
     def init_process_group(self, master_address, master_port, rank_offset, world_size, group_name, backend="nccl"):
         """Init torch process group for model weights update"""
         assert torch.distributed.is_initialized(), f"default torch process group must be initialized"
@@ -94,10 +114,10 @@ class WorkerWrap(Worker):
             rank=rank,
             group_name=group_name,
         )
-        # print(
-        #     f"init_process_group: master_address={master_address}, master_port={master_port}, ",
-        #     f"rank={rank}, world_size={world_size}, group_name={group_name}",
-        # )
+        print(
+            f"init_process_group: master_address={master_address}, master_port={master_port}, ",
+            f"rank={rank}, world_size={world_size}, group_name={group_name}",
+        )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):
         """Broadcast weight to all vllm workers from source rank 0 (actor model)"""
@@ -111,6 +131,33 @@ class WorkerWrap(Worker):
         self.model_runner.model.load_weights(weights=[(name, weight)])
 
         del weight
+        # TODO: should we empty cache if all weights have updated?
+        # if empty_cache:
+        #     torch.cuda.empty_cache()
+    
+
+    # def init_weight_update_group(self, master_address, master_port,
+    #                              rank_offset, world_size):
+    #     from vllm.distributed.parallel_state import get_world_group
+    #     rank = get_world_group().rank + rank_offset
+    #     self.model_update_group = stateless_init_process_group(
+    #         master_address,
+    #         master_port,
+    #         rank,
+    #         world_size,
+    #         self.device,
+    #     )
+
+
+    # def update_weight(self, name, dtype, shape):
+    #     weight = torch.empty(shape, dtype=dtype, device="cuda")
+    #     self.model_update_group.broadcast(weight,
+    #                                       src=0,
+    #                                       stream=torch.cuda.current_stream())
+
+    #     self.model_runner.model.load_weights(weights=[(name, weight)])
+
+    #     del weight
         # TODO: should we empty cache if all weights have updated?
         # if empty_cache:
         #     torch.cuda.empty_cache()

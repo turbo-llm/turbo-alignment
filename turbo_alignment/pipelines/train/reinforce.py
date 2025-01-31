@@ -154,7 +154,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             ref_model=ref_model,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            # data_collator=data_collator,
+            data_collator=data_collator,
             reward_model=reward_model,
             callbacks=[],
         )
@@ -254,7 +254,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)
 
-        # self._add_trainer_callbacks(experiment_settings)
+        self._add_trainer_callbacks(experiment_settings)
 
         os.makedirs(self.trainer.args.output_dir, exist_ok=True)
         self._save_experiment_config(

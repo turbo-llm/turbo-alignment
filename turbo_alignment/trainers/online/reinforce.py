@@ -1,5 +1,7 @@
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
+import itertools
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
@@ -46,6 +48,62 @@ from deepspeed.runtime.engine import DeepSpeedEngine
 import gc
 import time
 import logging
+
+def get_all_parameters(sub_module, recurse=False):
+    return itertools.chain(sub_module.named_parameters(recurse=recurse), sub_module.ds_external_parameters())
+
+def iter_params(module, recurse=False):
+    return [param for _, param in get_all_parameters(module, recurse)]
+
+def remove_hooks(model: "DeepSpeedEngine") -> None:
+    """Removes the optimizer hooks from a DeepSpeed ZeRO-3 model."""
+    if model.optimizer is not None and hasattr(model.optimizer, "parameter_offload"):
+        optimizer_offload = model.optimizer.parameter_offload
+    elif model.optimizer is not None:
+        optimizer_offload = model.optimizer
+
+    for param in iter_params(optimizer_offload.module, recurse=True):
+        param.ds_active_sub_modules.clear()
+
+    for hook in optimizer_offload.forward_hooks:
+        hook.remove()
+    for hook in optimizer_offload.backward_hooks:
+        hook.remove()
+
+    optimizer_offload.forward_hooks = []
+    optimizer_offload.backward_hooks = []
+
+def add_hooks(model: "DeepSpeedEngine") -> None:
+    """Adds the optimizer hooks from a DeepSpeed ZeRO-3 model."""
+    if model.optimizer is not None and hasattr(model.optimizer, "parameter_offload"):
+        optimizer_offload = model.optimizer.parameter_offload
+    elif model.optimizer is not None:
+        optimizer_offload = model.optimizer
+    optimizer_offload._register_hooks_recursively(optimizer_offload.module)
+
+@contextmanager
+def unwrap_model_for_generation(
+    model,
+    accelerator,
+    is_peft_model: bool = False,
+    gather_deepspeed3_params: bool = True,
+):
+    """Context manager to unwrap a model for generation.
+    For ZeRO-3 models, we gather the weights once to speed up generation.
+    """
+    unwrapped_model = accelerator.unwrap_model(model)
+    if is_peft_model:
+        unwrapped_model.pretrained_model.disable_adapter()
+    if accelerator.state.deepspeed_plugin is not None and accelerator.state.deepspeed_plugin.zero_stage == 3:
+        if not gather_deepspeed3_params:
+            yield accelerator.unwrap_model(model)
+        else:
+            with deepspeed.zero.GatheredParameters(model.parameters()):
+                remove_hooks(model)
+                yield accelerator.unwrap_model(model)
+                add_hooks(model)
+    else:
+        yield unwrapped_model
 
 def sum_all_parameter_values(model):
     if isinstance(model, deepspeed.DeepSpeedEngine):
@@ -174,7 +232,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     world_size,
                     "rloo",
                     backend=backend,
-                )
+                )                
                 for i, engine in enumerate(self.vllm_engines)
             ]
             self._model_update_group = _init_process_group(
@@ -185,21 +243,45 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 group_name="rloo",
             )
 
+
+            # print('BEFORE HANDLESS!!!!')
+
+            # self.handles = [
+            #     engine.collective_rpc.remote("init_weight_update_group",
+            #     args=(master_address, master_port, i, world_size)) # fixme with tp
+            #     for i, engine in enumerate(self.vllm_engines)
+            # ]
+
+            # print('AFTER HANDLESS!!!!')
+
+
+            # from turbo_alignment.trainers.online.ray.vllm_worker_wrap import stateless_init_process_group
+            # self._model_update_group = stateless_init_process_group(
+            #     master_address=master_address,
+            #     master_port=master_port,
+            #     world_size=world_size,
+            #     rank=0,
+            #     device=torch.cuda.current_device(),
+            # )
+
+            # print('AFTER MODEL UPDATE GROUP!!!!'*15)
+
             ray.get(refs)
 
         torch.distributed.barrier()
 
+        print('AFTER barriesr ⛔️'*15)
+
         self.ref_model = ref_model
 
-        print('REF MODEL WEIGHTS SUM, ', sum_all_parameter_values(self.ref_model))
-
+        # print('REF MODEL WEIGHTS SUM, ', sum_all_parameter_values(self.ref_model))
 
         # TODO: TODO_RLOO watch later
         if self.ref_model is not None:
             self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
 
 
-        print('REF MODEL WEIGHTS SUM AFTER DEEPSPEED, ', sum_all_parameter_values(self.ref_model))
+        # print('REF MODEL WEIGHTS SUM AFTER DEEPSPEED, ', sum_all_parameter_values(self.ref_model))
         
         disable_dropout_in_model(self.model)
         disable_dropout_in_model(self.ref_model)
@@ -250,15 +332,17 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
-        # logging.info(f'Statictis calculation elapsed time:{time.time() - start}')
+        logging.info(f'Statictis calculation elapsed time:{time.time() - start}')
     
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
         # avoid OOM
         torch.cuda.empty_cache()
 
-        print('POLICY MODEL WEIGHTS SUM WHEN BROADCAST, ', sum_all_parameter_values(model))
+        print('BROADCAST, ', sum_all_parameter_values(model))
+        
+        model = model.module #
 
-        model = model.module
+        count, num_params = 0, len(list(model.named_parameters()))
 
 
         count, num_params = 0, len(list(model.named_parameters()))
@@ -279,6 +363,30 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 if torch.distributed.get_rank() == 0:
                     torch.distributed.broadcast(param.data, 0, group=self._model_update_group)
                     ray.get(refs)
+
+
+        # for name, param in model.named_parameters():
+            # count += 1  # empty_cache at last param
+
+            # Fire all vllm engines for broadcast
+            # if torch.distributed.get_rank() == 0: #maybe fixme
+                # shape = param.shape if self.args.deepspeed_plugin.zero_stage != 3 else param.ds_shape FIXME WHEN STAGE3 WORKS!!!
+            # refs = [
+            #     engine.collective_rpc.remote('update_weight', args=(name, param.dtype, param.shape))
+            #     for engine in self.vllm_engines
+            # ]
+
+            # self._model_update_group.broadcast(param, src=0, stream=torch.cuda.current_stream())
+
+            # ray.get(refs)
+
+
+            # FIXME 
+            # For ZeRO-3, allgather sharded parameter and broadcast to all vllm engines by rank 0
+            # with deepspeed.zero.GatheredParameters([param], enabled=False): # self.accelerator.deepspeed_plugin.zero_stage == 3 FIXME WHEN STAGE3 WORKS!!!
+            #     if torch.distributed.get_rank() == 0:
+            #         torch.distributed.broadcast(param.data, 0, group=self._model_update_group)
+            #         ray.get(refs)
     
     # FIXME: some base class instead of RMSamplingGenerator (join with ChatGeneratorBase?)
     def _get_rm_generator(self, reward_model: torch.nn.Module | PreTrainedModel) -> RMSamplingGenerator:
@@ -330,10 +438,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         do_broadcast=True
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
-        # if torch.distributed.get_rank() == 0:
-        #     print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
-        #     print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
-        #     print(f'Input Example at index [0]: {self.processing_class.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
+        if torch.distributed.get_rank() == 0:
+            print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
+            print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
+            print(f'Input Example at index [0]: {self.processing_class.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
 
         if do_broadcast:
             # TODO: move to generator
@@ -349,7 +457,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 end = time.time()
                 self.time_profiler.broadcast_time.append(end - start)
-                # logging.info(f'broadcast elapsed time:{end - start}')
+                logging.info(f'broadcast elapsed time:{end - start}')
 
 
         generator = self._get_chat_generator()
@@ -363,9 +471,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         response_ids = [torch.cat([g.input_token_ids, ans.answer_token_ids], dim=1) for g in generations for ans in g.answers]
         response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
 
-        # if torch.distributed.get_rank() == 0:
-        #     print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
-        #     print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
+        if torch.distributed.get_rank() == 0:
+            print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
+            print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
 
         # Padding
         max_length = max([response_id.size(1) for response_id in response_ids])
@@ -391,7 +499,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         rm_inputs = {
             'input_ids': response_ids,
             'attention_mask': response_attention_mask,
-            'position_ids': position_ids,
+            # 'position_ids': position_ids,
         }
         
         if torch.distributed.get_rank() == 0:
@@ -403,7 +511,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.reward_model_time.append(end - start)
-            # logging.info(f'Rewards elapsed time:{end - start}')
+            logging.info(f'Rewards elapsed time:{end - start}')
         
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
@@ -414,7 +522,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         train_eval: Literal['train', 'eval'] = 'train',
     ):
         
-        print(' INPUTS!!!!', inputs)
+        # print(' INPUTS!!!!', inputs)
 
         with torch.no_grad():
             (
@@ -450,7 +558,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     attention_mask=attention_mask.cuda(),
                     #position_ids=records['position_ids'],
                     #use_cache=False,
-                ).logits
+                ).logits[:, :-1]
 
             ref_logprobs = self.get_logprobs(
                 logits=ref_logits,
@@ -465,14 +573,16 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 end = time.time()
                 self.time_profiler.reference_model_time.append(end - start)
-                # logging.info(f'Reference logprobs elapsed time:{end - start}')
+                logging.info(f'Reference logprobs elapsed time:{end - start}')
             
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
         
+        # print('WHAT IS QUERY_RESPONSE, ', query_response)
+
         logits = model(
             input_ids=query_response.cuda(),
             attention_mask=attention_mask.cuda(),
-        ).logits
+        ).logits[:, :-1]
         
         del inputs
         gc.collect()
@@ -492,10 +602,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.policy_model_time.append(end - start)
-            # logging.info(f'Policy logrobs elapsed time:{end - start}')
+            logging.info(f'Policy logrobs elapsed time:{end - start}')
 
         with torch.no_grad():
             kl_term = logprobs.detach() - ref_logprobs
+            # kl_term = torch.zeros_like(ref_logprobs) + 3
             regularized_rewards = rewards - self.kl_coef * kl_term
 
             baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(rewards=regularized_rewards)
@@ -545,15 +656,17 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     metrics[k] = metrics[k].cpu()
         return loss.mean(), metrics
     
-    # def print_readable_stats(self):
-    #     if torch.distributed.get_rank() == 0:
-    #         print(f"Allocated: {torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB")
-    #         print(f"Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB")
+    def print_readable_stats(self):
+        if torch.distributed.get_rank() == 0:
+            print(f"Allocated: {torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB")
+            print(f"Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB")
 
     def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
         
         if torch.distributed.get_rank() == 0:
             start = time.time()
+
+        print('COMPUTE LOSS BROADCAST, ', sum_all_parameter_values(model))
         
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
@@ -562,8 +675,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.total_time.append(end - start)
-            # logging.info(f'Total elapsed time:{end - start}')
-            # self.time_profiler.print()
+            logging.info(f'Total elapsed time:{end - start}')
+            self.time_profiler.print()
         
         gc.collect()
         torch.cuda.empty_cache()
@@ -626,7 +739,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     ):
         # logits /= self.args.temperature
 
-        all_logprob = F.log_softmax(logits[:, :-1], dim=-1).cuda()
+        all_logprob = F.log_softmax(logits, dim=-1).cuda()
 
         logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].cuda().unsqueeze(-1)).squeeze(
             -1
@@ -644,11 +757,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         # return logprob.sum(-1)
 
     def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.args.non_eos_penalty:
-            invalid_mask = query_response[:, -1] != self.stop_generation_token_id[0]
-            rewards[invalid_mask] = self.args.penalty_reward_value
+        # if self.args.non_eos_penalty:
+        #     invalid_mask = query_response[:, -1] != self.stop_generation_token_id[0]
+        #     rewards[invalid_mask] = self.args.penalty_reward_value
 
-            return rewards, ~invalid_mask
+        #     return rewards, ~invalid_mask
 
         return rewards, torch.ones_like(rewards).to(torch.bool)
 
@@ -660,9 +773,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         rewards, reward_metrics = self.reward_processor.postprocess_rewards(rewards=rewards)
         rewards = rewards.squeeze(-1)
-        # reward_metrics['normalizing_reward_mean'] = self.norm_reward_mean
-        # reward_metrics['normalizing_reward_std'] = self.norm_reward_std
-        # rewards = (rewards - self.norm_reward_mean) / self.norm_reward_std
+        reward_metrics['normalizing_reward_mean'] = self.norm_reward_mean
+        reward_metrics['normalizing_reward_std'] = self.norm_reward_std
+        rewards = (rewards - self.norm_reward_mean) / self.norm_reward_std
         # boundness is required: https://arxiv.org/pdf/2406.01462
         rewards = torch.clamp(rewards, self.args.clip_rewards_min, self.args.clip_rewards_max)
 

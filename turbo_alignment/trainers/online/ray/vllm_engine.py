@@ -27,18 +27,25 @@ class LLMRayActor:
 
             if vllm.__version__ > "0.4.1":
                 RayWorkerWrapperPath = vllm.executor.ray_utils
-            else:
-                RayWorkerWrapperPath = vllm.engine.ray_utils
 
-            class RayWorkerWrapper(RayWorkerWrapperPath.RayWorkerWrapper):
-                def __init__(self, *args, **kwargs) -> None:
-                    kwargs["worker_module_name"] = "vllm_worker_wrap"
-                    kwargs["worker_class_name"] = "WorkerWrap"
-                    super().__init__(*args, **kwargs)
+                class RayWorkerWrapper(RayWorkerWrapperPath.RayWorkerWrapper):
+                        def __init__(self, *args, **kwargs) -> None:
+                            kwargs["worker_module_name"] = "openrlhf.trainer.ray.vllm_worker_wrap"
+                            kwargs["worker_class_name"] = "WorkerWrap"
+                            super().__init__(*args, **kwargs)
 
-            RayWorkerWrapperPath.RayWorkerWrapper = RayWorkerWrapper
+                RayWorkerWrapperPath.RayWorkerWrapper = RayWorkerWrapper
 
         self.llm = vllm.LLM(*args, **kwargs)
+
+    # def collective_rpc(
+    #     self,
+    #     method,
+    #     timeout = None,
+    #     args = (),
+    #     kwargs = None,
+    # ):
+    #     return self.llm.llm_engine.model_executor.collective_rpc(method, timeout, args, kwargs)
 
     def generate(self, *args, **kwargs):
         return self.llm.generate(*args, **kwargs)

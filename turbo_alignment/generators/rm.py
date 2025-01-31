@@ -22,7 +22,29 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             
             rank = torch.distributed.get_rank()
 
+            rewards = []        
+
+            # for sample in records['input_ids']:
+            #     print('RECORDS INSIDE RM', sample)
+
+            #     if sample[-1] == 4:
+            #         rewards.append(10)
+            #     elif sample[-1] == 10:
+            #         rewards.append(15)
+            #     elif sample[-1] == 2:
+            #         rewards.append(0.1)
+            #     elif sample[-1] == 0:
+            #         rewards.append(-10)
+            #     elif sample[-1] == -5:
+            #         rewards.append(-100)
+            #     else:
+            #         rewards.append(-1)
+
+
             rewards = ray.get(self._model.reward_forward(records=records, index=rank % self.model_replicas))
+
+            # print('FINAL REWARDS, ', rewards)
+            # print('FINAL REAL REWARDS, ', rewards.shape, rewards)
         return rewards  # .squeeze()
 
     def generate_from_batch(

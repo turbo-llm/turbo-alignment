@@ -80,8 +80,10 @@ class RLOORewardProcessor(RewardProcessor):
 
     def baseline_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
         rewards = rewards.reshape(-1, self.num_generations)
+        # rewards += 5
         baseline: torch.Tensor = (rewards.sum(-1).unsqueeze(-1) - rewards) / (self.num_generations - 1)
         rloo_advantages: torch.Tensor = (rewards - baseline).flatten()
+        # rloo_advantages = (rewards + 10).flatten()
 
         with torch.no_grad():
             metrics: dict[str, float] = {
