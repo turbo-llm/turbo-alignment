@@ -124,17 +124,32 @@ def reinforce_training(
     from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
     from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
     from turbo_alignment.trainers.online.reward_actor import RewardModel
-    # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
     
     ray.init(address="auto")
     
     experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
 
-    policy_models = RayGroup(num_nodes=experiment_settings.trainer_settings.num_nodes, num_gpus_per_node=8, ray_actor_type=pipelines.TrainREINFORCEStrategy)
+    policy_models = RayGroup(
+        num_nodes=experiment_settings.trainer_settings.num_nodes, 
+        num_gpus_per_node=8, 
+        ray_actor_type=pipelines.TrainREINFORCEStrategy,
+    )
     
     assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
-    reward_model = RayGroup(num_nodes=1, num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas, ray_actor_type=RewardModel)
-    # reference_model = RayGroup(num_nodes=1, num_gpus_per_node=1, ray_actor_type=ReferenceModel)
+    reward_model = RayGroup(
+        num_nodes=1, 
+        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas, 
+        ray_actor_type=RewardModel,
+    )
+
+    # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
+    # assert 1 <= experiment_settings.trainer_settings.reference_model_replicas <= 8
+    # reference_model = RayGroup(
+    #     num_nodes=1, 
+    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas, 
+    #     ray_actor_type=ReferenceModel,
+    # )
+
 
     # TODO_RLOO if possible hide init inside RayGroup
     # TODO add settings fields to reward model
@@ -158,9 +173,12 @@ def reinforce_training(
         max_model_len=experiment_settings.trainer_settings.actor_settings.max_model_len,
     )
 
-    ray.get(policy_models.async_fit_actor_model(
-        experiment_settings=experiment_settings,
-        vllm_engines=vllm_engines,
-        # reference_model=reference_model, 
-        reward_model=reward_model
-    ))
+    ray.get(
+        policy_models.async_fit_actor_model(
+            experiment_settings=experiment_settings,
+            vllm_engines=vllm_engines,
+            # reference_model=reference_model, 
+            reward_model=reward_model
+        )
+    )
+

@@ -60,16 +60,23 @@ def get_global_std(values: torch.Tensor, mean: float) -> float:
 
 
 def get_log_mean_std(
-    tensor: torch.Tensor, name: str, train_eval: Literal['train', 'eval'] | None = None
+    tensor: torch.Tensor, name: str, train_eval: Literal['train', 'eval'] | None = None, use_global: bool = True,
 ) -> dict[str, float]:
-    mean = get_global_mean(tensor)
+    if use_global:
+        mean = get_global_mean(tensor)
+        std = get_global_std(tensor, mean=mean)
+    else:
+        mean = torch.mean(tensor)
+        std = torch.std(tensor)
+
+
     metrics = {}
     if train_eval is not None:
         metrics[f'{train_eval}/{name}_mean'] = mean
-        metrics[f'{train_eval}/{name}_std'] = get_global_std(tensor, mean=mean)
+        metrics[f'{train_eval}/{name}_std'] = std
     else:
         metrics[f'{name}_mean'] = mean
-        metrics[f'{name}_std'] = get_global_std(tensor, mean=mean)
+        metrics[f'{name}_std'] = std
 
     return metrics
 

@@ -75,7 +75,6 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
         input_ids = records['input_ids'].tolist()
 
-        # print('👀👀👀 VLLM INPUT RECORDS, ', input_ids)
         
         rank = torch.distributed.get_rank()
         llm = self.vllm_engines[rank % len(self.vllm_engines)]
@@ -91,11 +90,11 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             time_profiler.completions_time.append(end - start)
         
         outputs = []
-        for i, request_output in enumerate(request_outputs):
+        for i, request_output in enumerate(request_outputs): #FIXME
             answers = []
             for a in request_output.outputs:
                 answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0)
-                #TODO assuming len(eos_token_id) == 1
+                #TODO assuming len(eos_token_id) == 1 FIXME
                 answer_token_ids[:, -1] = self.eos_token_id[0]
                 ans_msg = AnswerMessage(
                     id=str(a.index),

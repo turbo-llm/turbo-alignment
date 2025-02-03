@@ -122,23 +122,24 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         vllm_engines,
         training_args: REINFORCETrainingArguments,
         experiment_settings: REINFORCETrainExperimentSettings,
-        # ref_model,
         reward_model,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         train_dataset: Dataset,
         val_dataset: Dataset,
         data_collator: Callable,
+        ref_model=None,
     ):
         # TODO: different tokenizer for reward model
 
         # TODO: TODO_RLOO load reference and reward model here
 
-        ref_model = load_model(experiment_settings.model_settings, tokenizer)
-        for _, param in ref_model.named_parameters():
-            param.requires_grad = False
+        if ref_model is None:
+            ref_model = load_model(experiment_settings.model_settings, tokenizer)
+            for _, param in ref_model.named_parameters():
+                param.requires_grad = False
 
-        # ref_model.eval()
+            ref_model.eval()
 
         # reward_model = load_model(experiment_settings.reward_model_settings, tokenizer)
         # for _, param in reward_model.named_parameters():
@@ -190,9 +191,8 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
     def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None: #reference_model
         training_args = self._get_training_args(experiment_settings)
 
-        # print('HERE!!!!!!!!!!!!!!!!!!!!!!!!')
-        import torch
-        torch.cuda.memory._record_memory_history()
+        # import torch
+        # torch.cuda.memory._record_memory_history()
         self.tokenizer = self._load_tokenizer(experiment_settings)
 
         logger.info('Tokenizer is loaded!')

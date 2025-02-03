@@ -52,7 +52,7 @@ class REINFORCERewardProcessor(RewardProcessor):
         rewards = rewards[:, 0].unsqueeze(-1)  # values are at 1
 
         with torch.no_grad():
-            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward')
+            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward', use_global=False) # FIXME?
 
         return rewards, metrics
 
@@ -63,7 +63,7 @@ class REINFORCEWithBaselineRewardProcessor(RewardProcessor):
         rewards = rewards[:, 0].unsqueeze(-1)  # values are at 1
 
         with torch.no_grad():
-            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward')
+            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward', use_global=False) # FIXME?
 
         return rewards, metrics
 
@@ -74,21 +74,19 @@ class RLOORewardProcessor(RewardProcessor):
         rewards = rewards[:, 0].unsqueeze(-1)  # values are at 1
 
         with torch.no_grad():
-            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward')
+            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward', use_global=False) # FIXME?
 
         return rewards, metrics
 
     def baseline_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
         rewards = rewards.reshape(-1, self.num_generations)
-        # rewards += 5
         baseline: torch.Tensor = (rewards.sum(-1).unsqueeze(-1) - rewards) / (self.num_generations - 1)
         rloo_advantages: torch.Tensor = (rewards - baseline).flatten()
-        # rloo_advantages = (rewards + 10).flatten()
 
         with torch.no_grad():
             metrics: dict[str, float] = {
-                **get_log_mean_std(baseline, 'baseline'),
-                **get_log_mean_std(baseline.std(-1), 'baseline_inner_std'),
+                **get_log_mean_std(baseline, 'baseline', use_global=False), # FIXME?
+                **get_log_mean_std(baseline.std(-1), 'baseline_inner_std', use_global=False), # FIXME?
             }
 
         return rloo_advantages, metrics

@@ -6,13 +6,6 @@ import torch.nn.functional as F
 import gc
 
 
-def sum_all_parameter_values(model):
-    # if isinstance(model, deepspeed.DeepSpeedEngine):
-        # model = model.module
-    total_sum = sum(p.sum().item() for p in model.parameters())
-    return total_sum
-
-
 @ray.remote(num_gpus=1)
 class ReferenceModel(DistributedTorchRayActor):
     def __init__(self, world_size, rank, local_rank, master_addr, master_port):
@@ -22,11 +15,53 @@ class ReferenceModel(DistributedTorchRayActor):
     
     def init_model_from_pretrained(self, pretrain):
         self._setup_distributed()
-        self.model = AutoModelForCausalLM.from_pretrained(pretrain, device_map='cuda', torch_dtype=torch.bfloat16, attn_implementation='flash_attention_2') #attn_implementation='flash_attention_2'
+        self.model = AutoModelForCausalLM.from_pretrained(
+            pretrain, 
+            device_map='cuda', 
+            torch_dtype=torch.bfloat16, 
+            attn_implementation='flash_attention_2', #FIXME hardcoding all this
+        )
+
+        for _, param in self.model.named_parameters():
+            param.requires_grad = False
+
+        def disable_dropout_in_model(model: torch.nn.Module) -> None:
+            for module in model.modules():
+                if isinstance(module, torch.nn.Dropout):
+                    module.p = 0
+
+        disable_dropout_in_model(self.model)
+
         self.tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True)
-        print('IN REFERENCE NODE REF MODEL WEIGHT , ', sum_all_parameter_values(self.model))
         # print(f"Reference model initialized on Node {self.node_id}, Local Rank {self.local_rank}")
         # print("GPU IDs: {}".format(ray.get_runtime_context().get_accelerator_ids()["GPU"]))
+
+    def prepare_reference_model(self, accelerator, is_deepspeed_enabled):
+        if is_deepspeed_enabled:
+            import deepspeed
+            self.model, *_ = deepspeed.initialize(
+                model=self.model, 
+                # FIXME
+                config={
+                    'zero_optimization': {
+                        'stage': 0
+                    },
+                    'optimizer': {
+                        'type': None
+                    },
+                    'fp16': {
+                        'enabled': False
+                    },
+                    'bf16': {
+                        'enabled': True
+                    },
+                    'train_micro_batch_size_per_gpu': 1,
+                    # 'train_batch_size': 'auto',
+                }
+            )
+            self.model.eval()
+        else:
+            self.model = accelerator.prepare_model(self.model, evaluation_mode=True)
 
     def tokenize(self, text: str):
         return self.tokenizer(text, return_tensors='pt')
@@ -41,18 +76,17 @@ class ReferenceModel(DistributedTorchRayActor):
     @torch.no_grad
     def forward(self, x):
         self.model.eval()
-        print('IN REFERENCE NODE REF MODEL WEIGHT HERE IM FORWARD HERE, ', sum_all_parameter_values(self.model))
         x = {k: v.cuda() for k, v in x.items()}
         return self.model(**x)
     
     @torch.no_grad
     def reference_forward(self, x):
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         self.model.eval()
         x = {k: v.cuda() for k, v in x.items()}
 
         # print(f"{x.keys()}")
-        logits = self.model(**x).logits
+        logits = self.model(**x).logits[:, :-1]
 
         return logits
 

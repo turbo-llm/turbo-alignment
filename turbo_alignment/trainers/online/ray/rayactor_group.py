@@ -100,13 +100,15 @@ class RayGroup:
                     ).remote(world_size, rank, local_rank, master_addr, master_port)
                 self._actor_handlers.append(worker_actor)
 
-    def reference_forward(self, records: dict[str, torch.Tensor], temperature, loss_mask):
-        # TODO assuming one reference model
-        return self._actor_handlers[0].reference_forward.remote(records, temperature, loss_mask)
+    def prepare_reference_model(self, accelerator, is_deepspeed_enabled):
+        return [actor.prepare_reference_model.remote(accelerator, is_deepspeed_enabled) for actor in self._actor_handlers]
+
+    def reference_forward(self, records: dict[str, torch.Tensor], index: int):
+        assert index < len(self._actor_handlers), f'Reference model replicas: {len(self._actor_handlers)}, provided index: {index}'
+        return self._actor_handlers[index].reference_forward.remote(records)
     
     def reward_forward(self, records: dict[str, torch.Tensor], index: int):
         assert index < len(self._actor_handlers), f'Reward model replicas: {len(self._actor_handlers)}, provided index: {index}'
-        # print(' REWARDS FORWARD INPUT RECORDS, ', records)
         return self._actor_handlers[index].forward.remote(records)
     
     def async_forward(self, records: dict[str, torch.Tensor]):
@@ -142,20 +144,18 @@ class RayGroup:
     def async_fit_actor_model(
         self,
         experiment_settings: REINFORCETrainExperimentSettings,
-        vllm_engines: List,
+        vllm_engines,
         # reference_model,
         reward_model,
     ):
         refs = []
         for i, actor in enumerate(self._actor_handlers):
-
             refs.append(
                 actor.run.remote(
                     experiment_settings=experiment_settings,
                     vllm_engines=vllm_engines,
                     # reference_model=reference_model,
                     reward_model=reward_model,
-
                 )
             )
 

@@ -17,8 +17,9 @@ from typing import Union
 
 class REINFORCETrainerSettings(TrainerSettings):
 
-    num_nodes: int = 2
+    num_nodes: int = 1
     reward_model_replicas: int = 1
+    reference_model_replicas: int = 1
     max_new_tokens: int = 1024
     stop_token: str = '<eos>'
 

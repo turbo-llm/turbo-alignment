@@ -38,26 +38,40 @@ class LLMRayActor:
 
         self.llm = vllm.LLM(*args, **kwargs)
 
-    # def collective_rpc(
-    #     self,
-    #     method,
-    #     timeout = None,
-    #     args = (),
-    #     kwargs = None,
-    # ):
-    #     return self.llm.llm_engine.model_executor.collective_rpc(method, timeout, args, kwargs)
-
     def generate(self, *args, **kwargs):
         return self.llm.generate(*args, **kwargs)
-
-    def init_process_group(self, master_address, master_port, rank_offset, world_size, group_name, backend):
+    
+    def init_weight_update_group(
+        self, 
+        master_address, 
+        master_port,
+        rank_offset, 
+        world_size,
+    ):
         if self.use_gpu_executor:
-            return self.llm.llm_engine.model_executor.driver_worker.init_process_group(
-                master_address, master_port, rank_offset, world_size, group_name, backend
-            )
+            return self.llm.llm_engine.model_executor.driver_worker.init_weight_update_group(
+                master_address=master_address,
+                    master_port=master_port,
+                    rank_offset=rank_offset,
+                    world_size=world_size,
+                )
         else:
             return self.llm.llm_engine.model_executor._run_workers(
-                "init_process_group", master_address, master_port, rank_offset, world_size, group_name, backend
+                "init_weight_update_group", master_address, master_port, rank_offset, world_size
+            )
+        
+    def collective_rpc(
+            self,
+            method,
+            timeout=None,
+            args=(),
+            kwargs=None,
+    ):
+        if self.use_gpu_executor:
+            return self.llm.llm_engine.model_executor.collective_rpc(method, timeout, args, kwargs)
+        else:
+            return self.llm.llm_engine.model_executor._run_workers(
+                "collective_rpc", method, timeout, args, kwargs,
             )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):
@@ -117,9 +131,3 @@ def create_vllm_engines(
         )
 
     return vllm_engines
-
-
-# if __name__ == "__main__":
-#     llm = LLMRayActor.remote("meta-llama/Llama-2-7b-chat-hf", tensor_parallel_size=4)
-#     output = ray.get(llm.generate.remote("San Franciso is a"))
-#     print(f"output: {output}")
