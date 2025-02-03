@@ -280,7 +280,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         )
 
 
-class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, Gemma2ForCausalLM):
+class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Gemma2ForCausalLM):
     def __init__(self, config):
         super().__init__(config)
         self.model = Gemma2ModelWithMPU(config)

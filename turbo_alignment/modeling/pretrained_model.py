@@ -23,6 +23,9 @@ from transformers.modeling_utils import (
     PretrainedConfig,
     PreTrainedModel,
     QuantizationMethod,
+    _is_quantized,
+    _is_ds_init_called,
+    set_zero3_state,
     _add_variant,
     auto_conversion,
     cached_file,
@@ -956,13 +959,14 @@ class PreTrainedModelWithMPU(PreTrainedModel):
 
             logger.info("Detected DeepSpeed ZeRO-3: activating zero.init() for this model")
             mpu_inited = mpu.sequence_parallel_is_initialized()
+            print('MPU inited')
 
             init_contexts = [
                 deepspeed.zero.Init(
                     config_dict_or_path=deepspeed_config(),
                     mpu=mpu if mpu_inited else None,
                     # sequence_data_parallel_group=mpu.get_sequence_data_parallel_group() if mpu_inited else None,
-                    data_parallel_group=mpu.get_data_parallel_group() if mpu_inited else None,
+                    # data_parallel_group=mpu.get_data_parallel_group() if mpu_inited else None,
                 )
             ] + init_contexts
         elif low_cpu_mem_usage:
@@ -1204,5 +1208,64 @@ class PreTrainedModelWithMPU(PreTrainedModel):
                     "error_msgs": error_msgs,
                 }
             return model, loading_info
+
+        return model
+
+
+    @classmethod
+    def _from_config(cls, config, **kwargs):
+        """
+        All context managers that the model should be initialized under go here.
+
+        Args:
+            torch_dtype (`torch.dtype`, *optional*):
+                Override the default `torch.dtype` and load the model under this dtype.
+        """
+        # when we init a model from within another model (e.g. VLMs) and dispatch on FA2
+        # a warning is raised that dtype should be fp16. Since we never pass dtype from within
+        # modeling code, we can try to infer it here same way as done in `from_pretrained`
+        torch_dtype = kwargs.pop("torch_dtype", torch.get_default_dtype())
+        use_flash_attention_2 = kwargs.pop("use_flash_attention_2", False)
+
+        # override default dtype if needed
+        dtype_orig = None
+        if torch_dtype is not None:
+            dtype_orig = cls._set_default_torch_dtype(torch_dtype)
+
+        config = copy.deepcopy(config)  # We do not want to modify the config inplace in _from_config.
+
+        if config._attn_implementation_internal is not None:
+            # In this case, the config has been created with the attn_implementation set by the user, which we
+            # should respect.
+            attn_implementation = config._attn_implementation_internal
+        else:
+            attn_implementation = None
+
+        config._attn_implementation = kwargs.pop("attn_implementation", attn_implementation)
+        if not getattr(config, "_attn_implementation_autoset", False):
+            config = cls._autoset_attn_implementation(
+                config,
+                use_flash_attention_2=use_flash_attention_2,
+                check_device_map=False,
+                torch_dtype=torch_dtype,
+            )
+
+        if is_deepspeed_zero3_enabled() and not _is_quantized and not _is_ds_init_called:
+            import deepspeed
+            import turbo_alignment.modeling.parallel_states as mpu
+
+            logger.info("Detected DeepSpeed ZeRO-3: activating zero.init() for this model")
+            # this immediately partitions the model across all gpus, to avoid the overhead in time
+            # and memory copying it on CPU or each GPU first
+            init_contexts = [deepspeed.zero.Init(config_dict_or_path=deepspeed_config(), mpu=mpu), set_zero3_state()]
+            with ContextManagers(init_contexts):
+                model = cls(config, **kwargs)
+
+        else:
+            model = cls(config, **kwargs)
+
+        # restore default dtype if it was modified
+        if dtype_orig is not None:
+            torch.set_default_dtype(dtype_orig)
 
         return model
