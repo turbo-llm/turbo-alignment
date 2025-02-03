@@ -300,7 +300,7 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
         )
 
 
-class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, Qwen2ForCausalLM):
+class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Qwen2ForCausalLM):
     def __init__(self, config):
         super().__init__(config)
         self.model = Qwen2ModelWithMPU(config)
