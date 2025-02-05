@@ -151,11 +151,15 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
             special_tokens_setter.set_all()
             special_tokens_setter.set_custom_tokens(additional_special_tokens)
 
+            # In the older version, we loaded the model before args were created,
+            # because of bug in embedding resizing with DeepSpeed Zero3
+            # Now, we don't observe this bug and this order helps to save RAM
+
+            training_args = self._get_training_args(experiment_settings)
+
             logger.info('Special tokens added!')
             self.model = self._load_model(experiment_settings, self.tokenizer)
             logger.info('Model is loaded!')
-
-            training_args = self._get_training_args(experiment_settings)
 
             special_tokens_setter.setup_model_config(self.model)
 
