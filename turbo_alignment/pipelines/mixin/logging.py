@@ -28,17 +28,16 @@ class LoggingMixin(ABC):
 class WandbLoggingMixin(LoggingMixin):
     @staticmethod
     def get_logging_callback(experiment_settings: BaseTrainExperimentSettings) -> WandbLoggingCallback:
-        # logging_settings: WandbSettings = WandbSettings(**experiment_settings.logging_settings.dict())
-        # wandb_run = create_wandb_run(parameters=logging_settings, config=experiment_settings.dict())
-        # return WandbLoggingCallback(wandb_run=wandb_run)
-        return None
+        logging_settings: WandbSettings = WandbSettings(**experiment_settings.logging_settings.dict())
+        wandb_run = create_wandb_run(parameters=logging_settings, config=experiment_settings.dict())
+        return WandbLoggingCallback(wandb_run=wandb_run)
 
 
 @LoggingRegistry.register(ClearMLSettings.__name__)
 class ClearMLLoggingMixin(LoggingMixin):
     @staticmethod
     def get_logging_callback(experiment_settings: BaseTrainExperimentSettings) -> ClearMLLoggingCallback:
-        # logging_settings: ClearMLSettings = ClearMLSettings(**experiment_settings.logging_settings.dict())
-        # clearml_task = create_clearml_task(parameters=logging_settings, config=experiment_settings.dict())
-        # return ClearMLLoggingCallback(clearml_task=clearml_task)
-        return None
+        logging_settings: ClearMLSettings = ClearMLSettings(**experiment_settings.logging_settings.dict())
+        clearml_task = create_clearml_task(parameters=logging_settings, config=experiment_settings.dict())
+        return ClearMLLoggingCallback(clearml_task=clearml_task)
+        # return None

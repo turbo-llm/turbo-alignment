@@ -119,8 +119,7 @@ class TimeProfiler:
         self.broadcast_time = []
         self.completions_time = []
         self.reward_model_time = []
-        # self.reward_processing_time = []
-        self.reward_postprocessing_time = []
+        self.reward_processing_time = []
         self.baseline_reward_time = []
         self.reference_model_time = []
         self.reference_forward_time = []
@@ -147,8 +146,7 @@ class TimeProfiler:
         print(f"Broadcast Time: {mean_std_format(self.broadcast_time)}", flush=True)
         print(f"Completions Time: {mean_std_format(self.completions_time)}", flush=True)
         print(f"Reward Model Time: {mean_std_format(self.reward_model_time)}", flush=True)
-        # print(f"Reward Processing Time: {mean_std_format(self.reward_processing_time)}", flush=True)
-        print(f"Reward Postprocessing Time: {mean_std_format(self.reward_postprocessing_time)}", flush=True)
+        print(f"Reward Processing Time: {mean_std_format(self.reward_processing_time)}", flush=True)
         print(f"Reward Baseline Time: {mean_std_format(self.baseline_reward_time)}", flush=True)
         print(f"Reference Logprobs Time: {mean_std_format(self.reference_model_time)}", flush=True)
         print(f"Reference Forward Time: {mean_std_format(self.reference_forward_time)}", flush=True)
@@ -535,12 +533,41 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 self.time_profiler.reference_model_time.append(end - start)
                 # logging.info(f'Reference logprobs elapsed time:{end - start}')
             
-            # if torch.distributed.get_rank() == 0:
-                # start = time.time()
+            if torch.distributed.get_rank() == 0:
+                start = time.time()
+
+            # profiler = torch.profiler.profile(
+            #     activities=[
+            #         torch.profiler.ProfilerActivity.CPU,
+            #         torch.profiler.ProfilerActivity.CUDA,
+            #     ],
+
+            #     record_shapes=True,
+            #     profile_memory=True,
+            #     with_stack=False,
+            # )
+
+            
+            # with profiler as prof:
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
-            # if torch.distributed.get_rank() == 0:
-                # end = time.time()
-                # self.time_profiler.reward_processing_time.append(end - start)
+                # prof.step()
+            if torch.distributed.get_rank() == 0:
+                end = time.time()
+                self.time_profiler.reward_processing_time.append(end - start)
+                # print('PROCESSING CUDA METRICS'*15)
+                # print(
+                #         prof.key_averages().table(
+                #         sort_by="cuda_time_total", 
+                #         row_limit=10,
+                #     )
+                # )
+                # print('PROCESSING CPU METRICS'*15)
+                # print(
+                #         prof.key_averages().table(
+                #         sort_by="cpu_time_total", 
+                #         row_limit=10,
+                #     )
+                # )
 
         if torch.distributed.get_rank() == 0:
             start = time.time()
@@ -587,7 +614,41 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 start = time.time()
 
+            # new_profiler = torch.profiler.profile(
+            #     activities=[
+            #         torch.profiler.ProfilerActivity.CPU,
+            #         torch.profiler.ProfilerActivity.CUDA,
+            #     ],
+
+            #     record_shapes=True,
+            #     profile_memory=True,
+            #     with_stack=False,
+            # )
+
+            
+            # with new_profiler as new_prof:
+
             baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(rewards=regularized_rewards)
+
+                # new_prof.step()
+
+            # if torch.distributed.get_rank() == 0:
+                # end = time.time()
+                # self.time_profiler.reward_processing_time.append(end - start)
+                # print('BASELINE CUDA METRICS'*15)
+                # print(
+                #         new_prof.key_averages().table(
+                #         sort_by="cuda_time_total", 
+                #         row_limit=10,
+                #     )
+                # )
+                # print('BASELINE CPU METRICS'*15)
+                # print(
+                #         new_prof.key_averages().table(
+                #         sort_by="cpu_time_total", 
+                #         row_limit=10,
+                #     )
+                # )
 
             if torch.distributed.get_rank() == 0:
                 end = time.time()
@@ -638,7 +699,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             
             for k, v in metrics.items():
                 if isinstance(v, torch.Tensor):
-                    metrics[k] = metrics[k].cpu()
+                    metrics[k] = metrics[k]
 
         if torch.distributed.get_rank() == 0:
             end = time.time()
@@ -652,12 +713,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             print(f"Allocated: {torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB")
             print(f"Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB")
 
-    def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
-        
+    def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):        
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
-        
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
         self.store_metrics(metrics=metrics, train_eval='train')
@@ -714,8 +773,10 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
             all_rewards = torch.cat(all_rewards, 0)
 
-            norm_reward_mean = get_global_mean(all_rewards)
-            norm_reward_std = get_global_std(all_rewards, mean=norm_reward_mean)
+            norm_reward_metrics = get_log_mean_std(all_rewards, 'norm_reward', train_eval='train', use_global=True)
+
+            norm_reward_mean = norm_reward_metrics['train/norm_reward_mean']
+            norm_reward_std = norm_reward_metrics['train/norm_reward_std']
 
         return norm_reward_mean, norm_reward_std
 
@@ -744,18 +805,13 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         return rewards, torch.ones_like(rewards).to(torch.bool)
 
-    def process_rewards(self, rewards, query_response) -> tuple[torch.Tensor, torch.Tensor, Any]:
+    def process_rewards(self, rewards, query_response) -> tuple[torch.Tensor, torch.Tensor, Any]: #bottleneck
         """
         Second, this token should be the <eot_id>.
         Otherwise, return a fixed reward of -1.
         """
 
-        if torch.distributed.get_rank() == 0:
-            start = time.time()
         rewards, reward_metrics = self.reward_processor.postprocess_rewards(rewards=rewards) #FIXME 4 secods?
-        if torch.distributed.get_rank() == 0:
-            end = time.time()
-            self.time_profiler.reward_postprocessing_time.append(end - start)
         rewards = rewards.squeeze(-1)
         reward_metrics['normalizing_reward_mean'] = self.norm_reward_mean
         reward_metrics['normalizing_reward_std'] = self.norm_reward_std
@@ -775,7 +831,34 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         main_keys = list(self._stored_metrics.keys())
         for main_key in main_keys:
             for key, metrics in self._stored_metrics[main_key].items():
-                logs[key] = torch.tensor(metrics).float().cpu().mean().item()
+                if not isinstance(metrics, (list, tuple)):
+                    metrics = [metrics] 
+
+
+                float_values = []
+                tensor_values = []
+                for m in metrics:
+                    if isinstance(m, float):
+                        float_values.append(m)
+                    elif isinstance(m, (int, bool)):
+                        float_values.append(float(m))
+                    elif isinstance(m, torch.Tensor):
+                        tensor_values.append(m)
+                    else:
+                        logging.info(f'skipped metric {m} in logging.')
+
+                if tensor_values:
+                    gpu_tensors = [t.cuda() for t in tensor_values]
+                    stacked = torch.stack(gpu_tensors)
+                    gpu_mean = stacked.mean()
+                    metric_val = gpu_mean.detach().cpu().item()
+                    logs[key] = metric_val
+                elif float_values:
+                    # If we have no tensors but have floats, just log the last float.
+                    logs[key] = float_values[-1]
+                else:
+                    logging.info(f'skipped key {key} in logging.')
+                    logs[key] = float('nan')
 
             if main_key == 'train':
                 logs['train/global_step'] = int(self.state.global_step)
