@@ -14,10 +14,14 @@ from turbo_alignment.settings import pipelines as pipeline_settings
         (FIXTURES_PATH / 'configs/train/kto/base.json', pipeline_settings.KTOTrainExperimentSettings),
     ],
 )
-def test_evaluation_strategy_warning(config_path, settings_cls):
+def test_evaluation_strategy_deprecation(config_path, settings_cls):
     match_str = (
         "'evaluation_strategy' is deprecated and will be removed in a future version. Use 'eval_strategy' instead."
     )
     with pytest.warns(FutureWarning, match=match_str):
         with open(config_path) as f:
-            settings_cls.model_validate(json.load(f))
+            settings = settings_cls.model_validate(json.load(f))
+    
+    assert not hasattr(settings, 'evaluation_strategy')
+    assert hasattr(settings, 'eval_strategy')
+    assert settings.eval_strategy == 'steps'
