@@ -6,6 +6,7 @@ from tests.constants import FIXTURES_PATH
 from turbo_alignment.settings import pipelines as pipeline_settings
 
 
+# TODO: remove in future
 @pytest.mark.parametrize(
     'config_path, settings_cls',
     [
