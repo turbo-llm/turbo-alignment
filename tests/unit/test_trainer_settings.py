@@ -20,7 +20,9 @@ def test_evaluation_strategy_deprecation(config_path, settings_cls):
     )
     with pytest.warns(FutureWarning, match=match_str):
         with open(config_path) as f:
-            settings = settings_cls.model_validate(json.load(f))
+            json_data = json.load(f)
+        json_data["trainer_settings"]["evaluation_strategy"] = json_data["trainer_settings"].pop("eval_strategy")
+        settings = settings_cls.model_validate(json_data)
 
     trainer_settings = settings.trainer_settings
     assert not hasattr(trainer_settings, 'evaluation_strategy')
