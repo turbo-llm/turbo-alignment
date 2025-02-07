@@ -29,8 +29,8 @@ from transformers.models.gemma2.modeling_gemma2 import (
 )
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
-from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
+from turbo_alignment.sequence_parallel.vocab_parallel_cross_entropy import vocab_sequence_parallel_cross_entropy_loss
 from turbo_alignment.modeling.gemma2.ulysses_attn import _SeqAllToAll
 
 
@@ -373,25 +373,10 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
         loss = None
         if labels is not None:
             if parallel_states.sequence_parallel_is_initialized():
-                old_logits = logits
-                old_labels = labels
+               loss = vocab_sequence_parallel_cross_entropy_loss(logits, labels)
 
-                spg = parallel_states.get_sequence_parallel_group()
-                logits = GatherAllLogits.apply(logits, spg)
-                labels = GatherAllLogits.apply(labels, spg)
-                if (num_items_in_batch := loss_kwargs.get('num_items_in_batch')) is not None:
-                    loss_kwargs = loss_kwargs.copy()
-                    loss_kwargs['num_items_in_batch'] = dist.all_reduce(
-                        num_items_in_batch,
-                        op=dist.ReduceOp.SUM,
-                        group=spg,
-                    )
-
-            loss = self.loss_function(logits, labels, self.vocab_size, **loss_kwargs)
-
-            if parallel_states.sequence_parallel_is_initialized():
-                logits = old_logits
-                labels = old_labels
+            else:
+                loss = self.loss_function(logits, labels, self.vocab_size, **loss_kwargs)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
