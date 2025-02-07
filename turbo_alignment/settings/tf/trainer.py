@@ -2,7 +2,7 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import model_validator
 
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
@@ -57,8 +57,9 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     def handle_deprecated_evaluation_strategy(cls, values):
         if 'evaluation_strategy' in values:
             warnings.warn(
-                "'evaluation_strategy' is deprecated and will be removed in a future version. Use 'eval_strategy' instead.",
-                FutureWarning
+                "'evaluation_strategy' is deprecated and will be removed in a future version. "
+                "Use 'eval_strategy' instead.",
+                FutureWarning,
             )
             values['eval_strategy'] = values.pop('evaluation_strategy')
         return values

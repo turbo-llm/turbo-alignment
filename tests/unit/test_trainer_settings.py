@@ -21,7 +21,8 @@ def test_evaluation_strategy_deprecation(config_path, settings_cls):
     with pytest.warns(FutureWarning, match=match_str):
         with open(config_path) as f:
             settings = settings_cls.model_validate(json.load(f))
-    
-    assert not hasattr(settings, 'evaluation_strategy')
-    assert hasattr(settings, 'eval_strategy')
-    assert settings.eval_strategy == 'steps'
+
+    trainer_settings = settings.trainer_settings
+    assert not hasattr(trainer_settings, 'evaluation_strategy')
+    assert hasattr(trainer_settings, 'eval_strategy')
+    assert trainer_settings.eval_strategy == 'steps'
