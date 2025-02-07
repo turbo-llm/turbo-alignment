@@ -1,40 +1,44 @@
 # pylint: disable=line-too-long,protected-access,abstract-method
 # flake8: noqa
 
-from typing import List, Optional, Tuple, Union, Callable
+from typing import Callable, List, Optional, Tuple, Union
 
 import torch
-import torch.distributed as dist
 from torch import nn
-from transformers.cache_utils import StaticCache, DynamicCache
+from transformers.cache_utils import DynamicCache, StaticCache
 from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
 )
 from transformers.models.qwen2.modeling_qwen2 import (
-    apply_rotary_pos_emb,
-    eager_attention_forward,
-    logger,
     ALL_ATTENTION_FUNCTIONS,
     AttentionMaskConverter,
     Cache,
     FlashAttentionKwargs,
     KwargsForCausalLM,
     Qwen2Config,
+)
+from transformers.models.qwen2.modeling_qwen2 import (
     Qwen2DecoderLayer as Qwen2DecoderLayerBase,
+)
+from transformers.models.qwen2.modeling_qwen2 import (
     Qwen2ForCausalLM,
-    Qwen2Model,
     Qwen2MLP,
+    Qwen2Model,
     Qwen2RMSNorm,
     Qwen2RotaryEmbedding,
     Unpack,
+    apply_rotary_pos_emb,
+    eager_attention_forward,
+    logger,
 )
-
 from turbo_alignment.modeling import parallel_states
-from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
-from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
-from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
 from turbo_alignment.modeling.gemma2.ulysses_attn import _SeqAllToAll
+from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
+from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
+from turbo_alignment.sequence_parallel.vocab_parallel_cross_entropy import (
+    vocab_sequence_parallel_cross_entropy_loss,
+)
 
 
 class Qwen2Attention(nn.Module):
@@ -471,25 +475,10 @@ class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
         loss = None
         if labels is not None:
             if parallel_states.sequence_parallel_is_initialized():
-                old_logits = logits
-                old_labels = labels
+               loss = vocab_sequence_parallel_cross_entropy_loss(logits, labels)
 
-                spg = parallel_states.get_sequence_parallel_group()
-                logits = GatherAllLogits.apply(logits, spg)
-                labels = GatherAllLogits.apply(labels, spg)
-                if (num_items_in_batch := kwargs.get('num_items_in_batch')) is not None:
-                    kwargs = kwargs.copy()
-                    kwargs['num_items_in_batch'] = dist.all_reduce(
-                        num_items_in_batch,
-                        op=dist.ReduceOp.SUM,
-                        group=spg,
-                    )
-
-            loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
-
-            if parallel_states.sequence_parallel_is_initialized():
-                logits = old_logits
-                labels = old_labels
+            else:
+                loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
