@@ -31,7 +31,8 @@ class GatherAllLogits(torch.autograd.Function):
         )
 
         dist.all_gather_into_tensor(all_logits, transposed, group=sp_group)
-        return all_logits.transpose(0, 1).contiguous()
+        del transposed
+        return all_logits.transpose(0, 1)
 
     @staticmethod
     def backward(ctx, grad_output):
