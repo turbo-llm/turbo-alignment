@@ -1,3 +1,4 @@
+from turbo_alignment.metrics.accuracy import AccuracyMetric
 from turbo_alignment.metrics.distinctness import DistinctnessMetric
 from turbo_alignment.metrics.diversity import DiversityMetric
 from turbo_alignment.metrics.kl import KLMetric
