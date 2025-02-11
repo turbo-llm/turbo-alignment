@@ -14,7 +14,7 @@ class AccuracyMetric(Metric):
 
         if references is None:
             raise ValueError('references should not be None')
-        
+
         if predictions is None:
             raise ValueError('predictions should not be None')
 
@@ -27,8 +27,9 @@ class AccuracyMetric(Metric):
                     ElementWiseScores(
                         label=dataset_name + '@@' + 'accuracy',
                         values=[
-                            int(reference[0] == prediction[0].removesuffix(tokenizer.eos_token))
-                            for reference, prediction in zip(references, predictions)
+                            int(reference == self._remove_suffix(prediction, tokenizer))
+                            for reference_list, prediction_list in zip(references, predictions)
+                            for reference, prediction in zip(reference_list, prediction_list)
                         ],
                     )
                 ],
@@ -36,3 +37,7 @@ class AccuracyMetric(Metric):
             )
             for need_average in self._settings.need_average
         ]
+
+    @staticmethod
+    def _remove_suffix(prediction: str, tokenizer: PreTrainedTokenizerBase) -> str:
+        return prediction.removesuffix(tokenizer.pad_token).removesuffix(tokenizer.eos_token)
