@@ -48,6 +48,7 @@ Turbo-Alignment supports a wide range of methods for model training and alignmen
 
 <a name="-implemented-metrics"></a>
 ## 🧮 Implemented Metrics
+- **🎯** Accuracy
 - **🔠** Distinctness
 - **🌈** Diversity
 - **🔵** Self-BLEU
