@@ -13,7 +13,7 @@ keywords = ["alignment", "llm", "dpo", "ppo", "rlhf"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-transformers = "4.48"
+transformers = "4.48.1"
 peft = "0.8.2"
 typer ="^0.9.0"
 wandb ="^0.15.3"
