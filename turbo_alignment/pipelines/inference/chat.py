@@ -33,19 +33,19 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 from turbo_alignment.generators.vllm_chat import VLLMChatGenerator
 
                 lora_request: LoRARequest | None = None
-                enable_lora: bool = False
 
-                if isinstance(model_inference_settings.model_settings, PreTrainedAdaptersModelSettings):
+                engine_settings = model_inference_settings.vllm_engine_settings.dict()
+                engine_settings.update({
+                    'model': model_inference_settings.model_settings.model_path.absolute().as_posix(),
+                    'gpu_memory_utilization': 0.95,
+                    'dtype': 'bfloat16',
+                    'enable_lora': isinstance(model_inference_settings.model_settings, PreTrainedAdaptersModelSettings),
+                })
+
+                if engine_settings["enable_lora"]:
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
-                    enable_lora = True
 
-                model = vllm.LLM(
-                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
-                    dtype='bfloat16',
-                    tensor_parallel_size=model_inference_settings.tensor_parallel_size,
-                    enable_lora=enable_lora,
-                    gpu_memory_utilization=0.95,
-                )
+                model = vllm.LLM(**engine_settings)
 
             else:
                 model = load_model(model_inference_settings.model_settings, tokenizer)
