@@ -17,7 +17,6 @@ class ChatGenerationSettings(ExtraFieldsNotAllowedBaseModel):
 class ChatSingleModelInferenceSettings(SingleModelInferenceSettings):
     generation_settings: list[ChatGenerationSettings]
     use_vllm: bool = False
-    tensor_parallel_size: int = 1
 
 
 class ChatInferenceExperimentSettings(InferenceExperimentSettings):

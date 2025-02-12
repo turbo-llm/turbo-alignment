@@ -1,11 +1,6 @@
 {
   "inference_settings": [
     {
-      "vllm_engine_settings": {
-        "tensor_parallel_size": 2,
-        "max_lora_rank": 128,
-        "max_logprobs": 400000
-      },
       "model_settings": {
         "model_path": "tests/fixtures/models/llama2_tiny",
         "model_type": "causal",
@@ -26,7 +21,12 @@
           "custom_settings": {}
         }
       ],
-      "use_vllm": true
+      "use_vllm": true,
+      "vllm_engine_settings": {
+        "tensor_parallel_size": 2,
+        "max_lora_rank": 128,
+        "max_logprobs": 400000
+      }
     }
   ],
   "dataset_settings": {

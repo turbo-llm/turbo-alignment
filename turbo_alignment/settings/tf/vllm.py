@@ -4,7 +4,6 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class EngineSettings(ExtraFieldsNotAllowedBaseModel):
-    model: str
     dtype: Optional[Literal['auto', 'half', 'float16', 'bfloat16', 'float', 'float32']] = 'auto'
     tensor_parallel_size: int = 1
     gpu_memory_utilization: Optional[float] = 0.9
