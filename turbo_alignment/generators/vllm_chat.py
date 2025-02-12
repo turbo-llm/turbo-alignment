@@ -51,6 +51,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
             max_tokens=transformers_settings.max_new_tokens,
+            logprobs=transformers_settings.logprobs,
             **beam_search_params,
         )
         self._lora_request = lora_request
@@ -77,6 +78,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
                     id=str(a.index),
                     content=a.text,
                     sequence_score=a.cumulative_logprob,
+                    logprobs=a.logprobs if a.logprobs else None,
                 )
                 if self._return_logits:
                     ans_msg.input_token_ids = torch.tensor(request_output.prompt_token_ids).unsqueeze(0)
