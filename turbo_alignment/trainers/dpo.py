@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
 import torch
@@ -24,9 +24,12 @@ from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
-from turbo_alignment.common.tf.callbacks.sync_ref_model import SyncRefModelCallback
+from turbo_alignment.common.tf.callbacks.sync_ref_model import (
+    SyncRefModelCallback,
+    SyncRefModelSettings,
+)
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
-from turbo_alignment.settings.pipelines.train.dpo import (
+from turbo_alignment.settings.pipelines.train.utils import (
     APODownLossSettings,
     APOZeroLossSettings,
     ASFTLossSettings,
@@ -42,7 +45,6 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SigmoidLossWithMarginSettings,
     SimPOLossSettings,
     SlicHfLossSettings,
-    SyncRefModelSettings,
 )
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
@@ -505,14 +507,10 @@ class DPOTrainingArguments(TrainingArguments):
         | SigmoidLossWithMarginSettings
         | APOZeroLossSettings
         | APODownLossSettings
-        | DPOPLossSettings
         | NCAPairLossSettings
-    ) = field(
-        default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
-    )  # type: ignore[call-overload]
-    sync_ref_settings: SyncRefModelSettings = field(  # type: ignore[call-overload]
-        default_factory=SyncRefModelSettings()
-    )
+        | DPOPLossSettings
+    ) = SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
+    sync_ref_settings: SyncRefModelSettings = SyncRefModelSettings()
     use_ref_model: bool = True
     use_sft_model: bool = False
     average_log_prob: bool = False

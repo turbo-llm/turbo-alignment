@@ -92,7 +92,7 @@
         "adapter_path": "tests/fixtures/models/llama2_tiny_rm"
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "do_sample": false,
             "max_new_tokens": 8
@@ -132,7 +132,7 @@
         "eos_token": "</s>",
         "pad_token": "<pad>"
     },
-    "trainer_settings": {
+    "training_arguments": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
         "per_device_eval_batch_size": 1,
@@ -156,6 +156,7 @@
         "max_grad_norm": 1.0
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "ddpo",
         "entity": "turbo-alignment"

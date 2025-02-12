@@ -1,4 +1,4 @@
-from functools import partial
+from typing import Any
 
 import numpy as np
 import torch
@@ -15,10 +15,7 @@ from sklearn.utils import compute_class_weight
 from torch.utils.data import Dataset
 from transformers import EvalPrediction
 
-from turbo_alignment.settings.pipelines.train.classification import (
-    ClassificationLossSettings,
-)
-from turbo_alignment.trainers.custom_loss import CustomLossTrainer
+from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 
 
 def compute_clf_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
@@ -41,19 +38,17 @@ def compute_clf_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
     return metrics
 
 
-def classification_loss(
-    logits: torch.Tensor, labels: torch.LongTensor, loss_settings: ClassificationLossSettings
-) -> torch.Tensor:
-    if loss_settings.alpha is None:
+def classification_loss(logits: torch.Tensor, labels: torch.LongTensor, alpha, gamma) -> torch.Tensor:
+    if alpha is None:
         alpha = torch.ones((logits.size(-1),), device=logits.device, dtype=logits.dtype)
     else:
-        alpha = torch.tensor(loss_settings.alpha, device=logits.device, dtype=logits.dtype)
+        alpha = torch.tensor(alpha, device=logits.device, dtype=logits.dtype)
 
     ce_loss = F.cross_entropy(logits, labels, weight=alpha, reduction='none')
 
     p_t = torch.exp(-ce_loss)
 
-    focal_loss = ((1 - p_t) ** loss_settings.gamma) * ce_loss
+    focal_loss = ((1 - p_t) ** gamma) * ce_loss
 
     return focal_loss.mean()
 
@@ -64,10 +59,35 @@ def auto_class_weights(dataset: Dataset) -> list[float]:
     return class_weights.tolist()
 
 
-class ClassificationTrainer(CustomLossTrainer):
-    def __init__(self, loss_settings: ClassificationLossSettings, **kwargs):
+class ClassificationTrainer(MultiGPUCherryPicksTrainer):
+    def __init__(self, **kwargs) -> None:
+        args = kwargs.get('args')
+        self.loss_settings = args.loss_settings  # type: ignore[union-attr]
         super().__init__(
-            custom_loss=partial(classification_loss, loss_settings=loss_settings),
             compute_metrics=compute_clf_metrics,
             **kwargs,
         )
+
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        return_outputs=False,
+        num_items_in_batch=None,  # pylint: disable=unused-argument
+    ) -> tuple[torch.Tensor, dict[str, Any]] | torch.Tensor:
+        """
+        Modified original version, without manual label smoothing
+        """
+        if 'labels' in inputs:
+            labels = inputs.pop('labels')
+        else:
+            raise ValueError('No labels provided in the inputs')
+
+        outputs = model(**inputs)
+        logits = outputs['logits'] if isinstance(outputs, dict) else outputs[0]
+
+        loss = classification_loss(
+            logits=logits, labels=labels, alpha=self.loss_settings.alpha, gamma=self.loss_settings.gamma
+        )
+
+        return (loss, outputs) if return_outputs else loss

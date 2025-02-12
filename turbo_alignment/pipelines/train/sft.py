@@ -9,7 +9,6 @@ from transformers.data.data_collator import (
 
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.metrics.metric import Metric
@@ -57,13 +56,6 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
         )
 
     @staticmethod
-    def _get_training_args(experiment_settings: SftTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            **experiment_settings.trainer_settings.dict(),
-        )
-
-    @staticmethod
     def _get_trainer(
         training_args: TrainingArguments,
         experiment_settings: SftTrainExperimentSettings,
@@ -74,7 +66,7 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
         data_collator: DataCollatorMixin,
         **_kwargs,
     ) -> MultiGPUCherryPicksTrainer:
-        model.config.use_cache = not experiment_settings.trainer_settings.gradient_checkpointing
+        model.config.use_cache = not experiment_settings.training_arguments.gradient_checkpointing
 
         return MultiGPUCherryPicksTrainer(
             model=model,

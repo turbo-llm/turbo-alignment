@@ -38,7 +38,7 @@
       },
       "generation_settings": [
         {
-          "transformers_settings": {
+          "generation_config": {
             "num_beams": 1,
             "max_new_tokens": 10,
             "repetition_penalty": 1.2,

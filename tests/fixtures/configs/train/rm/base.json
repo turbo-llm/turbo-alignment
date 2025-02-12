@@ -81,11 +81,18 @@
             "return_dict": true
         },
         "peft_settings": {
-            "r": 8,
-            "lora_alpha": 16,
-            "lora_dropout": 0.05,
-            "target_modules": ["q_proj", "v_proj"],
-            "task_type": "SEQ_CLS"
+            "name": "LORA",
+            "config": {
+                "r": 8,
+                "lora_alpha": 16,
+                "lora_dropout": 0.05,
+                "target_modules": [
+                    "q_proj",
+                    "v_proj"
+                ],
+                "task_type": "SEQ_CLS",
+                "modules_to_save": ["embed_tokens", "lm_head"]
+            }
         }
     },
     "tokenizer_settings": {},
@@ -94,7 +101,7 @@
         "eos_token": "</s>",
         "pad_token": "<pad>"
     },
-    "trainer_settings": {
+    "training_arguments": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
         "per_device_eval_batch_size": 1,
@@ -113,6 +120,7 @@
         "no_cuda": true
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "rm",
         "entity": "turbo-alignment"

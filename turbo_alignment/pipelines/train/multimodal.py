@@ -8,7 +8,6 @@ from transformers.data.data_collator import DataCollatorMixin
 from turbo_alignment.cherry_picks.multimodal import MultimodalCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders import load_model
-from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.dataset.multimodal import InferenceMultimodalDataset
 from turbo_alignment.dataset.multimodal.collators import DataCollatorWithModalityInputs
@@ -42,8 +41,10 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
         experiment_settings: MultimodalTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> MultimodalCherryPickCallback:
+    ) -> MultimodalCherryPickCallback | None:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
+        if cherry_pick_settings is None:
+            return None
 
         cherry_pick_datasets = DatasetLoader[InferenceMultimodalDataset](InferenceMultimodalDataset).load_datasets(
             cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
@@ -58,13 +59,6 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
             cherry_pick_settings=cherry_pick_settings,
             datasets=cherry_pick_datasets,
             metrics=metrics,
-        )
-
-    @staticmethod
-    def _get_training_args(experiment_settings: MultimodalTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
-            output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
-            **experiment_settings.trainer_settings.dict(),
         )
 
     @staticmethod

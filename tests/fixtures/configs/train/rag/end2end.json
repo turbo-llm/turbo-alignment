@@ -55,16 +55,18 @@
         "<system>": "system"
       },
       "peft_settings": {
-        "r": 16,
-        "lora_alpha": 16,
-        "lora_dropout": 0.05,
-        "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj"],
-        "task_type": "CAUSAL_LM",
-        "modules_to_save": [
-          "embed_tokens",
-          "lm_head"
-        ],
-        "name": "LORA"
+            "name": "LORA",
+            "config": {
+                "r": 8,
+                "lora_alpha": 16,
+                "lora_dropout": 0.05,
+                "target_modules": [
+                    "q_proj",
+                    "v_proj"
+                ],
+                "task_type": "CAUSAL_LM",
+                "modules_to_save": ["embed_tokens", "lm_head"]
+            }
       }
     },
     "question_encoder_settings": {
@@ -84,7 +86,7 @@
     }
   },
   "cherry_pick_settings": {
-    "generator_transformers_settings": {
+    "generation_config": {
       "num_beams": 3,
       "max_new_tokens": 16,
       "repetition_penalty": 1.1,
@@ -124,7 +126,7 @@
     "eos_token": "</s>",
     "pad_token": "<pad>"
 },
-  "trainer_settings": {
+  "training_arguments": {
     "evaluation_strategy": "epoch",
     "save_strategy": "epoch",
     "per_device_train_batch_size": 1,
@@ -147,6 +149,7 @@
     "save_total_limit": 1
   },
   "logging_settings": {
+    "logging_type": "wandb",
     "project_name": "alignment",
     "run_name": "rag",
     "entity": "turbo-alignment"

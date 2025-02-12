@@ -22,7 +22,7 @@ class RagCherryPickCallback(ChatCherryPickCallback):
         generator = RagGenerator(
             model=model,
             tokenizer=tokenizer,
-            transformers_settings=self._generator_transformers_settings,
+            generation_config=self._generation_config,
             custom_generation_settings=self._custom_generation_settings,
         )
 

@@ -48,16 +48,18 @@
         "transformers_settings": {
         },
         "peft_settings": {
-            "r": 8,
-            "lora_alpha": 16,
-            "lora_dropout": 0.05,
-            "target_modules": [
-                "q_proj",
-                "v_proj"
-            ],
-            "task_type": "CAUSAL_LM",
-            "modules_to_save": ["embed_tokens", "lm_head"],
-            "name": "LORA"
+            "name": "LORA",
+            "config": {
+                "r": 8,
+                "lora_alpha": 16,
+                "lora_dropout": 0.05,
+                "target_modules": [
+                    "q_proj",
+                    "v_proj"
+                ],
+                "task_type": "CAUSAL_LM",
+                "modules_to_save": ["embed_tokens", "lm_head"]
+            }
         },
         "embeddings_initialization_strategy": {
             "<RS>": "<s>",
@@ -68,10 +70,11 @@
         }
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "num_return_sequences": 2,
             "stop_strings": "</RS>",
+            "do_sample": true,
             "max_new_tokens": 8
         },
         "custom_generation_settings": {
@@ -127,7 +130,7 @@
         "eos_token": "</s>",
         "pad_token": "<pad>"
     },
-    "trainer_settings": {
+    "training_arguments": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
         "per_device_eval_batch_size": 1,
@@ -146,6 +149,7 @@
         "no_cuda": true
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "sft",
         "entity": "turbo-alignment"

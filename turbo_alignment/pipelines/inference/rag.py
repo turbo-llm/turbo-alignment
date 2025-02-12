@@ -43,7 +43,7 @@ class RAGInferenceStrategy(BaseInferenceStrategy):
 
             for generation_settings in model_inference_settings.generation_settings:
                 generator = RagGenerator(
-                    transformers_settings=generation_settings.transformers_settings,
+                    generation_config=generation_settings.generation_config,
                     custom_generation_settings=generation_settings.custom_settings,
                     tokenizer=tokenizer,
                     model=model,

@@ -47,9 +47,11 @@
     "transformers_settings": {},
     "resize_token_embeddings": true,
     "peft_settings": {
-        "task_type": "CAUSAL_LM",
         "name": "PROMPT_TUNING",
-        "num_virtual_tokens": 32
+        "config": {
+            "task_type": "CAUSAL_LM",
+            "num_virtual_tokens": 32
+        }
     },
     "embeddings_initialization_strategy": {
       "<RS>": "<s>",
@@ -60,7 +62,7 @@
   }
     },
     "cherry_pick_settings": {
-        "generator_transformers_settings": {
+        "generation_config": {
             "num_beams": 1,
             "max_new_tokens": 35,
             "repetition_penalty": 1.1,
@@ -100,7 +102,7 @@
         "eos_token": "</s>",
         "pad_token": "<pad>"
     },
-    "trainer_settings": {
+    "training_arguments": {
         "evaluation_strategy": "steps",
         "per_device_train_batch_size": 1,
         "per_device_eval_batch_size": 1,
@@ -119,6 +121,7 @@
         "no_cuda": true
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "sft",
         "entity": "turbo-alignment"

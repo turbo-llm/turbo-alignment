@@ -1,25 +1,28 @@
-from pydantic import Field
+from typing import Any
 
+from pydantic import field_validator
+
+from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.datasets.kto import KTOMultiDatasetSettings
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
-from turbo_alignment.settings.pipelines.train.dpo import SyncRefModelSettings
-from turbo_alignment.settings.tf.trainer import TrainerSettings
-
-
-class KTOTrainerSettings(TrainerSettings):
-    undesirable_weight: float = 1.0
-    desirable_weight: float = 1.33
-    beta: float = 0.1
-    use_ref_model: bool = True
-    sync_ref_settings: SyncRefModelSettings = SyncRefModelSettings()
-    average_log_prob: bool = Field(default=False, description='Normalize log probability by length or not')
+from turbo_alignment.trainers.kto import KTOTrainingArguments
 
 
 class KTOTrainExperimentSettings(BaseTrainExperimentSettings):
     train_dataset_settings: KTOMultiDatasetSettings
     val_dataset_settings: KTOMultiDatasetSettings
 
-    trainer_settings: KTOTrainerSettings
-
     cherry_pick_settings: ChatCherryPickSettings | None = None
+
+    training_arguments: KTOTrainingArguments
+
+    @field_validator('training_arguments', mode='before')
+    def create_training_arguments(cls, values: dict[str, Any]) -> KTOTrainingArguments:
+        return KTOTrainingArguments(
+            **values,
+            output_dir=TRAINER_LOGS_FOLDER,
+            report_to=[],
+            label_names=[],
+            remove_unused_columns=False,
+        )

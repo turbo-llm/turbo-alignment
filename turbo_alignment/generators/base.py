@@ -10,7 +10,6 @@ from turbo_alignment.dataset.base import BaseDataset
 from turbo_alignment.dataset.base.models import DatasetRecord
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.base import BaseInferenceOutput
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 
 InferenceOutputT = TypeVar('InferenceOutputT', bound=BaseInferenceOutput)
 DatasetRecordT = TypeVar('DatasetRecordT', bound=DatasetRecord)
@@ -89,7 +88,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
 class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]):
     def __init__(
         self,
-        transformers_settings: GeneratorTransformersSettings,
+        generation_config: GenerationConfig,
         custom_generation_settings: CustomChatGenerationSettings,
         tokenizer: PreTrainedTokenizerBase,
         return_logits: bool = False,
@@ -99,10 +98,8 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
 
         self._return_logits = return_logits
 
-        self._transformers_generator_parameters = GenerationConfig(
-            bos_token_id=self._tokenizer.bos_token_id,
-            **transformers_settings.dict(),
-        )
+        self._generation_config = generation_config
+        self._generation_config.bos_token_id = self._tokenizer.bos_token_id
 
         self._custom_generation_settings = custom_generation_settings
 
@@ -128,7 +125,7 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         self, records: list[dict[str, Any]], original_records: list[DatasetRecordT], dataset_name: str
     ) -> list[InferenceOutputT]:
         if self._custom_generation_settings.batch > 1:
-            if self._transformers_generator_parameters.num_beams != 1:
+            if self._generation_config.num_beams != 1:
                 raise ValueError('You can not use batch generation with num_beams != 1')
 
             self._tokenizer.padding_side = 'left'

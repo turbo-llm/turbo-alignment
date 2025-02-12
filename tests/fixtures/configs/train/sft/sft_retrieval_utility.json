@@ -132,6 +132,7 @@
         "no_cuda": true
     },
     "logging_settings": {
+        "logging_type": "wandb",
         "project_name": "alignment",
         "run_name": "sft_retrieval_utility",
         "entity": "turbo-alignment"

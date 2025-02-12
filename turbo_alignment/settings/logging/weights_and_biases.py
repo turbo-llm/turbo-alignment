@@ -1,6 +1,7 @@
+import os
 from enum import Enum
 
-from pydantic_settings import BaseSettings
+from turbo_alignment.settings.logging.common import LoggingSettings, LoggingType
 
 
 class WandbMode(str, Enum):
@@ -9,7 +10,8 @@ class WandbMode(str, Enum):
     DISABLED = 'disabled'
 
 
-class WandbSettings(BaseSettings):
+class WandbSettings(LoggingSettings):
+    logging_type: LoggingType = LoggingType.WANDB
     project_name: str
     run_name: str
     entity: str
@@ -19,5 +21,10 @@ class WandbSettings(BaseSettings):
 
     __name__ = 'WandbSettings'
 
-    class Config:
-        env_prefix: str = 'WANDB_'
+    def __init__(self, **kwargs) -> None:
+        mode_from_env = os.getenv('WANDB_MODE', None)
+
+        if mode_from_env:
+            kwargs['mode'] = WandbMode(mode_from_env)
+
+        super().__init__(**kwargs)

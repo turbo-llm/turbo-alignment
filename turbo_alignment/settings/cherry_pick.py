@@ -1,3 +1,8 @@
+from typing import Any
+
+from pydantic import field_validator
+from transformers import GenerationConfig
+
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.datasets.base import MultiDatasetSettings
 from turbo_alignment.settings.datasets.chat import ChatMultiDatasetSettings
@@ -10,7 +15,6 @@ from turbo_alignment.settings.datasets.pair_preference import (
 )
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.metric import MetricSettings
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 
 
 class CherryPickSettings(ExtraFieldsNotAllowedBaseModel):
@@ -27,8 +31,12 @@ class ClassificationCherryPickSettings(CherryPickSettings):
 
 
 class GenerationSettings(CherryPickSettings):
-    generator_transformers_settings: GeneratorTransformersSettings
+    generation_config: GenerationConfig
     custom_generation_settings: CustomChatGenerationSettings
+
+    @field_validator('generation_config', mode='before')
+    def convert_generation_config(cls, values: dict[str, Any]) -> GenerationConfig:
+        return GenerationConfig.from_dict(values)
 
 
 class ChatCherryPickSettings(GenerationSettings):
