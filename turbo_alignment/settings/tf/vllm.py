@@ -9,4 +9,4 @@ class EngineSettings(ExtraFieldsNotAllowedBaseModel):
     gpu_memory_utilization: float | None = 0.9
     max_logprobs: int | None = None
     enable_lora: bool = False
-    max_lora_rank: Optional[int] = None
+    max_lora_rank: int | None = None
