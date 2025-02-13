@@ -35,16 +35,7 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 lora_request: LoRARequest | None = None
 
                 engine_settings = model_inference_settings.vllm_engine_settings.dict()
-                engine_settings.update(
-                    {
-                        'gpu_memory_utilization': 0.95,
-                        'dtype': 'bfloat16',
-                        'enable_lora': isinstance(
-                            model_inference_settings.model_settings, PreTrainedAdaptersModelSettings
-                        ),
-                    }
-                )
-
+                engine_settings['enable_lora'] = isinstance(model_inference_settings.model_settings, PreTrainedAdaptersModelSettings)
                 if engine_settings['enable_lora']:
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
 

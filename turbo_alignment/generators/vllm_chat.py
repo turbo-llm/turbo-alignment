@@ -12,13 +12,13 @@ from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
+from turbo_alignment.settings.tf.generation import VLLMGeneratorSettings
 
 
 class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
     def __init__(
         self,
-        transformers_settings: GeneratorTransformersSettings,
+        transformers_settings: VLLMGeneratorSettings,
         custom_generation_settings: CustomChatGenerationSettings,
         model: LLM,
         tokenizer: PreTrainedTokenizerBase,
@@ -35,23 +35,18 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
 
         beam_search_params: dict[str, Any] = {
-            'best_of': transformers_settings.num_return_sequences,
-            'use_beam_search': False,
+            'use_beam_search': transformers_settings.use_beam_search,
+            'best_of': transformers_settings.sampling_params.n
         }
-        if transformers_settings.num_beams > 1:
-            beam_search_params['use_beam_search'] = True
-            beam_search_params['best_of'] = transformers_settings.num_beams
+        if transformers_settings.use_beam_search:
+            beam_search_params['best_of'] = transformers_settings.best_of
+
+        sampling_params = transformers_settings.sampling_params.dict()
 
         self._sampling_params = SamplingParams(
-            n=transformers_settings.num_return_sequences,
-            repetition_penalty=transformers_settings.repetition_penalty,
-            temperature=transformers_settings.temperature,
-            top_p=transformers_settings.top_p,
-            top_k=transformers_settings.top_k,
+            **sampling_params,
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
-            max_tokens=transformers_settings.max_new_tokens,
-            logprobs=transformers_settings.logprobs,
             **beam_search_params,
         )
         self._lora_request = lora_request

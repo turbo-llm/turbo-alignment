@@ -14,7 +14,6 @@ from turbo_alignment.settings.model import (
     PreTrainedModelSettings,
 )
 from turbo_alignment.settings.tf.tokenizer import TokenizerSettings
-from turbo_alignment.settings.tf.vllm import EngineSettings
 
 INFERENCE_DATASETS_SETTINGS = Annotated[
     ChatMultiDatasetSettings | ClassificationMultiDatasetSettings | MultimodalMultiDatasetSettings,
@@ -28,7 +27,6 @@ class SingleModelInferenceSettings(ExtraFieldsNotAllowedBaseModel):
     use_vllm: bool = False
     batch: int = 1
     micro_batch: int = 1
-    vllm_engine_settings: EngineSettings = Field(default_factory=EngineSettings)
 
 
 class InferenceExperimentSettings(ExtraFieldsNotAllowedBaseModel):
