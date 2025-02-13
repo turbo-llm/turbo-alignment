@@ -22,7 +22,7 @@ config = {
 def get_project_logger() -> loguru.Logger:
     from loguru import logger
 
-    # logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO)
 
     logging.getLogger('alignment-logger')
 
