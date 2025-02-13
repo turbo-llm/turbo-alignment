@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
