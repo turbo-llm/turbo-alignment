@@ -49,8 +49,7 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
 
                 model = vllm.LLM(
-                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
-                    **engine_settings
+                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(), **engine_settings
                 )
 
             else:
