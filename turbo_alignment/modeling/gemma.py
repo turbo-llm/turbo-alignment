@@ -373,7 +373,7 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
         loss = None
         if labels is not None:
             if parallel_states.sequence_parallel_is_initialized():
-               loss = vocab_sequence_parallel_cross_entropy_loss(logits, labels)
+                loss = vocab_sequence_parallel_cross_entropy_loss(logits, labels)
 
             else:
                 loss = self.loss_function(logits, labels, self.vocab_size, **loss_kwargs)
