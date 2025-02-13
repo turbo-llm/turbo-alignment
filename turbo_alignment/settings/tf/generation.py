@@ -1,5 +1,7 @@
-from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from pydantic import Field
+
+from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
+
 
 class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     num_beams: int = 1
@@ -12,6 +14,7 @@ class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     temperature: float = 1.0
     stop_strings: str | list[str] = '</s>'
 
+
 class VLLMSampleingSettings(ExtraFieldsNotAllowedBaseModel):
     n: int = 1
     repetition_penalty: float = 1.0
@@ -20,6 +23,7 @@ class VLLMSampleingSettings(ExtraFieldsNotAllowedBaseModel):
     top_k: int = 50
     max_tokens: int = 15
     logprobs: int | None = None
+
 
 class VLLMGeneratorSettings(ExtraFieldsNotAllowedBaseModel):
     sampling_params: VLLMSampleingSettings = Field(default_factory=VLLMSampleingSettings)

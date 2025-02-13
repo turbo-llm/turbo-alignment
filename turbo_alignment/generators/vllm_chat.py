@@ -36,7 +36,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
 
         beam_search_params: dict[str, Any] = {
             'use_beam_search': transformers_settings.use_beam_search,
-            'best_of': transformers_settings.sampling_params.n
+            'best_of': transformers_settings.sampling_params.n,
         }
         if transformers_settings.use_beam_search:
             beam_search_params['best_of'] = transformers_settings.best_of

@@ -1,12 +1,17 @@
 from typing import Sequence
+
 from pydantic import Field
+
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.pipelines.inference.base import (
     InferenceExperimentSettings,
     SingleModelInferenceSettings,
 )
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings, VLLMGeneratorSettings
+from turbo_alignment.settings.tf.generation import (
+    GeneratorTransformersSettings,
+    VLLMGeneratorSettings,
+)
 from turbo_alignment.settings.tf.vllm import EngineSettings
 
 
