@@ -8,7 +8,6 @@ from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 
 
 class _VocabSequenceParallelCrossEntropy(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, vocab_seq_parallel_logits, target, sp_group):
         # vocab_seq_parallel_logits: [S/P, B, V]
@@ -27,10 +26,12 @@ class _VocabSequenceParallelCrossEntropy(torch.autograd.Function):
         ctx.seqlen = vocab_seq_parallel_logits.size(0) * sp_world_size
         batch_size = vocab_seq_parallel_logits.size(1)
 
-        loss_all = torch.empty(ctx.seqlen,
-                               batch_size,
-                               dtype=vocab_seq_parallel_logits.dtype,
-                               device=vocab_seq_parallel_logits.device)
+        loss_all = torch.empty(
+            ctx.seqlen,
+            batch_size,
+            dtype=vocab_seq_parallel_logits.dtype,
+            device=vocab_seq_parallel_logits.device,
+        )
         dist.all_gather_into_tensor(loss_all, loss, group=sp_group)
 
         ctx.save_for_backward(softmax, target)
@@ -43,7 +44,7 @@ class _VocabSequenceParallelCrossEntropy(torch.autograd.Function):
 
         step_seqlen = ctx.seqlen // ctx.sp_world_size
         sp_rank = ctx.sp_rank
-        grad_output_part = grad_output[step_seqlen * sp_rank:step_seqlen * (sp_rank + 1), :]
+        grad_output_part = grad_output[step_seqlen * sp_rank : step_seqlen * (sp_rank + 1), :]
 
         grad_input = softmax
         grad_2d = grad_input.view(-1, ctx.vocab_size)
