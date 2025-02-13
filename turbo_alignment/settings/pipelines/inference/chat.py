@@ -16,8 +16,9 @@ from turbo_alignment.settings.tf.vllm import EngineSettings
 
 
 class ChatGenerationSettings(ExtraFieldsNotAllowedBaseModel):
-    transformers_settings: GeneratorTransformersSettings | VLLMGeneratorSettings
-    custom_settings: CustomChatGenerationSettings
+    transformers_settings: GeneratorTransformersSettings = Field(default_factory=GeneratorTransformersSettings)
+    vllm_settings: VLLMGeneratorSettings = Field(default_factory=VLLMGeneratorSettings)
+    custom_settings: CustomChatGenerationSettings = Field(default_factory=CustomChatGenerationSettings)
 
 
 class ChatSingleModelInferenceSettings(SingleModelInferenceSettings):

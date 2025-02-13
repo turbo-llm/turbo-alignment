@@ -57,18 +57,19 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 generator_kwargs = {
                     'model': model,
                     'tokenizer': tokenizer,
-                    'transformers_settings': generation_settings.transformers_settings,
                     'custom_generation_settings': generation_settings.custom_settings,
                     'batch': model_inference_settings.batch,
                 }
                 generator = (
                     ChatGenerator(
                         **generator_kwargs,
+                        transformers_settings=generation_settings.transformers_settings,
                         accelerator=accelerator,
                     )
                     if not model_inference_settings.use_vllm
                     else VLLMChatGenerator(
                         **generator_kwargs,
+                        generator_settings=generation_settings.vllm_settings,
                         lora_request=lora_request,
                     )
                 )

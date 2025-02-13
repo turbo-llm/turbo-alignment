@@ -15,10 +15,21 @@ from turbo_alignment.settings.generators.outputs.chat import (
 from turbo_alignment.settings.tf.generation import VLLMGeneratorSettings
 
 
+class TokenSuppressionLogitsProcessor:
+    def __init__(self, available_tokens: list[int]):
+        self.available_tokens = available_tokens
+
+    def __call__(self, generated_tokens: list[int], logits: torch.Tensor) -> torch.Tensor:
+        suppress_mask = torch.full_like(logits, float('-inf'))
+        suppress_mask[self.available_tokens] = 0
+
+        return logits + suppress_mask
+
+
 class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
     def __init__(
         self,
-        transformers_settings: VLLMGeneratorSettings,
+        generator_settings: VLLMGeneratorSettings,
         custom_generation_settings: CustomChatGenerationSettings,
         model: LLM,
         tokenizer: PreTrainedTokenizerBase,
@@ -29,19 +40,23 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         model.set_tokenizer(tokenizer)
         super().__init__(model, tokenizer, batch=batch)
 
-        if isinstance(transformers_settings.stop_strings, list):
+        if isinstance(generator_settings.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
 
-        eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
+        eos_token_id: list[int] = self._tokenizer.encode(generator_settings.stop_strings, add_special_tokens=False)
 
         beam_search_params: dict[str, Any] = {
-            'use_beam_search': transformers_settings.use_beam_search,
-            'best_of': transformers_settings.sampling_params.n,
+            'use_beam_search': generator_settings.use_beam_search,
+            'best_of': generator_settings.best_of if generator_settings.use_beam_search else generator_settings.n,
         }
-        if transformers_settings.use_beam_search:
-            beam_search_params['best_of'] = transformers_settings.best_of
 
-        sampling_params = transformers_settings.sampling_params.dict()
+        sampling_params = generator_settings.dict(
+            exclude={'use_beam_search', 'best_of', 'stop_strings', 'filter_token_ids'}
+        )
+        if generator_settings.filter_token_ids:
+            sampling_params['logits_processors'] = [
+                TokenSuppressionLogitsProcessor(generator_settings.filter_token_ids)
+            ]
 
         self._sampling_params = SamplingParams(
             **sampling_params,
@@ -70,10 +85,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             answers = []
             for a in request_output.outputs:
                 ans_msg = AnswerMessage(
-                    id=str(a.index),
-                    content=a.text,
-                    sequence_score=a.cumulative_logprob,
-                    logprobs=a.logprobs if a.logprobs else None,
+                    id=str(a.index), content=a.text, sequence_score=a.cumulative_logprob, logprobs=a.logprobs
                 )
                 if self._return_logits:
                     ans_msg.input_token_ids = torch.tensor(request_output.prompt_token_ids).unsqueeze(0)
