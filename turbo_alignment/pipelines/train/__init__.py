@@ -5,5 +5,7 @@ from .kto import TrainKTOStrategy
 from .multimodal import TrainMultimodalStrategy
 from .rag import TrainRAGStrategy
 from .reinforce import TrainREINFORCEStrategy
+from .reinforce_cot import TrainREINFORCEСoTStrategy
+from .grpo import TrainGRPOStrategy
 from .rm import TrainRMStrategy
 from .sft import TrainSFTStrategy

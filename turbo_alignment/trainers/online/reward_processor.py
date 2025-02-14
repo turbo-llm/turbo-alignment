@@ -86,6 +86,8 @@ class RLOORewardProcessor(RewardProcessor):
         baseline: torch.Tensor = (rewards.sum(-1).unsqueeze(-1) - rewards) / (self.num_generations - 1)
         rloo_advantages: torch.Tensor = (rewards - baseline).flatten()
 
+        # [ 1,  1,  1,  1, -1, -1, -1, -1]
+
         # if torch.distributed.get_rank() == 0:
             # print(f'REWARD DEVICES INSIDE BASELINE, {rewards.device}')
             # print(f'BASELINE DEVICES INSIDE BASELINE, {baseline.device}')
@@ -98,3 +100,35 @@ class RLOORewardProcessor(RewardProcessor):
             }
 
         return rloo_advantages, metrics
+
+
+class GRPORewardProcessor(RewardProcessor):
+    def __init__(self, num_generations) -> None:
+        self.num_generations = num_generations
+
+    def postprocess_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        rewards = rewards[:, 0].unsqueeze(-1)  # values are at 
+
+        with torch.no_grad():
+            metrics: dict[str, float] = get_log_mean_std(rewards, 'real_reward', use_global=True) # FIXME?
+
+        return rewards, metrics
+
+    def baseline_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        rewards = rewards.reshape(-1, self.num_generations)
+
+        mean_grouped_rewards = rewards.mean(dim=1)
+        std_grouped_rewards = rewards.std(dim=1)
+
+        mean_grouped_rewards = mean_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+        std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+
+        grpo_advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4).flatten()
+
+        with torch.no_grad():
+            metrics: dict[str, float] = {
+                **get_log_mean_std(mean_grouped_rewards, 'mean_group_advantage', use_global=True), # FIXME?
+                **get_log_mean_std(std_grouped_rewards, 'std_group_advantage', use_global=True), # FIXME?
+            }
+
+        return grpo_advantages, metrics

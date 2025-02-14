@@ -93,7 +93,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         for i, request_output in enumerate(request_outputs): #FIXME
             answers = []
             for a in request_output.outputs:
-                answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0)
+                answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0).cuda()
                 #TODO assuming len(eos_token_id) == 1 FIXME
                 answer_token_ids[:, -1] = self.eos_token_id[0]
                 ans_msg = AnswerMessage(
@@ -101,15 +101,15 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
                     content=a.text,
                     sequence_score=a.cumulative_logprob,
                     answer_token_ids=answer_token_ids,
-                    answer_attention_mask=torch.ones_like(answer_token_ids)
+                    answer_attention_mask=torch.ones_like(answer_token_ids, device=answer_token_ids.device)
                 )
 
                 answers.append(ans_msg)
             if original_records:
                 outputs.append(
                     ChatInferenceOutput(
-                        input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0),
-                        input_attention_mask=records['attention_mask'][i, :].unsqueeze(0).cpu(),
+                        input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0).cuda(),
+                        input_attention_mask=records['attention_mask'][i, :].unsqueeze(0).cuda(),
                         id=None,
                         dataset_name=dataset_name,
                         messages=None,
