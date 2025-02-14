@@ -33,18 +33,16 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 from turbo_alignment.generators.vllm_chat import VLLMChatGenerator
 
                 lora_request: LoRARequest | None = None
-                enable_lora: bool = False
 
-                if isinstance(model_inference_settings.model_settings, PreTrainedAdaptersModelSettings):
+                engine_settings = model_inference_settings.vllm_engine_settings.dict()
+                engine_settings['enable_lora'] = isinstance(
+                    model_inference_settings.model_settings, PreTrainedAdaptersModelSettings
+                )
+                if engine_settings['enable_lora']:
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
-                    enable_lora = True
 
                 model = vllm.LLM(
-                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
-                    dtype='bfloat16',
-                    tensor_parallel_size=model_inference_settings.tensor_parallel_size,
-                    enable_lora=enable_lora,
-                    gpu_memory_utilization=0.95,
+                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(), **engine_settings
                 )
 
             else:
@@ -59,18 +57,19 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 generator_kwargs = {
                     'model': model,
                     'tokenizer': tokenizer,
-                    'transformers_settings': generation_settings.transformers_settings,
                     'custom_generation_settings': generation_settings.custom_settings,
                     'batch': model_inference_settings.batch,
                 }
                 generator = (
                     ChatGenerator(
                         **generator_kwargs,
+                        transformers_settings=generation_settings.transformers_settings,
                         accelerator=accelerator,
                     )
                     if not model_inference_settings.use_vllm
                     else VLLMChatGenerator(
                         **generator_kwargs,
+                        generator_settings=generation_settings.vllm_settings,
                         lora_request=lora_request,
                     )
                 )

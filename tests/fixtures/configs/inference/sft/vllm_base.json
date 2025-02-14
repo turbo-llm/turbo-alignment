@@ -11,17 +11,28 @@
         "use_fast": false,
         "tokenizer_path": "tests/fixtures/models/llama2_tiny_fine_tuned_with_adapters/tokenizer_with_special_tokens"
       },
+      "use_vllm": true,
+      "vllm_engine_settings": {
+        "max_lora_rank": 32,
+        "tensor_parallel_size": 1
+      },
       "generation_settings": [
         {
+          "vllm_settings": {
+            "n": 1,
+            "repetition_penalty": 1.02,
+            "max_tokens": 16,
+            "top_k": -1,
+            "stop_strings": "<|im_end|>"
+          },
           "transformers_settings": {
             "num_beams": 3,
-            "max_new_tokens": 8
+            "max_new_tokens": 8,
+            "logprobs": 100
           },
           "custom_settings": {}
         }
-      ],
-      "use_vllm": true,
-      "tensor_parallel_size": 2
+      ]
     }
   ],
   "dataset_settings": {
