@@ -2,6 +2,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 import itertools
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
@@ -24,6 +25,7 @@ from turbo_alignment.common.distributed import (
     get_log_mean_std,
     _init_process_group
 )
+from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator, vLLMChatGenerator, RayRMSamplingGenerator
 from turbo_alignment.generators.base import ChatGeneratorBase
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
@@ -46,6 +48,7 @@ import deepspeed
 import ray
 import socket
 import os
+import re
 from deepspeed.runtime.engine import DeepSpeedEngine
 import gc
 import time
@@ -113,6 +116,29 @@ def sum_all_parameter_values(model):
     total_sum = sum(p.sum().item() for p in model.parameters())
     return total_sum
 
+
+
+ANS_RE = re.compile(r"<answer>\s*(-?[0-9.,]+)\s*</answer>")
+PATTERN_RE = re.compile(r"^<think>.*?</think>\s*<answer>.*?</answer>$")
+INVALID_ANS = "[invalid]"
+
+NEG_REWARD = 0
+
+def extract_answer(completion):
+    match = ANS_RE.search(completion)
+    if match:
+        match_str = match.group(1).strip()
+        match_str = match_str.replace(",", "")
+        return match_str
+    else:
+        return INVALID_ANS
+    
+    
+def format_reward(completion):
+    match = PATTERN_RE.match(completion, re.DOTALL | re.MULTILINE)
+    print('completion,', completion)
+    print('format match,', match)
+    return match
 
 class TimeProfiler:
     def __init__(self):
@@ -352,6 +378,11 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
                 generator = ...
+            case CriticType.DATASET:
+                generator = {
+                    item['input']: item['answer'] for item in read_jsonl(Path('/from_s3/dataset/rewards_train.jsonl'))
+                }
+                torch.distributed.barrier()
             case _:
                 raise ValueError(f'Critic {self.args.critic_type} is not supported')
         return generator
@@ -382,13 +413,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         self,
         model: torch.nn.Module | PreTrainedModel | DeepSpeedEngine ,
         inputs: dict[str, torch.Tensor],
-        do_broadcast=True
+        do_broadcast=True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-
-        # if torch.distributed.get_rank() == 0:
-        #     print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
-        #     print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
-        #     print(f'Input Example at index [0]: {self.processing_class.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}')
 
         if do_broadcast:
             # TODO: move to generator
@@ -416,8 +442,17 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
 
         # if torch.distributed.get_rank() == 0:
-        #     print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
-        #     print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
+            # print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
+            # print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0], skip_special_tokens=False)}', flush=True)
+
+        if isinstance(self.critic_generator, dict):
+            message_answers = [
+                    {
+                        'input': self.tokenizer.decode(g.input_token_ids[0].cpu(), skip_special_tokens=False), 
+                        'answer': self.tokenizer.decode(ans.answer_token_ids[0].cpu(), skip_special_tokens=False),
+                    } 
+                    for g in generations for ans in g.answers
+                ]
 
         max_length = max([response_id.size(1) for response_id in response_ids])
 
@@ -425,18 +460,17 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             padded_sequences = []
             for seq in sequences:
                 padding_needed = max_length - seq.size(1)
-                padded_seq = torch.cat([seq.squeeze(0), torch.full((padding_needed,), pad_value, dtype=seq.dtype)])
+                padded_seq = torch.cat([seq.squeeze(0), torch.full((padding_needed,), pad_value, dtype=seq.dtype, device=seq.device)])
                 padded_sequences.append(padded_seq)
             return torch.stack(padded_sequences)
         
         if torch.distributed.get_rank() == 0:
             start = time.time()
             
-        response_ids = pad_sequences(response_ids, max_length, pad_value=self.tokenizer.pad_token_id).cuda()
-        response_attention_mask = pad_sequences(response_attention_mask, max_length, pad_value=0).cuda()
+        response_ids = pad_sequences(response_ids, max_length, pad_value=self.tokenizer.pad_token_id)
+        response_attention_mask = pad_sequences(response_attention_mask, max_length, pad_value=0)
 
         response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.bfloat16, device=response_ids.device) # why bf16 FIXME
-        # response_tokens_mask[:, generations[0].input_token_ids.shape[0] :] = 1.0 # ?????/ incorrect
 
         input_lengths = [g.input_token_ids.size(1) for g in generations for _ in g.answers]
 
@@ -449,7 +483,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.padding_time.append(end - start)
-            # logging.info(f'padding elapsed time:{end - start}')
 
         rm_inputs = {
             'input_ids': response_ids,
@@ -460,12 +493,46 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
-        rewards = self.critic_generator.generate_from_batch_records(rm_inputs)
+        if isinstance(self.critic_generator, dict):
+
+            self.correct_rewards = []
+            self.template_rewards =[]
+
+            for msg_ans in message_answers:
+                msg_ans['input'] = msg_ans['input'].rstrip('<|im_end|>\n<|im_start|>assistant\n')
+                input_ = msg_ans['input'][
+                    msg_ans['input'].rfind('<|im_start|>user\n') + len('<|im_start|>user\n'):
+                ]
+
+                if msg_ans['answer'].endswith('<|im_end|>'):
+                    msg_ans['answer'] = msg_ans['answer'][:-len('<|im_end|>')].strip('')
+
+
+                # if torch.distributed.get_rank() == 0:
+                #     print('answers,', msg_ans['answer'])
+                # torch.distributed.barrier()
+
+                if format_reward(msg_ans['answer']):
+                    self.template_rewards.append(1)
+                else:
+                    self.template_rewards.append(NEG_REWARD)
+
+                if extract_answer(msg_ans['answer']) == self.critic_generator[input_]:
+                    self.correct_rewards.append(1)
+                else:
+                    self.correct_rewards.append(NEG_REWARD)
+            
+
+            with torch.no_grad():
+                rewards = torch.tensor((self.template_rewards, self.correct_rewards), device=response_ids.device, requires_grad=False).sum(dim=0).unsqueeze(0)
+            # if torch.distributed.get_rank() == 0:
+                # print('REWARDS!!!', rewards, self.template_rewards, self.correct_rewards)
+        else:
+            rewards = self.critic_generator.generate_from_batch_records(rm_inputs)
 
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.reward_model_time.append(end - start)
-            # logging.info(f'Rewards elapsed time:{end - start}')
         
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
@@ -486,9 +553,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             ) = self.get_answers_and_rewards(
                 model=model,
                 inputs=inputs,
-                do_broadcast=True if train_eval == 'train' else False
+                do_broadcast=True if train_eval == 'train' else False,
             )
-            
+
             if isinstance(self.ref_model, RayGroup):
                 ref_logits = ray.get(
                     self.ref_model.reference_forward(
@@ -496,14 +563,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                             'input_ids': query_response,
                             'attention_mask': attention_mask,
                             'position_ids': position_ids,
-                            #'use_cache': False
+                            'use_cache': False,
                         },
                         index=torch.distributed.get_rank() % self.args.reference_model_replicas,
-                        # index=0,
                     )
                 )
             else:
-                # 77357.28369140625 SUM WEIGHTS
                 if torch.distributed.get_rank() == 0:
                     start = time.time()
 
@@ -511,13 +576,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     input_ids=query_response,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
-                    #use_cache=False,
+                    use_cache=False,
                 ).logits[:, :-1]
 
                 if torch.distributed.get_rank() == 0:
                     end = time.time()
                     self.time_profiler.reference_forward_time.append(end - start)
-                    # logging.info(f'Reference forward elapsed time:{end - start}')
 
             if torch.distributed.get_rank() == 0:
                 start = time.time()
@@ -531,43 +595,15 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 end = time.time()
                 self.time_profiler.reference_model_time.append(end - start)
-                # logging.info(f'Reference logprobs elapsed time:{end - start}')
             
             if torch.distributed.get_rank() == 0:
                 start = time.time()
-
-            # profiler = torch.profiler.profile(
-            #     activities=[
-            #         torch.profiler.ProfilerActivity.CPU,
-            #         torch.profiler.ProfilerActivity.CUDA,
-            #     ],
-
-            #     record_shapes=True,
-            #     profile_memory=True,
-            #     with_stack=False,
-            # )
-
             
-            # with profiler as prof:
             rewards, valid_mask, rewards_metrics = self.process_rewards(rewards=rewards, query_response=query_response)
-                # prof.step()
+
             if torch.distributed.get_rank() == 0:
                 end = time.time()
                 self.time_profiler.reward_processing_time.append(end - start)
-                # print('PROCESSING CUDA METRICS'*15)
-                # print(
-                #         prof.key_averages().table(
-                #         sort_by="cuda_time_total", 
-                #         row_limit=10,
-                #     )
-                # )
-                # print('PROCESSING CPU METRICS'*15)
-                # print(
-                #         prof.key_averages().table(
-                #         sort_by="cpu_time_total", 
-                #         row_limit=10,
-                #     )
-                # )
 
         if torch.distributed.get_rank() == 0:
             start = time.time()
@@ -576,12 +612,12 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             input_ids=query_response,
             attention_mask=attention_mask,
             position_ids=position_ids,
+            use_cache=False,
         ).logits[:, :-1]
 
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.policy_forward_time.append(end - start)
-            # logging.info(f'Policy forward elapsed time:{end - start}')
         
         # del inputs
         # gc.collect()
@@ -596,16 +632,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             loss_mask=response_tokens_mask,
         )
 
-        # assert torch.allclose(ref_logits, logits), 'REF LOGITS ALLCLOSE' check for 0 step 
-        # assert torch.allclose(ref_logprobs, logprobs), 'REF LOGPROBS ALLCLOSE'
-
-        # assert torch.equal(ref_logits, logits), 'REF LOGITS EQUAL'
-        # assert torch.equal(ref_logprobs, logprobs), 'REF LOGPROBS EQUAL'
-
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.policy_model_time.append(end - start)
-            # logging.info(f'Policy logrobs elapsed time:{end - start}')
 
         with torch.no_grad():
             kl_term = logprobs.detach() - ref_logprobs
@@ -614,41 +643,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 start = time.time()
 
-            # new_profiler = torch.profiler.profile(
-            #     activities=[
-            #         torch.profiler.ProfilerActivity.CPU,
-            #         torch.profiler.ProfilerActivity.CUDA,
-            #     ],
-
-            #     record_shapes=True,
-            #     profile_memory=True,
-            #     with_stack=False,
-            # )
-
-            
-            # with new_profiler as new_prof:
-
             baselined_reward, baseline_metrics = self.reward_processor.baseline_rewards(rewards=regularized_rewards)
-
-                # new_prof.step()
-
-            # if torch.distributed.get_rank() == 0:
-                # end = time.time()
-                # self.time_profiler.reward_processing_time.append(end - start)
-                # print('BASELINE CUDA METRICS'*15)
-                # print(
-                #         new_prof.key_averages().table(
-                #         sort_by="cuda_time_total", 
-                #         row_limit=10,
-                #     )
-                # )
-                # print('BASELINE CPU METRICS'*15)
-                # print(
-                #         new_prof.key_averages().table(
-                #         sort_by="cpu_time_total", 
-                #         row_limit=10,
-                #     )
-                # )
 
             if torch.distributed.get_rank() == 0:
                 end = time.time()
@@ -673,6 +668,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     logprobs.detach(),
                     ref_logprobs,
                     1 - valid_mask.float(),
+                    # (torch.tensor(self.correct_rewards) == NEG_REWARD).float(),
+                    # (torch.tensor(self.template_rewards) == NEG_REWARD).float(),
+
                 ],
                 [
                     'rewards',
@@ -683,6 +681,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     'logprobs',
                     'ref_logprobs',
                     'invalid_rewards',
+                    # 'correct_rewards',
+                    # 'template_rewards',
                 ],
             ):
                 metrics = {
@@ -704,7 +704,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.metrics_time.append(end - start)
-            # logging.info(f'Metrics elapsed time:{end - start}')
         
         return loss.mean(), metrics
     
@@ -724,7 +723,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.total_time.append(end - start)
-            # logging.info(f'Total elapsed time:{end - start}')
             self.time_profiler.print()
         
         # gc.collect()
@@ -785,15 +783,21 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         logits: torch.Tensor,
         input_ids: torch.Tensor,
         loss_mask: torch.Tensor,
+        log_softmax: bool = True,
+        do_sum: bool = True,
     ):
-        # logits /= self.args.temperature
+        logits /= self.args.temperature
 
-        all_logprob = F.log_softmax(logits, dim=-1)
+        all_logprob = F.log_softmax(logits, dim=-1) if log_softmax else F.softmax(logits, dim=-1)
 
         logprob = torch.gather(all_logprob, 2, input_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
         logprob[~loss_mask[:, 1:].to(torch.bool)] = 0
 
-        return logprob.sum(-1)
+        if do_sum:
+            return logprob.sum(-1)
+            
+        return logprob
+
 
     # FIXME
     def fill_nonvalid_rewards(self, rewards, query_response) -> Tuple[torch.Tensor, torch.Tensor]:

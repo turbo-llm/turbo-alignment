@@ -413,6 +413,11 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
 
         # if torch.distributed.get_rank() == 0:
+        #     print('response_ids.device, ', response_ids.device)
+        #     print('response_attention_mask.device, ', response_attention_mask.device)
+        # torch.distributed.barrier()
+
+        # if torch.distributed.get_rank() == 0:
         #     print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
         #     print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0])}', flush=True)
 
@@ -429,6 +434,9 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             start = time.time()
             
+        # if torch.distributed.get_rank() == 0:
+        #     print('response_ids.device, ', response_ids.device)
+        # torch.distributed.barrier()
         response_ids = pad_sequences(response_ids, max_length, pad_value=self.tokenizer.pad_token_id)
         response_attention_mask = pad_sequences(response_attention_mask, max_length, pad_value=0)
 
@@ -560,21 +568,17 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             do_sum=False,
         )
 
-        if torch.distributed.get_rank() == 0:
-            print('logprobs.shape', logprobs.shape)
-            print('ref_logprobs.shape', ref_logprobs.shape)
-        torch.distributed.barrier()
+        print('logprobs.shape', logprobs.shape)
+        print('ref_logprobs.shape', ref_logprobs.shape)
 
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.policy_model_time.append(end - start)
 
         with torch.no_grad():
-            kl_term = torch.exp(ref_logprobs - logprobs) - (ref_logprobs - logprobs) - 1
+            kl_term = (torch.exp(ref_logprobs - logprobs) - (ref_logprobs - logprobs) - 1)
 
-            if torch.distributed.get_rank() == 0:
-                print('kl_term.shape', kl_term.shape)
-            torch.distributed.barrier()
+            print('kl_term.shape', kl_term.shape)
 
             if torch.distributed.get_rank() == 0:
                 start = time.time()
@@ -585,16 +589,14 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                 end = time.time()
                 self.time_profiler.baseline_reward_time.append(end - start)
 
-        if torch.distributed.get_rank() == 0:
-            print('advantages.shape', advantages.shape)
-        torch.distributed.barrier()
+        print('advantages.shape', advantages.shape)
 
-        per_token_loss = torch.exp(logprobs - logprobs.detach()) * advantages # https://github.com/huggingface/trl/pull/2565#issuecomment-2595837761
-        loss = -(per_token_loss - self.kl_coef * kl_term)
+        per_token_loss = torch.exp(logprobs - logprobs.detach()) * advantages.unsqueeze(1) # https://github.com/huggingface/trl/pull/2565#issuecomment-2595837761
+        per_token_loss = -(per_token_loss - self.kl_coef * kl_term)
+        loss = per_token_loss.mean(dim=1)
 
-        if torch.distributed.get_rank() == 0:
-            print('per_token_loss.shape', per_token_loss.shape)
-        torch.distributed.barrier()
+        print('per_token_loss.shape', per_token_loss.shape)
+        print('loss.shape', loss.shape)
 
         assert len(loss.shape) == 1, loss.shape
 
@@ -608,7 +610,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                     rewards,
                     advantages,
                     loss.detach(),
-                    kl_term.detach(),
+                    kl_term.mean().detach(),
                     logprobs.detach(),
                     ref_logprobs,
                     1 - valid_mask.float(),

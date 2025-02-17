@@ -115,15 +115,20 @@ class GRPORewardProcessor(RewardProcessor):
         return rewards, metrics
 
     def baseline_rewards(self, rewards: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
-        rewards = rewards.reshape(-1, self.num_generations)
+        rewards = rewards.reshape(-1, self.num_generations) # [bs, num_generations]
 
-        mean_grouped_rewards = rewards.mean(dim=1)
-        std_grouped_rewards = rewards.std(dim=1)
+        print('rewards.shape, ', rewards.shape)
 
-        mean_grouped_rewards = mean_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
-        std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+        mean_grouped_rewards = rewards.mean(dim=1) # [bs,]
+        std_grouped_rewards = rewards.std(dim=1) # [bs,]
 
-        grpo_advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4).flatten()
+        print('mean_grouped_rewards.shape, ', mean_grouped_rewards.shape)
+        print('std_grouped_rewards.shape, ', std_grouped_rewards.shape)
+
+        mean_grouped_rewards = mean_grouped_rewards.repeat_interleave(self.num_generations, dim=0).reshape(-1, self.num_generations) # [bs * num_generations], [bs, num_generations]
+        std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0).reshape(-1, self.num_generations) # [bs * num_generations], [bs, num_generations]
+
+        grpo_advantages = ((rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4)).flatten()
 
         with torch.no_grad():
             metrics: dict[str, float] = {

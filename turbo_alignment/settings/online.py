@@ -20,6 +20,7 @@ class CriticType(str, Enum):
     LOCAL_TRANSFORMERS = 'local_transformers'
     RAY_TRANSFORMERS = 'ray_transformers'
     DISTRIBUTED_VLLM = 'distributed_vllm'
+    DATASET = 'dataset'
 
 
 class RewardProcessorType(str, Enum):
