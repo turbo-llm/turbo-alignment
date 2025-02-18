@@ -857,6 +857,7 @@ class DPOTrainer(Trainer):
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, torch.Tensor | Any],
         return_outputs=False,
+        num_items_in_batch=None,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
         loss, metrics = self.get_batch_metrics(model, inputs, train_eval='train')
 
