@@ -37,11 +37,13 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
         experiment_settings: DDPOTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> ChatCherryPickCallback:
+    ) -> ChatCherryPickCallback | None:
         rm_model = kwargs.get('rm_tokenizer', None)
         assert rm_model is not None, 'RM Tokenizer should not be None'
 
         cherry_pick_settings = experiment_settings.cherry_pick_settings
+        if cherry_pick_settings is None:
+            return None
 
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
             cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE

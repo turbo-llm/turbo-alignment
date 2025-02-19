@@ -34,15 +34,16 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
 
                 lora_request: LoRARequest | None = None
 
-                engine_settings = model_inference_settings.vllm_engine_settings.dict()
-                engine_settings['enable_lora'] = isinstance(
+                engine_settings = model_inference_settings.vllm_engine_settings
+
+                if engine_settings.enable_lora and isinstance(
                     model_inference_settings.model_settings, PreTrainedAdaptersModelSettings
-                )
-                if engine_settings['enable_lora']:
+                ):
                     lora_request = LoRARequest('adapter', 1, str(model_inference_settings.model_settings.adapter_path))
 
                 model = vllm.LLM(
-                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(), **engine_settings
+                    model=model_inference_settings.model_settings.model_path.absolute().as_posix(),
+                    **engine_settings.dict(),
                 )
 
             else:
