@@ -37,7 +37,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
         experiment_settings: RMTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **_kwargs,
-    ) -> RmCherryPickCallback:
+    ) -> RmCherryPickCallback | None:
         cherry_pick_settings = experiment_settings.cherry_pick_settings
         if cherry_pick_settings is None:
             return None
