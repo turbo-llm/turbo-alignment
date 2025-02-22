@@ -26,6 +26,11 @@ class MetricSettings(ExtraFieldsNotAllowedBaseModel):
     need_average: list[bool]
 
 
+@MetricSettingsRegistry.register(MetricType.ACCURACY)
+class AccuracySettings(MetricSettings):
+    ...
+
+
 @MetricSettingsRegistry.register(MetricType.DIST_N)
 class DistinctnessSettings(MetricSettings):
     ngram: int = 5
