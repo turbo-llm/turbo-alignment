@@ -1,67 +1,68 @@
+import gc
+import itertools
+import logging
+import os
+import socket
+import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-import itertools
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+import deepspeed
+import ray
 import torch
 import torch.distributed
 import torch.nn.functional as F
 import torch.utils
 import torch.utils.data
 from datasets import Dataset
+from deepspeed.runtime.engine import DeepSpeedEngine
 from transformers import (
+    GenerationConfig,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     TrainerCallback,
-    TrainingArguments, 
-    GenerationConfig,
+    TrainingArguments,
 )
 
-from turbo_alignment.common.distributed import (
-    get_global_mean,
-    get_global_std,
-    get_log_mean_std,
-    _init_process_group
+from turbo_alignment.common.distributed import get_log_mean_std
+from turbo_alignment.common.tf.loaders.model.model import disable_dropout_in_model
+from turbo_alignment.generators import (
+    ChatGenerator,
+    RayRMSamplingGenerator,
+    RMSamplingGenerator,
+    vLLMChatGenerator,
 )
-from turbo_alignment.generators import ChatGenerator, RMSamplingGenerator, vLLMChatGenerator, RayRMSamplingGenerator
 from turbo_alignment.generators.base import ChatGeneratorBase
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.chat import ChatInferenceOutput
-from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.settings.online import (
-    CriticType,
-    vLLMActorSettings,
-    HFActorSettings,
     ActorType,
+    CriticType,
+    HFActorSettings,
     RewardProcessorType,
+    vLLMActorSettings,
 )
-from turbo_alignment.common.tf.loaders.model.model import disable_dropout_in_model
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
-from turbo_alignment.trainers.online.reward_processor import GRPORewardProcessor, RewardProcessor
 from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
+from turbo_alignment.trainers.online.reward_processor import GRPORewardProcessor
 from turbo_alignment.trainers.utils import prepare_model
 
-import deepspeed
-import ray
-import socket
-import os
-from deepspeed.runtime.engine import DeepSpeedEngine
-import gc
-import time
-import logging
 
 def get_all_parameters(sub_module, recurse=False):
     return itertools.chain(sub_module.named_parameters(recurse=recurse), sub_module.ds_external_parameters())
 
+
 def iter_params(module, recurse=False):
     return [param for _, param in get_all_parameters(module, recurse)]
 
-def remove_hooks(model: "DeepSpeedEngine") -> None:
+
+def remove_hooks(model: 'DeepSpeedEngine') -> None:
     """Removes the optimizer hooks from a DeepSpeed ZeRO-3 model."""
-    if model.optimizer is not None and hasattr(model.optimizer, "parameter_offload"):
+    if model.optimizer is not None and hasattr(model.optimizer, 'parameter_offload'):
         optimizer_offload = model.optimizer.parameter_offload
     elif model.optimizer is not None:
         optimizer_offload = model.optimizer
@@ -77,13 +78,15 @@ def remove_hooks(model: "DeepSpeedEngine") -> None:
     optimizer_offload.forward_hooks = []
     optimizer_offload.backward_hooks = []
 
-def add_hooks(model: "DeepSpeedEngine") -> None:
+
+def add_hooks(model: 'DeepSpeedEngine') -> None:
     """Adds the optimizer hooks from a DeepSpeed ZeRO-3 model."""
-    if model.optimizer is not None and hasattr(model.optimizer, "parameter_offload"):
+    if model.optimizer is not None and hasattr(model.optimizer, 'parameter_offload'):
         optimizer_offload = model.optimizer.parameter_offload
     elif model.optimizer is not None:
         optimizer_offload = model.optimizer
     optimizer_offload._register_hooks_recursively(optimizer_offload.module)
+
 
 @contextmanager
 def unwrap_model_for_generation(
@@ -109,6 +112,7 @@ def unwrap_model_for_generation(
     else:
         yield unwrapped_model
 
+
 def sum_all_parameter_values(model):
     if isinstance(model, deepspeed.DeepSpeedEngine):
         model = model.module
@@ -133,31 +137,33 @@ class TimeProfiler:
 
     def print(self):
         import numpy as np
-        
+
         additional_time = []
-        
+
         for length in range(len(self.total_time)):
-            other_time = 2 * self.total_time[length] - sum([self.__getattribute__(key)[length] for key in self.__dict__.keys()])
+            other_time = 2 * self.total_time[length] - sum(
+                [self.__getattribute__(key)[length] for key in self.__dict__.keys()]
+            )
             additional_time.append(other_time)
 
         def mean_std_format(values):
             mean = np.mean(values)
             std = np.std(values)
-            return f"{mean:.2f} (±{std:.2f})"
+            return f'{mean:.2f} (±{std:.2f})'
 
-        print(f"Broadcast Time: {mean_std_format(self.broadcast_time)}", flush=True)
-        print(f"Completions Time: {mean_std_format(self.completions_time)}", flush=True)
-        print(f"Reward Model Time: {mean_std_format(self.reward_model_time)}", flush=True)
-        print(f"Reward Processing Time: {mean_std_format(self.reward_processing_time)}", flush=True)
-        print(f"Reward Baseline Time: {mean_std_format(self.baseline_reward_time)}", flush=True)
-        print(f"Reference Logprobs Time: {mean_std_format(self.reference_model_time)}", flush=True)
-        print(f"Reference Forward Time: {mean_std_format(self.reference_forward_time)}", flush=True)
-        print(f"Policy Logprobs Time: {mean_std_format(self.policy_model_time)}", flush=True)
-        print(f"Policy Forward Time: {mean_std_format(self.policy_forward_time)}", flush=True)
-        print(f"Total Time: {mean_std_format(self.total_time)}", flush=True)
-        print(f"Padding Time: {mean_std_format(self.padding_time)}", flush=True)
-        print(f"Metrics Time: {mean_std_format(self.metrics_time)}", flush=True)
-        print(f"Additional Time: {mean_std_format(additional_time)}", flush=True)
+        print(f'Broadcast Time: {mean_std_format(self.broadcast_time)}', flush=True)
+        print(f'Completions Time: {mean_std_format(self.completions_time)}', flush=True)
+        print(f'Reward Model Time: {mean_std_format(self.reward_model_time)}', flush=True)
+        print(f'Reward Processing Time: {mean_std_format(self.reward_processing_time)}', flush=True)
+        print(f'Reward Baseline Time: {mean_std_format(self.baseline_reward_time)}', flush=True)
+        print(f'Reference Logprobs Time: {mean_std_format(self.reference_model_time)}', flush=True)
+        print(f'Reference Forward Time: {mean_std_format(self.reference_forward_time)}', flush=True)
+        print(f'Policy Logprobs Time: {mean_std_format(self.policy_model_time)}', flush=True)
+        print(f'Policy Forward Time: {mean_std_format(self.policy_forward_time)}', flush=True)
+        print(f'Total Time: {mean_std_format(self.total_time)}', flush=True)
+        print(f'Padding Time: {mean_std_format(self.padding_time)}', flush=True)
+        print(f'Metrics Time: {mean_std_format(self.metrics_time)}', flush=True)
+        print(f'Additional Time: {mean_std_format(additional_time)}', flush=True)
 
 
 # FIXME
@@ -179,11 +185,11 @@ class GRPOTrainingArguments(TrainingArguments):
 
     non_eos_penalty: bool = True
     temperature: float | None = None
-    whiten_rewards: bool = False
 
     actor_type: ActorType = ActorType.DISTRIBUTED_VLLM
     critic_type: CriticType = CriticType.RAY_TRANSFORMERS
     actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
+
 
 class GRPOTrainer(MultiGPUCherryPicksTrainer):
     def __init__(
@@ -199,7 +205,6 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ) -> None:
-
         super().__init__(
             model=policy,
             args=args,
@@ -209,30 +214,33 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             callbacks=callbacks,
             **kwargs,
         )
-        
+
         self.time_profiler = TimeProfiler()
         self.vllm_engines = vllm_engines
 
         if self.vllm_engines is not None and torch.distributed.get_rank() == 0:
             master_address = ray._private.services.get_node_ip_address()
             with socket.socket() as sock:
-                sock.bind(("", 0))
+                sock.bind(('', 0))
                 master_port = sock.getsockname()[1]
-            
+
             # TODO_RLOO assert tp_size same for all engines
-            world_size = args.actor_settings["vllm_num_engines"] * args.actor_settings["vllm_tensor_parallel_size"] + 1
+            world_size = args.actor_settings['vllm_num_engines'] * args.actor_settings['vllm_tensor_parallel_size'] + 1
 
             refs = [
                 engine.init_weight_update_group.remote(
                     master_address,
                     master_port,
-                    i * args.actor_settings["vllm_tensor_parallel_size"] + 1,
+                    i * args.actor_settings['vllm_tensor_parallel_size'] + 1,
                     world_size,
                 )
                 for i, engine in enumerate(self.vllm_engines)
             ]
 
-            from turbo_alignment.trainers.online.ray.vllm_worker_wrap import stateless_init_process_group
+            from turbo_alignment.trainers.online.ray.vllm_worker_wrap import (
+                stateless_init_process_group,
+            )
+
             # https://github.com/vllm-project/vllm/issues/11399
             # https://github.com/vllm-project/vllm/pull/12084
             # https://github.com/vllm-project/vllm/issues/5723
@@ -241,7 +249,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                 master_port=master_port,
                 world_size=world_size,
                 rank=0,
-                device=torch.device(f"cuda:0")
+                device=torch.device(f'cuda:0'),
             )
 
             ray.get(refs)
@@ -256,10 +264,8 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             disable_dropout_in_model(self.ref_model)
 
         elif isinstance(self.ref_model, RayGroup):
-            refs = ray.get(
-                self.ref_model.prepare_reference_model(self.accelerator, self.is_deepspeed_enabled)
-            )
-        
+            refs = ray.get(self.ref_model.prepare_reference_model(self.accelerator, self.is_deepspeed_enabled))
+
         disable_dropout_in_model(self.model)
 
         self.reward_model = reward_model
@@ -277,16 +283,16 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
 
         self.stop_generation_token_id = processing_class.encode(args.stop_token, add_special_tokens=False)
         assert len(self.stop_generation_token_id) == 1, self.stop_generation_token_id
-        
-        #TODO separate stop_strings and eos_token
-        
+
+        # TODO separate stop_strings and eos_token
+
         self.generator_transformers_settings = GeneratorTransformersSettings(
             temperature=args.temperature,
             max_new_tokens=args.max_new_tokens,
             num_return_sequences=args.num_generations,
             num_beams=args.num_generations,
             do_sample=True,
-            stop_strings=args.stop_token
+            stop_strings=args.stop_token,
         )
         self.generator_custom_settings = CustomChatGenerationSettings(
             batch=self.args.per_device_train_batch_size,
@@ -299,18 +305,26 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         )
 
         self.critic_generator = self._get_rm_generator(self.reward_model)
-        
-        print("Generations Params:\n" + "\n".join([f"{attr}: {getattr(self.generator_transformers_settings, attr, None)}" for attr, _ in self.generator_transformers_settings.__annotations__.items()]))
+
+        print(
+            'Generations Params:\n'
+            + '\n'.join(
+                [
+                    f'{attr}: {getattr(self.generator_transformers_settings, attr, None)}'
+                    for attr, _ in self.generator_transformers_settings.__annotations__.items()
+                ]
+            )
+        )
 
         start = time.time()
-        
+
         # if num_samples_for_reward_stats == 0 then no normalization is done FIXME
 
         self.norm_reward_mean, self.norm_reward_std = self.reward_stats(
             model=self.model, dataloader=self.get_train_dataloader()
         )
         logging.info(f'Statictis calculation elapsed time:{time.time() - start}')
-    
+
     def _broadcast_to_vllm(self, model: DeepSpeedEngine):
         # avoid OOM
         # torch.cuda.empty_cache()
@@ -319,20 +333,12 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             # FIXME i dont know will it work with zero-3
             if torch.distributed.get_rank() == 0:
                 refs = [
-                    engine.collective_rpc.remote(
-                        "update_weight",
-                        args=(name, param.dtype, param.shape)
-                    )
+                    engine.collective_rpc.remote('update_weight', args=(name, param.dtype, param.shape))
                     for engine in self.vllm_engines
                 ]
-                self.model_update_group.broadcast(
-                    param, 
-                    src=0,
-                    stream=torch.cuda.current_stream()
-                )
+                self.model_update_group.broadcast(param, src=0, stream=torch.cuda.current_stream())
                 ray.get(refs)
 
-    
     # FIXME: some base class instead of RMSamplingGenerator (join with ChatGeneratorBase?)
     def _get_rm_generator(self, reward_model: torch.nn.Module | PreTrainedModel) -> RMSamplingGenerator:
         match self.args.critic_type:
@@ -347,14 +353,14 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                     model=reward_model,
                     tokenizer=self.processing_class,
                     model_replicas=self.args.reward_model_replicas,
-                )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
+                )  # TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
                 generator = ...
             case _:
                 raise ValueError(f'Critic {self.args.critic_type} is not supported')
         return generator
 
-    #TODO_RLOO why every time generates new object? Since the model weights are changing, recreate new object and 
+    # TODO_RLOO why every time generates new object? Since the model weights are changing, recreate new object and
     def _get_chat_generator(self, model: torch.nn.Module | PreTrainedModel = None) -> ChatGeneratorBase:
         match self.args.actor_type:
             case ActorType.LOCAL_TRANSFORMERS:
@@ -378,11 +384,10 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
 
     def get_answers_and_rewards(
         self,
-        model: torch.nn.Module | PreTrainedModel | DeepSpeedEngine ,
+        model: torch.nn.Module | PreTrainedModel | DeepSpeedEngine,
         inputs: dict[str, torch.Tensor],
-        do_broadcast=True
+        do_broadcast=True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-
         # if torch.distributed.get_rank() == 0:
         #     print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
         #     print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
@@ -401,16 +406,20 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                 end = time.time()
                 self.time_profiler.broadcast_time.append(end - start)
 
-
         generator = self._get_chat_generator()
 
         generations: list[ChatInferenceOutput] = generator.generate_from_batch_records(
-            dataset_name='online', records=inputs, original_records=True, time_profiler = self.time_profiler
+            dataset_name='online', records=inputs, original_records=True, time_profiler=self.time_profiler
         )
-        
 
-        response_ids = [torch.cat([g.input_token_ids, ans.answer_token_ids], dim=1) for g in generations for ans in g.answers]
-        response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
+        response_ids = [
+            torch.cat([g.input_token_ids, ans.answer_token_ids], dim=1) for g in generations for ans in g.answers
+        ]
+        response_attention_mask = [
+            torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1)
+            for g in generations
+            for ans in g.answers
+        ]
 
         # if torch.distributed.get_rank() == 0:
         #     print('response_ids.device, ', response_ids.device)
@@ -427,25 +436,29 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             padded_sequences = []
             for seq in sequences:
                 padding_needed = max_length - seq.size(1)
-                padded_seq = torch.cat([seq.squeeze(0), torch.full((padding_needed,), pad_value, dtype=seq.dtype, device=seq.device)])
+                padded_seq = torch.cat(
+                    [seq.squeeze(0), torch.full((padding_needed,), pad_value, dtype=seq.dtype, device=seq.device)]
+                )
                 padded_sequences.append(padded_seq)
             return torch.stack(padded_sequences)
-        
+
         if torch.distributed.get_rank() == 0:
             start = time.time()
-            
+
         # if torch.distributed.get_rank() == 0:
         #     print('response_ids.device, ', response_ids.device)
         # torch.distributed.barrier()
         response_ids = pad_sequences(response_ids, max_length, pad_value=self.tokenizer.pad_token_id)
         response_attention_mask = pad_sequences(response_attention_mask, max_length, pad_value=0)
 
-        response_tokens_mask = torch.zeros(response_ids.shape, dtype=torch.bfloat16, device=response_ids.device) # why bf16 FIXME
+        response_tokens_mask = torch.zeros(
+            response_ids.shape, dtype=torch.bfloat16, device=response_ids.device
+        )  # why bf16 FIXME
 
         input_lengths = [g.input_token_ids.size(1) for g in generations for _ in g.answers]
 
         for i, input_len in enumerate(input_lengths):
-            response_tokens_mask[i, input_len:] = 1.0 #FIXME 
+            response_tokens_mask[i, input_len:] = 1.0  # FIXME
 
         position_ids = (response_attention_mask.cumsum(-1) - 1).clamp(min=0)
         position_ids.masked_fill_(response_attention_mask.to(torch.bool) == 0, 0).cuda()
@@ -459,7 +472,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             'attention_mask': response_attention_mask,
             'position_ids': position_ids,
         }
-        
+
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
@@ -468,7 +481,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.reward_model_time.append(end - start)
-        
+
         return response_ids, response_attention_mask, response_tokens_mask, position_ids, rewards
 
     def get_batch_loss_metrics(
@@ -477,7 +490,6 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         inputs: dict[str, torch.Tensor],
         train_eval: Literal['train', 'eval'] = 'train',
     ):
-        
         with torch.no_grad():
             (
                 query_response,
@@ -486,11 +498,9 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                 position_ids,
                 rewards,
             ) = self.get_answers_and_rewards(
-                model=model,
-                inputs=inputs,
-                do_broadcast=True if train_eval == 'train' else False
+                model=model, inputs=inputs, do_broadcast=True if train_eval == 'train' else False
             )
-            
+
             if isinstance(self.ref_model, RayGroup):
                 ref_logits = ray.get(
                     self.ref_model.reference_forward(
@@ -498,7 +508,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                             'input_ids': query_response,
                             'attention_mask': attention_mask,
                             'position_ids': position_ids,
-                            'use_cache': False
+                            'use_cache': False,
                         },
                         index=torch.distributed.get_rank() % self.args.reference_model_replicas,
                     )
@@ -531,7 +541,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 end = time.time()
                 self.time_profiler.reference_model_time.append(end - start)
-            
+
             if torch.distributed.get_rank() == 0:
                 start = time.time()
 
@@ -553,11 +563,11 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.policy_forward_time.append(end - start)
-        
+
         # del inputs
         # gc.collect()
         # torch.cuda.empty_cache() #NEED?
-        
+
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
@@ -576,14 +586,14 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             self.time_profiler.policy_model_time.append(end - start)
 
         with torch.no_grad():
-            kl_term = (torch.exp(ref_logprobs - logprobs) - (ref_logprobs - logprobs) - 1)
+            kl_term = torch.exp(ref_logprobs - logprobs) - (ref_logprobs - logprobs) - 1
 
             print('kl_term.shape', kl_term.shape)
 
             if torch.distributed.get_rank() == 0:
                 start = time.time()
 
-            advantages, advantages_metrics = self.reward_processor.baseline_rewards(rewards=rewards) # its advantage
+            advantages, advantages_metrics = self.reward_processor.baseline_rewards(rewards=rewards)  # its advantage
 
             if torch.distributed.get_rank() == 0:
                 end = time.time()
@@ -591,7 +601,9 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
 
         print('advantages.shape', advantages.shape)
 
-        per_token_loss = torch.exp(logprobs - logprobs.detach()) * advantages.unsqueeze(1) # https://github.com/huggingface/trl/pull/2565#issuecomment-2595837761
+        per_token_loss = torch.exp(logprobs - logprobs.detach()) * advantages.unsqueeze(
+            1
+        )  # https://github.com/huggingface/trl/pull/2565#issuecomment-2595837761
         per_token_loss = -(per_token_loss - self.kl_coef * kl_term)
         loss = per_token_loss.mean(dim=1)
 
@@ -634,7 +646,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
                 metrics[f'{train_eval}/{k}'] = v
             for k, v in advantages_metrics.items():
                 metrics[f'{train_eval}/{k}'] = v
-            
+
             for k, v in metrics.items():
                 if isinstance(v, torch.Tensor):
                     metrics[k] = metrics[k]
@@ -642,28 +654,28 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.metrics_time.append(end - start)
-        
+
         return loss.mean(), metrics
-    
+
     def print_readable_stats(self):
         if torch.distributed.get_rank() == 0:
-            print(f"Allocated: {torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB")
-            print(f"Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB")
+            print(f'Allocated: {torch.cuda.memory_allocated() / (1024 ** 2):.2f} MB')
+            print(f'Reserved: {torch.cuda.memory_reserved() / (1024 ** 2):.2f} MB')
 
-    def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):        
+    def compute_loss(self, model, inputs, return_outputs: bool = False, num_items_in_batch=None):
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
         loss, metrics = self.get_batch_loss_metrics(model, inputs, 'train')
 
         self.store_metrics(metrics=metrics, train_eval='train')
-        
+
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.total_time.append(end - start)
             # logging.info(f'Total elapsed time:{end - start}')
             self.time_profiler.print()
-        
+
         # gc.collect()
         # torch.cuda.empty_cache() #NEED?
 
@@ -676,7 +688,6 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
-        
         with torch.no_grad():
             loss, metrics = self.get_batch_loss_metrics(model, inputs, 'eval')
 
@@ -695,11 +706,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             all_rewards = []
             samples_processed = 0
             for batch in dataloader:
-                _, _, _, _, rewards = self.get_answers_and_rewards(
-                    model=model,
-                    inputs=batch,
-                    do_broadcast=False
-                )
+                _, _, _, _, rewards = self.get_answers_and_rewards(model=model, inputs=batch, do_broadcast=False)
                 rewards, _ = self.reward_processor.postprocess_rewards(rewards=rewards)
 
                 all_rewards.append(rewards)
@@ -734,7 +741,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
 
         if do_sum:
             return logprob.sum(-1)
-            
+
         return logprob
 
     # FIXME
@@ -747,13 +754,13 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
 
         return rewards, torch.ones_like(rewards).to(torch.bool)
 
-    def process_rewards(self, rewards, query_response) -> tuple[torch.Tensor, torch.Tensor, Any]: #bottleneck
+    def process_rewards(self, rewards, query_response) -> tuple[torch.Tensor, torch.Tensor, Any]:  # bottleneck
         """
         Second, this token should be the <eot_id>.
         Otherwise, return a fixed reward of -1.
         """
 
-        rewards, reward_metrics = self.reward_processor.postprocess_rewards(rewards=rewards) #FIXME 4 secods?
+        rewards, reward_metrics = self.reward_processor.postprocess_rewards(rewards=rewards)  # FIXME 4 secods?
         rewards = rewards.squeeze(-1)
         reward_metrics['normalizing_reward_mean'] = self.norm_reward_mean
         reward_metrics['normalizing_reward_std'] = self.norm_reward_std
@@ -774,8 +781,7 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
         for main_key in main_keys:
             for key, metrics in self._stored_metrics[main_key].items():
                 if not isinstance(metrics, (list, tuple)):
-                    metrics = [metrics] 
-
+                    metrics = [metrics]
 
                 float_values = []
                 tensor_values = []

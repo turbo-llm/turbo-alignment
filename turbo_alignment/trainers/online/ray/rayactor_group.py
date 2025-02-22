@@ -7,8 +7,12 @@ import ray
 import torch
 from ray.util.placement_group import PlacementGroup, placement_group
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
-from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
+
 from turbo_alignment.settings.pipelines import REINFORCETrainExperimentSettings
+from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import (
+    DistributedTorchRayActor,
+)
+
 
 class RayGroup:
     """
@@ -51,14 +55,14 @@ class RayGroup:
         # Use placement group to lock resources for models of same type
         if self._num_gpus_per_node > 1 and pg is None:
             bundles = [
-                {"GPU": self._num_gpus_per_node, "CPU": self._num_gpus_per_node} for _ in range(self._num_nodes)
+                {'GPU': self._num_gpus_per_node, 'CPU': self._num_gpus_per_node} for _ in range(self._num_nodes)
             ]
             if self._resources:
                 resources_name = list(self._resources.keys())[0]
                 for i in range(len(bundles)):
                     bundles[i][resources_name] = self._num_resources_per_node
 
-            pg = placement_group(bundles, strategy="PACK")
+            pg = placement_group(bundles, strategy='PACK')
             ray.get(pg.ready())
         if pg:
             master_actor = self.ray_actor_type.options(
@@ -101,22 +105,28 @@ class RayGroup:
                 self._actor_handlers.append(worker_actor)
 
     def prepare_reference_model(self, accelerator, is_deepspeed_enabled):
-        return [actor.prepare_reference_model.remote(accelerator, is_deepspeed_enabled) for actor in self._actor_handlers]
+        return [
+            actor.prepare_reference_model.remote(accelerator, is_deepspeed_enabled) for actor in self._actor_handlers
+        ]
 
     def reference_forward(self, records: dict[str, torch.Tensor], index: int):
-        assert index < len(self._actor_handlers), f'Reference model replicas: {len(self._actor_handlers)}, provided index: {index}'
+        assert index < len(
+            self._actor_handlers
+        ), f'Reference model replicas: {len(self._actor_handlers)}, provided index: {index}'
         return self._actor_handlers[index].reference_forward.remote(records)
-    
+
     def reward_forward(self, records: dict[str, torch.Tensor], index: int):
-        assert index < len(self._actor_handlers), f'Reward model replicas: {len(self._actor_handlers)}, provided index: {index}'
+        assert index < len(
+            self._actor_handlers
+        ), f'Reward model replicas: {len(self._actor_handlers)}, provided index: {index}'
         return self._actor_handlers[index].forward.remote(records)
-    
+
     def async_forward(self, records: dict[str, torch.Tensor]):
         return [actor.forward.remote(records) for actor in self._actor_handlers]
-    
+
     def async_eval(self):
         return [actor.eval.remote() for actor in self._actor_handlers]
-    
+
     def async_init_model_from_pretrained(
         self,
         *args,
@@ -128,18 +138,14 @@ class RayGroup:
             List: list of remote object refs.
         """
         return [actor.init_model_from_pretrained.remote(*args, **kwargs) for actor in self._actor_handlers]
-    
-    def async_generate_call(
-        self,
-        text: str
-    ):
+
+    def async_generate_call(self, text: str):
         """Init model from pretrained checkpoint.
 
         Returns:
             List: list of remote object refs.
         """
         return [actor.generate.remote(text=text) for actor in self._actor_handlers]
-    
 
     def async_fit_actor_model(
         self,

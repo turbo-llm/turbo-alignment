@@ -1,12 +1,13 @@
 from typing import Any
 
+import ray
 import torch
 from transformers import BatchEncoding, DataCollatorWithPadding, PreTrainedTokenizerBase
 
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.settings.generators.outputs.rm import RMSamplingInferenceOutput
-import ray
+
 
 class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, model_replicas: int = 1, **kwargs):
@@ -21,7 +22,7 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
 
             rank = torch.distributed.get_rank()
 
-            rewards = []        
+            rewards = []
 
             # for sample in records['input_ids']:
             #     print('RECORDS INSIDE RM', sample)
@@ -38,7 +39,6 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             #         rewards.append(-100)
             #     else:
             #         rewards.append(-1)
-
 
             rewards = ray.get(self._model.reward_forward(records=records, index=rank % self.model_replicas))
 
@@ -94,6 +94,7 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             )
 
         return outputs
+
 
 class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, **kwargs):

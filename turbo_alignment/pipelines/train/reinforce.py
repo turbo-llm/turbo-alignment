@@ -1,5 +1,8 @@
-from typing import Callable
+import os
+from pathlib import Path
+from typing import Callable, TypeVar
 
+import ray
 from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import (
@@ -7,11 +10,10 @@ from transformers.data.data_collator import (
     DataCollatorMixin,
 )
 
-from turbo_alignment.settings.s3 import ExperimentMetadata
-from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders import load_model
+from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
@@ -19,33 +21,36 @@ from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets.base import DatasetStrategy
+from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.reinforce import (
     REINFORCETrainExperimentSettings,
 )
-from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
+from turbo_alignment.settings.s3 import ExperimentMetadata
+from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import (
+    DistributedTorchRayActor,
+)
 from turbo_alignment.trainers.online.reinforce import (
     REINFORCETrainer,
     REINFORCETrainingArguments,
 )
-from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
-from typing import TypeVar
-import ray
-import os
-from pathlib import Path
 
 ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
 
 logger = get_project_logger()
+
 
 class ReinforceDataCollator(DataCollatorForTokenClassification):
     def torch_call(self, features):
         import torch
         from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
-        label_name = "label" if "label" in features[0].keys() else "labels"
+        label_name = 'label' if 'label' in features[0].keys() else 'labels'
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
 
-        no_labels_features = [{k: v for k, v in feature.items() if k != label_name and isinstance(v, torch.Tensor)} for feature in features]
+        no_labels_features = [
+            {k: v for k, v in feature.items() if k != label_name and isinstance(v, torch.Tensor)}
+            for feature in features
+        ]
 
         batch = pad_without_fast_tokenizer_warning(
             self.tokenizer,
@@ -53,13 +58,13 @@ class ReinforceDataCollator(DataCollatorForTokenClassification):
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors="pt",
+            return_tensors='pt',
         )
 
         if labels is None:
             return batch
 
-        sequence_length = batch["input_ids"].shape[1]
+        sequence_length = batch['input_ids'].shape[1]
         padding_side = self.tokenizer.padding_side
 
         def to_list(tensor_or_iterable):
@@ -67,7 +72,7 @@ class ReinforceDataCollator(DataCollatorForTokenClassification):
                 return tensor_or_iterable.tolist()
             return list(tensor_or_iterable)
 
-        if padding_side == "right":
+        if padding_side == 'right':
             batch[label_name] = [
                 to_list(label) + [self.label_pad_token_id] * (sequence_length - len(label)) for label in labels
             ]
@@ -79,13 +84,16 @@ class ReinforceDataCollator(DataCollatorForTokenClassification):
         batch[label_name] = torch.tensor(batch[label_name], dtype=torch.int64)
         return batch
 
+
 @ray.remote(num_gpus=1)
 class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], DistributedTorchRayActor):
     def __init__(self, world_size, rank, local_rank, master_addr, master_port):
-        super().__init__(world_size=world_size, rank=rank, local_rank=local_rank, master_addr=master_addr, master_port=master_port)
+        super().__init__(
+            world_size=world_size, rank=rank, local_rank=local_rank, master_addr=master_addr, master_port=master_port
+        )
         self.node_id = ray.get_runtime_context().get_node_id()
         self.local_rank = ray.get_gpu_ids()
-    
+
     def init_model_from_pretrained(self):
         self._setup_distributed()
 
@@ -181,14 +189,15 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             )
         )
         return train_dataset, val_dataset
-    
-    #TODO 
+
+    # TODO
     '''
     TODO_RLOO 
     get rid off vllm_engines, reference_model, reward_model if possible
     only get_trainer affected
     '''
-    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None: #reference_model
+
+    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None:  # reference_model
         training_args = self._get_training_args(experiment_settings)
 
         # import torch
@@ -211,7 +220,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
 
         self.model = self._load_model(experiment_settings, self.tokenizer)
 
-        print(f"Elapsed model load time: {time.time() - start} seconds")
+        print(f'Elapsed model load time: {time.time() - start} seconds')
 
         special_tokens_setter.setup_model_config(self.model)
 
@@ -234,9 +243,9 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         )
 
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
-        
+
         start = time.time()
-        
+
         self.trainer = self._get_trainer(
             vllm_engines,
             training_args,
@@ -249,7 +258,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
             val_dataset,
             data_collator,
         )
-        print(f"Elapsed get_trainer time: {time.time() - start} seconds")
+        print(f'Elapsed get_trainer time: {time.time() - start} seconds')
 
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)

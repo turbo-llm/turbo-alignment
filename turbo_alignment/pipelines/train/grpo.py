@@ -1,5 +1,8 @@
-from typing import Callable
+import os
+from pathlib import Path
+from typing import Callable, TypeVar
 
+import ray
 from torch.utils.data import ConcatDataset, Dataset
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.data.data_collator import (
@@ -7,44 +10,43 @@ from transformers.data.data_collator import (
     DataCollatorMixin,
 )
 
-from turbo_alignment.settings.s3 import ExperimentMetadata
-from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders import load_model
+from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
 from turbo_alignment.metrics.metric import Metric
 from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
+from turbo_alignment.pipelines.train.reinforce import ReinforceDataCollator
 from turbo_alignment.settings.datasets.base import DatasetStrategy
+from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.reinforce import (
     REINFORCETrainExperimentSettings,
 )
-from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import DistributedTorchRayActor
-from turbo_alignment.trainers.online.reinforce import (
-    REINFORCETrainingArguments,
-)
-from turbo_alignment.pipelines.train.reinforce import ReinforceDataCollator
+from turbo_alignment.settings.s3 import ExperimentMetadata
 from turbo_alignment.trainers.online.grpo import GRPOTrainer
-from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
-from typing import TypeVar
-import ray
-import os
-from pathlib import Path
+from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import (
+    DistributedTorchRayActor,
+)
+from turbo_alignment.trainers.online.reinforce import REINFORCETrainingArguments
 
 ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
 
 logger = get_project_logger()
 
+
 @ray.remote(num_gpus=1)
 class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], DistributedTorchRayActor):
     def __init__(self, world_size, rank, local_rank, master_addr, master_port):
-        super().__init__(world_size=world_size, rank=rank, local_rank=local_rank, master_addr=master_addr, master_port=master_port)
+        super().__init__(
+            world_size=world_size, rank=rank, local_rank=local_rank, master_addr=master_addr, master_port=master_port
+        )
         self.node_id = ray.get_runtime_context().get_node_id()
         self.local_rank = ray.get_gpu_ids()
-    
+
     def init_model_from_pretrained(self):
         self._setup_distributed()
 
@@ -140,14 +142,15 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
             )
         )
         return train_dataset, val_dataset
-    
-    #TODO 
+
+    # TODO
     '''
     TODO_RLOO 
     get rid off vllm_engines, reference_model, reward_model if possible
     only get_trainer affected
     '''
-    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None: #reference_model
+
+    def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None:  # reference_model
         training_args = self._get_training_args(experiment_settings)
 
         # import torch
@@ -170,7 +173,7 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
 
         self.model = self._load_model(experiment_settings, self.tokenizer)
 
-        print(f"Elapsed model load time: {time.time() - start} seconds")
+        print(f'Elapsed model load time: {time.time() - start} seconds')
 
         special_tokens_setter.setup_model_config(self.model)
 
@@ -193,9 +196,9 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
         )
 
         data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
-        
+
         start = time.time()
-        
+
         self.trainer = self._get_trainer(
             vllm_engines,
             training_args,
@@ -208,7 +211,7 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
             val_dataset,
             data_collator,
         )
-        print(f"Elapsed get_trainer time: {time.time() - start} seconds")
+        print(f'Elapsed get_trainer time: {time.time() - start} seconds')
 
         if self.trainer.accelerator.is_main_process:
             self._dataset_and_collator_sanity_check(train_dataset, data_collator)

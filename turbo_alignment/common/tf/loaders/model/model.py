@@ -41,6 +41,7 @@ def _load_pretrained_adapters(
         is_trainable=model_settings.is_trainable,
     )
 
+
 def disable_dropout_in_model(model: torch.nn.Module) -> None:
     for module in model.modules():
         if isinstance(module, torch.nn.Dropout):

@@ -3,17 +3,17 @@ from turbo_alignment.settings.model import (
     PreTrainedAdaptersModelSettings,
     PreTrainedModelSettings,
 )
+from turbo_alignment.settings.online import (
+    ActorType,
+    CriticType,
+    HFActorSettings,
+    vLLMActorSettings,
+)
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.tf.trainer import TrainerSettings
-from turbo_alignment.settings.online import (
-    CriticType,
-    vLLMActorSettings,
-    HFActorSettings,
-    ActorType,
-)
+
 
 class GRPOTrainerSettings(TrainerSettings):
-
     num_nodes: int = 1
     reward_model_replicas: int = 1
     reference_model_replicas: int = 1
@@ -36,7 +36,6 @@ class GRPOTrainerSettings(TrainerSettings):
     actor_type: ActorType = ActorType.DISTRIBUTED_VLLM
     critic_type: CriticType = CriticType.RAY_TRANSFORMERS
     actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
-
 
 
 class GRPOTrainExperimentSettings(BaseTrainExperimentSettings):

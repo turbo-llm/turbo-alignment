@@ -1,22 +1,23 @@
+from typing import Union
+
 from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.datasets import ChatMultiDatasetSettings
 from turbo_alignment.settings.model import (
     PreTrainedAdaptersModelSettings,
     PreTrainedModelSettings,
 )
+from turbo_alignment.settings.online import (
+    ActorType,
+    CriticType,
+    HFActorSettings,
+    RewardProcessorType,
+    vLLMActorSettings,
+)
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
 from turbo_alignment.settings.tf.trainer import TrainerSettings
-from turbo_alignment.settings.online import (
-    CriticType,
-    vLLMActorSettings,
-    HFActorSettings,
-    ActorType,
-    RewardProcessorType,
-)
-from typing import Union
+
 
 class REINFORCETrainerSettings(TrainerSettings):
-
     num_nodes: int = 1
     reward_model_replicas: int = 1
     reference_model_replicas: int = 1
@@ -41,7 +42,6 @@ class REINFORCETrainerSettings(TrainerSettings):
     actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
 
     reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
-
 
 
 class REINFORCETrainExperimentSettings(BaseTrainExperimentSettings):

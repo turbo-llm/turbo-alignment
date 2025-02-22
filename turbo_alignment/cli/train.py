@@ -121,40 +121,42 @@ def reinforce_training(
     ),
 ) -> None:
     import ray
+
     from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
     from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
     from turbo_alignment.trainers.online.reward_actor import RewardModel
-    
-    ray.init(address="auto")
-    
+
+    ray.init(address='auto')
+
     experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
 
     policy_models = RayGroup(
-        num_nodes=experiment_settings.trainer_settings.num_nodes, 
-        num_gpus_per_node=8, 
+        num_nodes=experiment_settings.trainer_settings.num_nodes,
+        num_gpus_per_node=8,
         ray_actor_type=pipelines.TrainREINFORCEStrategy,
     )
-    
+
     assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
     reward_model = RayGroup(
-        num_nodes=1, 
-        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas, 
+        num_nodes=1,
+        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas,
         ray_actor_type=RewardModel,
     )
 
     # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
     # assert 1 <= experiment_settings.trainer_settings.reference_model_replicas <= 8
     # reference_model = RayGroup(
-    #     num_nodes=1, 
-    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas, 
+    #     num_nodes=1,
+    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas,
     #     ray_actor_type=ReferenceModel,
     # )
-
 
     # TODO_RLOO if possible hide init inside RayGroup
     # TODO add settings fields to reward model
     ray.get(policy_models.async_init_model_from_pretrained())
-    ray.get(reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path))
+    ray.get(
+        reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path)
+    )
     # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
 
     '''
@@ -177,11 +179,10 @@ def reinforce_training(
         policy_models.async_fit_actor_model(
             experiment_settings=experiment_settings,
             vllm_engines=vllm_engines,
-            # reference_model=reference_model, 
-            reward_model=reward_model
+            # reference_model=reference_model,
+            reward_model=reward_model,
         )
     )
-
 
 
 @app.command(name='train_grpo', help='Train GRPO pipeline')
@@ -194,40 +195,42 @@ def grpo_training(
     ),
 ) -> None:
     import ray
+
     from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
     from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
     from turbo_alignment.trainers.online.reward_actor import RewardModel
-    
-    ray.init(address="auto")
-    
+
+    ray.init(address='auto')
+
     experiment_settings = pipeline_settings.GRPOTrainExperimentSettings.parse_file(experiment_settings_path)
 
     policy_models = RayGroup(
-        num_nodes=experiment_settings.trainer_settings.num_nodes, 
-        num_gpus_per_node=8, 
+        num_nodes=experiment_settings.trainer_settings.num_nodes,
+        num_gpus_per_node=8,
         ray_actor_type=pipelines.TrainGRPOStrategy,
     )
-    
+
     assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
     reward_model = RayGroup(
-        num_nodes=1, 
-        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas, 
+        num_nodes=1,
+        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas,
         ray_actor_type=RewardModel,
     )
 
     # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
     # assert 1 <= experiment_settings.trainer_settings.reference_model_replicas <= 8
     # reference_model = RayGroup(
-    #     num_nodes=1, 
-    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas, 
+    #     num_nodes=1,
+    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas,
     #     ray_actor_type=ReferenceModel,
     # )
-
 
     # TODO_GRPO if possible hide init inside RayGroup
     # TODO add settings fields to reward model
     ray.get(policy_models.async_init_model_from_pretrained())
-    ray.get(reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path))
+    ray.get(
+        reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path)
+    )
     # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
 
     '''
@@ -250,7 +253,7 @@ def grpo_training(
         policy_models.async_fit_actor_model(
             experiment_settings=experiment_settings,
             vllm_engines=vllm_engines,
-            # reference_model=reference_model, 
-            reward_model=reward_model
+            # reference_model=reference_model,
+            reward_model=reward_model,
         )
     )

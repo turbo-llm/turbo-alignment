@@ -1,20 +1,20 @@
 from typing import Any
+
+import ray
 import torch
-from transformers import BatchEncoding
+from transformers import BatchEncoding, PreTrainedTokenizerBase
+from vllm import SamplingParams
+from vllm.lora.request import LoRARequest
 
 from turbo_alignment.dataset.chat.models import ChatDatasetRecord
-from turbo_alignment.generators.base import ChatGeneratorBase
+from turbo_alignment.generators.base import BaseGenerator, ChatGeneratorBase
+from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
-from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
-from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
-from transformers import PreTrainedTokenizerBase
-from vllm.lora.request import LoRARequest
-from vllm import SamplingParams
-import ray
+
 
 class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
     def __init__(
@@ -31,10 +31,10 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         if isinstance(transformers_settings.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
 
-        #TODO separate stop_strings and eos_token
+        # TODO separate stop_strings and eos_token
         self.eos_token_id: int = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
         assert len(self.eos_token_id) == 1, 'Currently stop_strings == stop_token'
-        #TODO beam search was deprecated in vllm 0.6.2
+        # TODO beam search was deprecated in vllm 0.6.2
 
         # beam_search_params: dict[str, Any] = {
         #     'best_of': transformers_settings.num_return_sequences,
@@ -43,7 +43,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         # if transformers_settings.num_beams > 1:
         #     beam_search_params['use_beam_search'] = True
         #     beam_search_params['best_of'] = transformers_settings.num_beams
-        
+
         self._sampling_params = SamplingParams(
             n=transformers_settings.num_return_sequences,
             repetition_penalty=transformers_settings.repetition_penalty,
@@ -58,50 +58,50 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         self._lora_request = lora_request
         self.vllm_engines = vllm_engines
         self._custom_generation_settings = custom_generation_settings
-    
-    #TODO ?
-    def generate_from_batch(self, dataset_name, records, original_records = None):
+
+    # TODO ?
+    def generate_from_batch(self, dataset_name, records, original_records=None):
         return super().generate_from_batch(dataset_name, records, original_records)
 
     def generate_from_batch_records(
-        self,
-        dataset_name: str,
-        records: list[dict[str, Any]],
-        original_records: bool = False,
-        time_profiler = None
+        self, dataset_name: str, records: list[dict[str, Any]], original_records: bool = False, time_profiler=None
     ) -> list[ChatInferenceOutput]:
-        import time
         import logging
-        #TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
+        import time
+
+        # TODO Make sure that records are already splitted between ranks(Assuming micro_rollout_batch_size equal to micro_batch_size)
         input_ids = records['input_ids'].tolist()
 
-        
         rank = torch.distributed.get_rank()
         llm = self.vllm_engines[rank % len(self.vllm_engines)]
 
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
-        request_outputs = ray.get(llm.generate.remote(sampling_params=self._sampling_params, prompt_token_ids=input_ids, lora_request=self._lora_request))
-        
+        request_outputs = ray.get(
+            llm.generate.remote(
+                sampling_params=self._sampling_params, prompt_token_ids=input_ids, lora_request=self._lora_request
+            )
+        )
+
         if torch.distributed.get_rank() == 0:
             end = time.time()
             # logging.info(f'Generation elapsed time:{end - start}')
             time_profiler.completions_time.append(end - start)
-        
+
         outputs = []
-        for i, request_output in enumerate(request_outputs): #FIXME
+        for i, request_output in enumerate(request_outputs):  # FIXME
             answers = []
             for a in request_output.outputs:
-                answer_token_ids=torch.tensor(a.token_ids).unsqueeze(0).cuda()
-                #TODO assuming len(eos_token_id) == 1 FIXME
+                answer_token_ids = torch.tensor(a.token_ids).unsqueeze(0).cuda()
+                # TODO assuming len(eos_token_id) == 1 FIXME
                 answer_token_ids[:, -1] = self.eos_token_id[0]
                 ans_msg = AnswerMessage(
                     id=str(a.index),
                     content=a.text,
                     sequence_score=a.cumulative_logprob,
                     answer_token_ids=answer_token_ids,
-                    answer_attention_mask=torch.ones_like(answer_token_ids, device=answer_token_ids.device)
+                    answer_attention_mask=torch.ones_like(answer_token_ids, device=answer_token_ids.device),
                 )
 
                 answers.append(ans_msg)
@@ -135,7 +135,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         dataset_name: str,
         records_batch: dict[str, torch.Tensor] | BatchEncoding,
         original_records: list[ChatDatasetRecord] | None = None,
-        return_logits: bool = None
+        return_logits: bool = None,
     ) -> list[ChatInferenceOutput]:
         batched_input_ids = records_batch['input_ids'].to(self.device)
         batched_attention_mask = records_batch['attention_mask'].to(self.device)

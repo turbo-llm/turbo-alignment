@@ -4,7 +4,7 @@ from typing import Any
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
-class  TrainerSettings(ExtraFieldsNotAllowedBaseModel):
+class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     evaluation_strategy: str = 'steps'
     save_strategy: str = 'steps'
     per_device_train_batch_size: int = 4
