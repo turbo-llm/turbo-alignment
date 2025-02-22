@@ -200,7 +200,7 @@ def grpo_training(
     
     ray.init(address="auto")
     
-    experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
+    experiment_settings = pipeline_settings.GRPOTrainExperimentSettings.parse_file(experiment_settings_path)
 
     policy_models = RayGroup(
         num_nodes=experiment_settings.trainer_settings.num_nodes, 
@@ -224,89 +224,15 @@ def grpo_training(
     # )
 
 
-    # TODO_RLOO if possible hide init inside RayGroup
+    # TODO_GRPO if possible hide init inside RayGroup
     # TODO add settings fields to reward model
     ray.get(policy_models.async_init_model_from_pretrained())
     ray.get(reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path))
     # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
 
     '''
-    TODO_RLOO:
-    2. PARAMS to REINFORCETrainExperimentSettings
-    3. if possible hide creating of vllm engines inside trainer
-    '''
-
-    vllm_engines = create_vllm_engines(
-        num_engines=experiment_settings.trainer_settings.actor_settings.vllm_num_engines,
-        tensor_parallel_size=experiment_settings.trainer_settings.actor_settings.vllm_tensor_parallel_size,
-        pretrain=str(experiment_settings.model_settings.model_path),
-        seed=experiment_settings.seed,
-        enable_prefix_caching=False,
-        enforce_eager=False,
-        max_model_len=experiment_settings.trainer_settings.actor_settings.max_model_len,
-    )
-
-    ray.get(
-        policy_models.async_fit_actor_model(
-            experiment_settings=experiment_settings,
-            vllm_engines=vllm_engines,
-            # reference_model=reference_model, 
-            reward_model=reward_model
-        )
-    )
-
-
-
-
-@app.command(name='train_reinforce_cot', help='Train REINFORCE_CoT pipeline')
-def reinforce_cot_training(
-    experiment_settings_path: Path = typer.Option(
-        ...,
-        '--experiment_settings_path',
-        exists=True,
-        help='Path to experiment config file',
-    ),
-) -> None:
-    import ray
-    from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
-    from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
-    from turbo_alignment.trainers.online.reward_actor import RewardModel
-    
-    ray.init(address="auto")
-    
-    experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
-
-    policy_models = RayGroup(
-        num_nodes=experiment_settings.trainer_settings.num_nodes, 
-        num_gpus_per_node=8, 
-        ray_actor_type=pipelines.TrainREINFORCEСoTStrategy,
-    )
-    
-    assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
-    reward_model = RayGroup(
-        num_nodes=1, 
-        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas, 
-        ray_actor_type=RewardModel,
-    )
-
-    # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
-    # assert 1 <= experiment_settings.trainer_settings.reference_model_replicas <= 8
-    # reference_model = RayGroup(
-    #     num_nodes=1, 
-    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas, 
-    #     ray_actor_type=ReferenceModel,
-    # )
-
-
-    # TODO_RLOO if possible hide init inside RayGroup
-    # TODO add settings fields to reward model
-    ray.get(policy_models.async_init_model_from_pretrained())
-    ray.get(reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path))
-    # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
-
-    '''
-    TODO_RLOO:
-    2. PARAMS to REINFORCETrainExperimentSettings
+    TODO_GRPO:
+    2. PARAMS to GRPOTrainExperimentSettings
     3. if possible hide creating of vllm engines inside trainer
     '''
 

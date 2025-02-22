@@ -118,28 +118,6 @@ def sum_all_parameter_values(model):
 
 
 
-ANS_RE = re.compile(r"<answer>\s*(-?[0-9.,]+)\s*</answer>")
-PATTERN_RE = re.compile(r"^<think>.*?</think>\s*<answer>.*?</answer>$")
-INVALID_ANS = "[invalid]"
-
-NEG_REWARD = 0
-
-def extract_answer(completion):
-    match = ANS_RE.search(completion)
-    if match:
-        match_str = match.group(1).strip()
-        match_str = match_str.replace(",", "")
-        return match_str
-    else:
-        return INVALID_ANS
-    
-    
-def format_reward(completion):
-    match = PATTERN_RE.match(completion, re.DOTALL | re.MULTILINE)
-    print('completion,', completion)
-    print('format match,', match)
-    return match
-
 class TimeProfiler:
     def __init__(self):
         self.broadcast_time = []
@@ -210,7 +188,7 @@ class REINFORCETrainingArguments(TrainingArguments):
     critic_type: CriticType = CriticType.RAY_TRANSFORMERS
     actor_settings: vLLMActorSettings | HFActorSettings = vLLMActorSettings
 
-    reward_processor_type: RewardProcessorType = RewardProcessorType.RLOO
+    reward_processor_type: RewardProcessorType = RewardProcessorType.REINFORCE
 
 class REINFORCETrainer(MultiGPUCherryPicksTrainer):
     def __init__(
@@ -263,6 +241,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             # https://github.com/vllm-project/vllm/issues/11399
             # https://github.com/vllm-project/vllm/pull/12084
             # https://github.com/vllm-project/vllm/issues/5723
+            # TODO: doesnt work in single-node
             self.model_update_group = stateless_init_process_group(
                 master_address=master_address,
                 master_port=master_port,
@@ -378,11 +357,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 )#TODO this type of critic is created for Reward models with CausalLM head and utilize vllm engines
             case CriticType.DISTRIBUTED_VLLM:
                 generator = ...
-            case CriticType.DATASET:
-                generator = {
-                    item['input']: item['answer'] for item in read_jsonl(Path('/from_s3/dataset/rewards_train.jsonl'))
-                }
-                torch.distributed.barrier()
             case _:
                 raise ValueError(f'Critic {self.args.critic_type} is not supported')
         return generator
@@ -428,7 +402,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             if torch.distributed.get_rank() == 0:
                 end = time.time()
                 self.time_profiler.broadcast_time.append(end - start)
-                # logging.info(f'broadcast elapsed time:{end - start}')
+                logging.info(f'broadcast elapsed time:{end - start}')
 
 
         generator = self._get_chat_generator()
@@ -441,18 +415,9 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         response_ids = [torch.cat([g.input_token_ids, ans.answer_token_ids], dim=1) for g in generations for ans in g.answers]
         response_attention_mask = [torch.cat([g.input_attention_mask, ans.answer_attention_mask], dim=1) for g in generations for ans in g.answers]
 
-        # if torch.distributed.get_rank() == 0:
-            # print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
-            # print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0], skip_special_tokens=False)}', flush=True)
-
-        if isinstance(self.critic_generator, dict):
-            message_answers = [
-                    {
-                        'input': self.tokenizer.decode(g.input_token_ids[0].cpu(), skip_special_tokens=False), 
-                        'answer': self.tokenizer.decode(ans.answer_token_ids[0].cpu(), skip_special_tokens=False),
-                    } 
-                    for g in generations for ans in g.answers
-                ]
+        if torch.distributed.get_rank() == 0:
+            print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
+            print(f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0], skip_special_tokens=False)}', flush=True)
 
         max_length = max([response_id.size(1) for response_id in response_ids])
 
@@ -493,42 +458,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             start = time.time()
 
-        if isinstance(self.critic_generator, dict):
-
-            self.correct_rewards = []
-            self.template_rewards =[]
-
-            for msg_ans in message_answers:
-                msg_ans['input'] = msg_ans['input'].rstrip('<|im_end|>\n<|im_start|>assistant\n')
-                input_ = msg_ans['input'][
-                    msg_ans['input'].rfind('<|im_start|>user\n') + len('<|im_start|>user\n'):
-                ]
-
-                if msg_ans['answer'].endswith('<|im_end|>'):
-                    msg_ans['answer'] = msg_ans['answer'][:-len('<|im_end|>')].strip('')
-
-
-                # if torch.distributed.get_rank() == 0:
-                #     print('answers,', msg_ans['answer'])
-                # torch.distributed.barrier()
-
-                if format_reward(msg_ans['answer']):
-                    self.template_rewards.append(1)
-                else:
-                    self.template_rewards.append(NEG_REWARD)
-
-                if extract_answer(msg_ans['answer']) == self.critic_generator[input_]:
-                    self.correct_rewards.append(1)
-                else:
-                    self.correct_rewards.append(NEG_REWARD)
-            
-
-            with torch.no_grad():
-                rewards = torch.tensor((self.template_rewards, self.correct_rewards), device=response_ids.device, requires_grad=False).sum(dim=0).unsqueeze(0)
-            # if torch.distributed.get_rank() == 0:
-                # print('REWARDS!!!', rewards, self.template_rewards, self.correct_rewards)
-        else:
-            rewards = self.critic_generator.generate_from_batch_records(rm_inputs)
+        rewards = self.critic_generator.generate_from_batch_records(rm_inputs)
 
         if torch.distributed.get_rank() == 0:
             end = time.time()
@@ -621,7 +551,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         
         # del inputs
         # gc.collect()
-        # torch.cuda.empty_cache() #NEED?
+        # torch.cuda.empty_cache() #FIXME ?
         
         if torch.distributed.get_rank() == 0:
             start = time.time()
@@ -668,8 +598,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     logprobs.detach(),
                     ref_logprobs,
                     1 - valid_mask.float(),
-                    # (torch.tensor(self.correct_rewards) == NEG_REWARD).float(),
-                    # (torch.tensor(self.template_rewards) == NEG_REWARD).float(),
 
                 ],
                 [
@@ -681,8 +609,6 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     'logprobs',
                     'ref_logprobs',
                     'invalid_rewards',
-                    # 'correct_rewards',
-                    # 'template_rewards',
                 ],
             ):
                 metrics = {
@@ -690,7 +616,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     **get_log_mean_std(tensor.cuda(), name, train_eval),
                 }
 
-            # metrics[f'{train_eval}/kl_coef'] = self.kl_coef
+            metrics[f'{train_eval}/kl_coef'] = self.kl_coef
 
             for k, v in rewards_metrics.items():
                 metrics[f'{train_eval}/{k}'] = v
@@ -726,7 +652,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             self.time_profiler.print()
         
         # gc.collect()
-        # torch.cuda.empty_cache() #NEED?
+        # torch.cuda.empty_cache() #FIXME?
 
         return (loss, metrics) if return_outputs else loss
 
@@ -861,7 +787,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                     # If we have no tensors but have floats, just log the last float.
                     logs[key] = float_values[-1]
                 else:
-                    logging.info(f'skipped key {key} in logging.')
+                    logging.info(f'Skipped key {key} in logging.')
                     logs[key] = float('nan')
 
             if main_key == 'train':
