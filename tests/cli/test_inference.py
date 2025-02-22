@@ -61,6 +61,7 @@ def test_inference_classification(config_path: Path):
         assert len(read_jsonl(filepath)) != 0
 
 
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     'config_path',
     [

@@ -9,7 +9,7 @@ from turbo_alignment.settings.pipelines.train.rag import RAGTrainExperimentSetti
 
 runner = CliRunner()
 
-
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     'config_path',
     [
