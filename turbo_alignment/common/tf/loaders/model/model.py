@@ -1,9 +1,4 @@
 import torch
-from liger_kernel.transformers import (
-    apply_liger_kernel_to_gemma2,
-    apply_liger_kernel_to_llama,
-    apply_liger_kernel_to_qwen2,
-)
 from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled

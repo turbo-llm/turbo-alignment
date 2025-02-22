@@ -30,7 +30,6 @@ class WorkerWrap(Worker):
         from vllm.distributed.parallel_state import get_world_group
 
         rank = get_world_group().rank + rank_offset
-        # print(f'TRUE WORKER RANK, {get_world_group().rank}, WORKER RANK, {rank}, WORKER DEVICE, {self.device}, WORKER WORLD_SIZE, {world_size}')
         self.model_update_group = stateless_init_process_group(
             master_address,
             master_port,

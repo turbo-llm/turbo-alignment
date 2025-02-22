@@ -10,15 +10,12 @@ from transformers.data.data_collator import (
     DataCollatorMixin,
 )
 
-from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders import load_model
 from turbo_alignment.common.tf.special_tokens_setter import SpecialTokensSetter
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
 from turbo_alignment.dataset.chat.chat import InferenceChatDataset
 from turbo_alignment.dataset.loader import DatasetLoader
-from turbo_alignment.metrics.metric import Metric
-from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets.base import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.base import BaseTrainExperimentSettings
@@ -191,11 +188,8 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
         return train_dataset, val_dataset
 
     # TODO
-    '''
-    TODO_RLOO 
-    get rid off vllm_engines, reference_model, reward_model if possible
-    only get_trainer affected
-    '''
+    # get rid off vllm_engines, reference_model, reward_model if possible
+    # only get_trainer affected
 
     def run(self, experiment_settings: ExperimentSettingsT, vllm_engines, reward_model) -> None:  # reference_model
         training_args = self._get_training_args(experiment_settings)

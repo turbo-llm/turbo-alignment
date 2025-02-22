@@ -1,14 +1,10 @@
-import gc
 import itertools
 import logging
-import os
-import re
 import socket
 import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import deepspeed
@@ -21,7 +17,6 @@ import torch.utils.data
 from datasets import Dataset
 from deepspeed.runtime.engine import DeepSpeedEngine
 from transformers import (
-    GenerationConfig,
     PreTrainedModel,
     PreTrainedTokenizerBase,
     TrainerCallback,
@@ -254,7 +249,7 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
                 master_port=master_port,
                 world_size=world_size,
                 rank=0,
-                device=torch.device(f'cuda:0'),
+                device=torch.device('cuda:0'),
             )
 
             ray.get(refs)
@@ -284,7 +279,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         # In this way, the effective number of gradient
         # updates taken into account stays the same
         # effective_num_previous_samples = 1 / (1 - self.args.mean_baseline_coef)
-        # self.args.mean_baseline_coef = 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
+        # self.args.mean_baseline_coef =
+        # 1 - 1 / (effective_num_previous_samples * self.args.gradient_accumulation_steps)
 
         self.stop_generation_token_id = processing_class.encode(args.stop_token, add_special_tokens=False)
         assert len(self.stop_generation_token_id) == 1, self.stop_generation_token_id

@@ -18,7 +18,7 @@ class RewardModel(DistributedTorchRayActor):
         self._setup_distributed()
         self.model = AutoModelForSequenceClassification.from_pretrained(
             rm_model,
-            num_labels=1,  ##FIXME hardcoding all this
+            num_labels=1,  # FIXME hardcoding all this
             device_map='cuda',
             torch_dtype=torch.bfloat16,
             attn_implementation='flash_attention_2',

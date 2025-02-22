@@ -8,4 +8,3 @@ from .rag import TrainRAGStrategy
 from .reinforce import TrainREINFORCEStrategy
 from .rm import TrainRMStrategy
 from .sft import TrainSFTStrategy
-

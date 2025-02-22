@@ -1,6 +1,3 @@
-from typing import Union
-
-from turbo_alignment.settings.cherry_pick import ChatCherryPickSettings
 from turbo_alignment.settings.datasets import ChatMultiDatasetSettings
 from turbo_alignment.settings.model import (
     PreTrainedAdaptersModelSettings,

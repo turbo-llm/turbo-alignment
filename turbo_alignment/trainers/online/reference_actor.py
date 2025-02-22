@@ -1,8 +1,5 @@
-import gc
-
 import ray
 import torch
-import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from turbo_alignment.trainers.online.ray.distributed_torch_ray_actor import (
