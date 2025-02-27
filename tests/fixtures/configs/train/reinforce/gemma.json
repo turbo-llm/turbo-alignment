@@ -167,7 +167,6 @@
     "penalty_reward_value": -1,
     "clip_rewards_min": -1e+8,
     "clip_rewards_max": 1e+8,
-    "whiten_rewards": false,
     "kl_coef": 0.05,
     "mean_baseline_coef": 0.95,
     "num_samples_for_reward_stats": 1000,

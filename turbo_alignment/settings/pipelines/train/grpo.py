@@ -31,7 +31,6 @@ class GRPOTrainerSettings(TrainerSettings):
 
     non_eos_penalty: bool = True
     temperature: float | None = None
-    whiten_rewards: bool = False
 
     actor_type: ActorType = ActorType.DISTRIBUTED_VLLM
     critic_type: CriticType = CriticType.RAY_TRANSFORMERS
