@@ -12,24 +12,13 @@ from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
-from turbo_alignment.settings.tf.generation import VLLMGeneratorSettings
-
-
-class TokenSuppressionLogitsProcessor:
-    def __init__(self, available_tokens: list[int]):
-        self.available_tokens = available_tokens
-
-    def __call__(self, generated_tokens: list[int], logits: torch.Tensor) -> torch.Tensor:
-        suppress_mask = torch.full_like(logits, float('-inf'))
-        suppress_mask[self.available_tokens] = 0
-
-        return logits + suppress_mask
+from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
 
 
 class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
     def __init__(
         self,
-        generator_settings: VLLMGeneratorSettings,
+        transformers_settings: GeneratorTransformersSettings,
         custom_generation_settings: CustomChatGenerationSettings,
         model: LLM,
         tokenizer: PreTrainedTokenizerBase,
@@ -40,36 +29,39 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         model.set_tokenizer(tokenizer)
         super().__init__(model, tokenizer, batch=batch)
 
-        if isinstance(generator_settings.stop_strings, list):
+        if isinstance(transformers_settings.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
 
-        eos_token_id: list[int] = self._tokenizer.encode(generator_settings.stop_strings, add_special_tokens=False)
+        eos_token_id: list[int] = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
 
         beam_search_params: dict[str, Any] = {
-            'use_beam_search': generator_settings.use_beam_search,
-            'best_of': generator_settings.best_of if generator_settings.use_beam_search else generator_settings.n,
+            'best_of': transformers_settings.num_return_sequences,
+            'use_beam_search': False,
         }
-
-        sampling_params = generator_settings.dict(
-            exclude={'use_beam_search', 'best_of', 'stop_strings', 'filter_token_ids'}
-        )
-        if generator_settings.filter_token_ids:
-            sampling_params['logits_processors'] = [
-                TokenSuppressionLogitsProcessor(generator_settings.filter_token_ids)
-            ]
+        if transformers_settings.num_beams > 1:
+            beam_search_params['use_beam_search'] = True
+            beam_search_params['best_of'] = transformers_settings.num_beams
 
         self._sampling_params = SamplingParams(
-            **sampling_params,
+            n=transformers_settings.num_return_sequences,
+            repetition_penalty=transformers_settings.repetition_penalty,
+            temperature=transformers_settings.temperature,
+            top_p=transformers_settings.top_p,
+            top_k=transformers_settings.top_k,
             skip_special_tokens=custom_generation_settings.skip_special_tokens,
             stop_token_ids=eos_token_id,
+            max_tokens=transformers_settings.max_new_tokens,
             **beam_search_params,
         )
         self._lora_request = lora_request
 
-        self._return_logits = return_logits
+        self._custom_generation_settings = custom_generation_settings
 
-    def _generate_from_batch(
-        self, records: list[dict[str, Any]], original_records: list[ChatDatasetRecord], dataset_name: str
+    def generate_from_batch(
+        self,
+        dataset_name: str,
+        records: list[dict[str, Any]],
+        original_records: list[ChatDatasetRecord] | None = None,
     ) -> list[ChatInferenceOutput]:
         input_ids = [record['input_ids'].tolist() for record in records]
         request_outputs = self._model.generate(
@@ -85,9 +77,11 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             answers = []
             for a in request_output.outputs:
                 ans_msg = AnswerMessage(
-                    id=str(a.index), content=a.text, sequence_score=a.cumulative_logprob, logprobs=a.logprobs
+                    id=str(a.index),
+                    content=a.text,
+                    sequence_score=a.cumulative_logprob,
                 )
-                if self._return_logits:
+                if self._custom_generation_settings.return_logits:
                     ans_msg.input_token_ids = torch.tensor(request_output.prompt_token_ids).unsqueeze(0)
                     ans_msg.answer_token_ids = torch.tensor(a.token_ids).unsqueeze(0)
 

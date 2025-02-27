@@ -1,5 +1,5 @@
 import torch
-from transformers import PreTrainedTokenizerBase
+from transformers import BatchEncoding, PreTrainedTokenizerBase
 
 from turbo_alignment.dataset.multimodal.models import MultimodalDatasetRecord
 from turbo_alignment.generators.base import ChatGeneratorBase
@@ -26,19 +26,19 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
             **kwargs,
         )
 
-    def _generate_from_batch_records(
+    def generate_from_batch_records(
         self,
-        records: list[dict[str, torch.Tensor]],
-        original_records: list[MultimodalDatasetRecord],
         dataset_name: str,
+        records_batch: dict[str, torch.Tensor] | BatchEncoding,
+        original_records: list[MultimodalDatasetRecord] | None = None,
     ) -> list[MultimodalInferenceOutput]:
         raise ValueError('You can not use batch generation with multimodаl generator')
 
-    def _generate_from_single_record(
+    def generate_from_single_record(
         self,
-        record: dict[str, torch.Tensor],
-        original_record: MultimodalDatasetRecord,
         dataset_name: str,
+        record: dict[str, torch.Tensor],
+        original_record: MultimodalDatasetRecord | None = None,
     ) -> MultimodalInferenceOutput:
         input_ids = torch.unsqueeze(record['input_ids'], 0).to(self._model.language_model.device)
         attention_mask = torch.unsqueeze(record['attention_mask'], 0).to(self._model.language_model.device)
@@ -60,7 +60,7 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
         input_token_ids: torch.Tensor | None = None
         answer_tokens_ids: torch.Tensor | None = None
 
-        if self._return_logits:
+        if self._custom_generation_settings.return_logits:
             with torch.no_grad():
                 logits = self._model(output_indices).logits
 
@@ -72,11 +72,11 @@ class MultimodalGenerator(ChatGeneratorBase[MultimodalDatasetRecord, MultimodalI
             dataset_name=dataset_name,
             messages=original_record.messages,
             label=original_record.label,
+            input_token_ids=input_token_ids,
             answers=[
                 AnswerMessage(
                     id=str(i),
                     content=a,
-                    input_token_ids=input_token_ids,
                     answer_token_ids=answer_tokens_ids,
                     logits=logits,
                 )

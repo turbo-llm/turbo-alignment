@@ -1,11 +1,11 @@
 from typing import Any
 
-from clearml import Task
-
 from turbo_alignment.settings.logging.clearml import ClearMLSettings
 
+from clearml import Task
 
-def create_clearml_task(parameters: ClearMLSettings, config: dict[str, Any] | None = None) -> Task:
+
+def create_clearml_task(parameters: ClearMLSettings, config: dict[str, Any] | None = None):
     clearml_task = Task.init(
         task_name=parameters.task_name,
         project_name=parameters.project_name,
