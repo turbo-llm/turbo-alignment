@@ -7,3 +7,5 @@ class ModelTransformersSettings(ExtraFieldsNotAllowedBaseModel):
     omit_base_model_save: bool | None = None
 
     trust_remote_code: bool = False
+
+    torch_dtype: str = 'bfloat16'

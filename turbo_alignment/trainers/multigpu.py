@@ -11,7 +11,6 @@ from transformers import (
     PrinterCallback,
     ProcessorMixin,
     ProgressCallback,
-    Trainer,
     TrainerCallback,
     TrainerControl,
     TrainingArguments,
@@ -19,9 +18,10 @@ from transformers import (
 from transformers.integrations import get_reporting_integration_callbacks
 
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
+from turbo_alignment.sequence_parallel.trainer import TrainerWithSeqP
 
 
-class MultiGPUCherryPicksTrainer(Trainer):
+class MultiGPUCherryPicksTrainer(TrainerWithSeqP):
     def __init__(
         self,
         model: PreTrainedModel | nn.Module,

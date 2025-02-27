@@ -46,4 +46,3 @@ lock:
 clear:
 	rm -f test_*_answers.jsonl
 	rm -rf test_*_output
-	

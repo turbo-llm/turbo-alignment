@@ -22,5 +22,5 @@ def test_dpo_train(config_path: Path):
         app,
         ['train_dpo', '--experiment_settings_path', str(config_path)],
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.exception
     assert DPOTrainExperimentSettings.parse_file(config_path).log_path.is_dir()
