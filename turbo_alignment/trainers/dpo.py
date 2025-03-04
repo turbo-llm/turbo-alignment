@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
+import time
 
 import torch
 import torch.nn.functional as F
@@ -528,7 +529,7 @@ class DPOTrainer(Trainer):
         self,
         model: PreTrainedModel | nn.Module,
         data_collator: Callable,
-        args: DPOTrainingArguments,
+        args,
         train_dataset: Dataset,
         eval_dataset: Dataset,
         ref_model: PreTrainedModel | nn.Module | None = None,
@@ -559,7 +560,9 @@ class DPOTrainer(Trainer):
             loss_args.pop('loss_type')  # type: ignore[union-attr]
             self.dpo_loss_registry = DPOLossRegistry.by_name(self.loss_type)(**loss_args)
 
+        # Будем использовать для накопления метрик и времени
         self._stored_metrics: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+        self._last_time: float | None = None  # для подсчёта throughput
 
         super().__init__(
             model=model,
@@ -702,6 +705,7 @@ class DPOTrainer(Trainer):
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
         if self.args.use_ref_model or self.loss_type not in (
+            # Для этих лоссов можно без реф-модели, если задали соответствующее
             DPOLossesType.SIMPO,
             DPOLossesType.ORPO,
             DPOLossesType.ASFT,
@@ -741,6 +745,7 @@ class DPOTrainer(Trainer):
             )
 
         if self.loss_type == DPOLossesType.KTO:
+            # пользовательская логика для KTO...
             kto_chosen_KL = (
                 (policy_chosen_logps.detach().cpu() - reference_chosen_logps.detach().cpu()).mean().clamp(min=0)
             )
@@ -817,6 +822,8 @@ class DPOTrainer(Trainer):
 
         metrics[f'{prefix_name}grad_term'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().mean().item()
+            if hasattr(self.dpo_loss_registry, 'beta')
+            else 0.0
         )
 
         return metrics
@@ -857,10 +864,38 @@ class DPOTrainer(Trainer):
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, torch.Tensor | Any],
         return_outputs=False,
-        _num_items_in_batch=None,
+        num_items_in_batch=None, # pylint: disable=unused-argument
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, float]]:
+        """
+        Добавляем логику измерения throughput: 'throughput/device/tokens_per_sec'.
+        Всё остальное оставляем без изменений.
+        """
+        # Засекаем время в начале
+        current_time = time.time()
+        if self._last_time is None:
+            # Первый шаг просто инициализируем
+            self._last_time = current_time
+
+        # Считаем основной DPO лосс и метрики (как раньше)
         loss, metrics = self.get_batch_metrics(model, inputs, train_eval='train')
 
+        # Подсчитываем количество токенов в батче (chosen + rejected)
+        chosen_tokens = inputs["inputs_w"]["input_ids"].ne(DISABLE_LOSS_LABEL).sum().item()
+        rejected_tokens = inputs["inputs_l"]["input_ids"].ne(DISABLE_LOSS_LABEL).sum().item()
+        total_tokens_this_step = chosen_tokens + rejected_tokens
+
+        # Считаем время шага
+        step_time = time.time() - self._last_time
+        # Обновляем "прошлое" время
+        self._last_time = time.time()
+
+        # Если step_time > 0, считаем throughput
+        if step_time > 0:
+            metrics["throughput/device/tokens_per_sec"] = total_tokens_this_step / step_time
+        else:
+            metrics["throughput/device/tokens_per_sec"] = 0.0
+
+        # Логируем метрики как раньше
         if self.accelerator.is_main_process:
             self.store_metrics(metrics, train_eval='train')
         if return_outputs:
@@ -888,6 +923,7 @@ class DPOTrainer(Trainer):
         if prediction_loss_only:
             return loss.detach(), None, None
 
+        # Возвращаем логицы и лейблы, как у вас было
         logits_dict = {
             'logits_test/chosen': metrics['logits_test/chosen'],
             'logits_test/rejected': metrics['logits_test/rejected'],
