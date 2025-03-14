@@ -30,7 +30,7 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     adam_epsilon: float = 1e-8
     weight_decay: float = 0.0
     max_grad_norm: float = 1.0
-    deepspeed: Path | None = None
+    deepspeed: Path | dict[str, Any] | None = None
     save_total_limit: int = 1
     save_only_model: bool = False
     no_cuda: bool = False
