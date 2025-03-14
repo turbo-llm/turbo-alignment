@@ -1,4 +1,5 @@
 # adapted from https://github.com/deepspeedai/DeepSpeed/blob/master/deepspeed/sequence/cross_entropy.py
+# pylint: skip-file
 
 import torch
 import torch.distributed as dist

@@ -3,6 +3,8 @@
 
 # DeepSpeed Team
 
+# pylint: skip-file
+
 import torch
 
 from typing import Any, Tuple
