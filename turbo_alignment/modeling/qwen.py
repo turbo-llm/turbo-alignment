@@ -33,7 +33,7 @@ from transformers.models.qwen2.modeling_qwen2 import (
     logger,
 )
 from turbo_alignment.modeling import parallel_states
-from turbo_alignment.modeling.gemma2.ulysses_attn import _SeqAllToAll
+from turbo_alignment.modeling.ulysses_attn import _SeqAllToAll
 from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
 from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
 from turbo_alignment.sequence_parallel.vocab_parallel_cross_entropy import (
