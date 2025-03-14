@@ -4,7 +4,6 @@
 from typing import Optional, Tuple, Union, Callable
 
 import torch
-import torch.distributed as dist
 from torch import nn
 from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
