@@ -23,6 +23,7 @@ class DatasetStrategy(str, Enum):
 
 class BaseDatasetSettings(ExtraFieldsNotAllowedBaseModel):
     dataset_type: DatasetType
+    sample_random_seed: int = 42
 
 
 class DatasetSourceSettings(ExtraFieldsNotAllowedBaseModel):

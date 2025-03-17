@@ -28,6 +28,7 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
     ) -> None:
         self.source = source
         self.settings = settings
+        self.sampler = random.Random(self.settings.sample_random_seed)
 
         self.original_records_map: dict[str, RecordT] = {}
         self.records: list[dict[str, torch.Tensor]] = []
@@ -54,7 +55,7 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
         if self.source.sample_rate is not None:
             logger.info(f'Sampling dataset {self.source.name} with sample rate: {self.source.sample_rate}')
             sampled_original_records = {
-                record.id: record for record in original_records if random.random() <= self.source.sample_rate
+                record.id: record for record in original_records if self.sampler.random() <= self.source.sample_rate
             }
         elif self.source.num_samples is not None:
             logger.info(f'Sampling {self.source.num_samples} from dataset {self.source.name}')
