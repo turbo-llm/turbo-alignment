@@ -41,6 +41,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
     ) -> None:
         super().__init__(source=source, settings=settings, tokenizer=tokenizer)
         self.settings: ChatDatasetSettings = settings
+        self.random_cut_generator = random.Random(self.settings.random_cut_seed)
 
         if read:
             self._read()
@@ -192,7 +193,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 for i, m in enumerate(conversation.messages)
                 if m.role == ChatMessageRole.BOT and left_bound <= i < right_bound
             ]
-            right_bound = random.choice(bot_indices) if bot_indices else right_bound
+            right_bound = self.random_cut_generator.choice(bot_indices) if bot_indices else right_bound
 
         input_ids = np.array([])
         labels = np.array([])
