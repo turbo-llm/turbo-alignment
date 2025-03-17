@@ -35,12 +35,13 @@ class KTODataset(AlignmentDataset[KTODatasetRecord]):
             read=False,
         )
         super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        self.shuffle_generator = random.Random(settings.shuffle_seed)
 
         self._read()
 
     def convert_records(self, records: list[KTODatasetRecord]) -> list[dict[str, Any] | None]:
         shuffled_records = deepcopy(records)
-        random.shuffle(shuffled_records)
+        self.shuffle_generator.shuffle(shuffled_records)
 
         kl_records = []
         chat_records = []
