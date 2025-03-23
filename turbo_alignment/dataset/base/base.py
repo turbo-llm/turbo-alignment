@@ -25,10 +25,12 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
         self,
         source: DatasetSourceSettings,
         settings: BaseDatasetSettings,
+        seed: int,
     ) -> None:
         self.source = source
         self.settings = settings
-        self.sampler = random.Random(self.settings.sample_random_seed)
+        self.seed = seed
+        self.sampler = random.Random(seed)
 
         self.original_records_map: dict[str, RecordT] = {}
         self.records: list[dict[str, torch.Tensor]] = []
@@ -110,8 +112,9 @@ class AlignmentDataset(BaseDataset, ABC, Generic[RecordT]):
         source: DatasetSourceSettings,
         settings: BaseDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
     ) -> None:
-        super().__init__(source=source, settings=settings)
+        super().__init__(source=source, settings=settings, seed=seed)
 
         self.tokenizer = tokenizer
         self._logged = False

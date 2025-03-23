@@ -64,6 +64,7 @@ class RewardMetric(Metric):
             source=DatasetSourceSettings(name='', records_data=rm_input_records, sample_rate=1.0),
             settings=chat_settings,
             tokenizer=self.tokenizer,
+            seed=42,  # we set sample_ratio to 1.0, so no sampling
         )
 
         generator_outputs = generator.generate_from_dataset(new_dataset)

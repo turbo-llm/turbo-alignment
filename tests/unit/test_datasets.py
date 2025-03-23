@@ -21,7 +21,7 @@ def test_classification(tokenizer_llama2, chat_dataset_settings, classification_
 
     dataset_settings = ClassificationDatasetSettings(chat_settings=chat_dataset_settings)
 
-    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings)
+    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings, seed=42)
 
     assert len(data_dicts) == len(dataset)
 
@@ -43,7 +43,7 @@ def test_pair_preferences(tokenizer_llama2, chat_dataset_settings, pair_preferen
     dataset_cls = DatasetRegistry.by_name(DatasetType.PAIR_PREFERENCES).by_name(DatasetStrategy.TRAIN)
 
     dataset_settings = PairPreferenceDatasetSettings(chat_settings=chat_dataset_settings)
-    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings)
+    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings, seed=42)
 
     assert len(data_dicts) == len(dataset)
 
@@ -71,7 +71,7 @@ def test_ddpo(tokenizer_llama2, tokenizer_gptj, chat_dataset_settings, pair_pref
         chat_settings=chat_dataset_settings, pair_preferences=pair_preferences_dataset_settings
     )
     dataset = dataset_cls(
-        chat_tokenizer=sft_tokenizer, rm_tokenizer=rm_tokenizer, source=source, settings=dataset_settings
+        chat_tokenizer=sft_tokenizer, rm_tokenizer=rm_tokenizer, source=source, settings=dataset_settings, seed=42
     )
 
     assert len(data_dicts) == len(dataset)

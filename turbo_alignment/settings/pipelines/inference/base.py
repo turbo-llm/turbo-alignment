@@ -34,3 +34,4 @@ class InferenceExperimentSettings(ExtraFieldsNotAllowedBaseModel):
 
     dataset_settings: INFERENCE_DATASETS_SETTINGS
     save_path: Path
+    seed: int = 42

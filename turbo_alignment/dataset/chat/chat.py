@@ -37,11 +37,12 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         source: DatasetSourceSettings,
         settings: ChatDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
         read: bool = True,
     ) -> None:
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
-        self.random_cut_generator = random.Random(self.settings.random_cut_seed)
+        self.cut_generator = random.Random(self.seed)
 
         if read:
             self._read()
@@ -193,7 +194,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 for i, m in enumerate(conversation.messages)
                 if m.role == ChatMessageRole.BOT and left_bound <= i < right_bound
             ]
-            right_bound = self.random_cut_generator.choice(bot_indices) if bot_indices else right_bound
+            right_bound = self.cut_generator.choice(bot_indices) if bot_indices else right_bound
 
         input_ids = np.array([])
         labels = np.array([])
@@ -355,12 +356,13 @@ class InferenceChatDataset(ChatDataset):
         source: DatasetSourceSettings,
         settings: ChatDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
         read: bool = True,
         random_cut: bool = False,
     ) -> None:
         self._random_cut = random_cut
 
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer, read=read)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, read=read, seed=seed)
 
     def convert_records(self, records: list[ChatDatasetRecord]) -> list[dict[str, Any] | None]:
         return self._encode(records, inference=True, random_cut=self._random_cut)
@@ -371,7 +373,7 @@ class InferenceChatDataset(ChatDataset):
             settings=self.settings,
             tokenizer=self.tokenizer,
             read=False,
-            random_cut=self._random_cut,
+            seed=self.seed,
         )
 
         dataset_records = [self[idx] for idx in range(len(self))]

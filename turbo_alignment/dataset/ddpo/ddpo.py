@@ -33,6 +33,7 @@ class DDPODataset(BaseDataset[PairPreferenceRecord]):
         settings: DDPOMultiDatasetSettings,
         chat_tokenizer: PreTrainedTokenizerBase,
         rm_tokenizer: PreTrainedTokenizerBase,
+        seed: int,
         read: bool = True,
     ) -> None:
         settings.chat_settings.keep_end = True
@@ -40,17 +41,20 @@ class DDPODataset(BaseDataset[PairPreferenceRecord]):
             settings=settings.chat_settings,
             source=source,
             tokenizer=chat_tokenizer,
+            seed=seed,
             read=False,
         )
         self._rm_dataset = PairPreferenceDataset(
             settings=settings.pair_preferences,
             source=source,
             tokenizer=rm_tokenizer,
+            seed=seed,
         )
 
         super().__init__(
             settings=settings,
             source=source,
+            seed=seed,
         )
         if read:
             self._read()
@@ -121,6 +125,7 @@ def load_ddpo_datasets(
     multi_dataset_settings: DDPOMultiDatasetSettings,
     chat_tokenizer: PreTrainedTokenizerBase,
     rm_tokenizer: PreTrainedTokenizerBase,
+    seed: int,
 ) -> list[DDPODataset]:
     logger.info(
         f'Loading dataset {multi_dataset_settings.dataset_type} with settings:\n{multi_dataset_settings.dict()}'
@@ -135,6 +140,7 @@ def load_ddpo_datasets(
             rm_tokenizer=rm_tokenizer,
             source=source,
             settings=multi_dataset_settings,
+            seed=seed,
         )
 
         datasets.append(dataset)

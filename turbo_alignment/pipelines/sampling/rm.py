@@ -70,6 +70,7 @@ class BaseSamplingStrategyWithRM(BaseSamplingStrategy[SamplingSettingsWithRMT], 
             source=experiment_settings.dataset_settings.sources[0],
             settings=experiment_settings.dataset_settings.chat_dataset,
             tokenizer=tokenizer,
+            seed=experiment_settings.seed,
         )
 
         rewards = self._get_rewards(

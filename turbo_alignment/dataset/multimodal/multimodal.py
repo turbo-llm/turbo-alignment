@@ -30,8 +30,8 @@ logger = get_project_logger()
 
 
 class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
-    def __init__(self, tokenizer, source, settings):
-        super().__init__(tokenizer=tokenizer, source=source, settings=settings)
+    def __init__(self, tokenizer, source, settings, seed: int):
+        super().__init__(tokenizer=tokenizer, source=source, settings=settings, seed=seed)
 
         self._n_modality_embeddings = settings.n_modality_embeddings
         self._modality_reader_settings_mapping = settings.modality_reader_settings_mapping
@@ -140,7 +140,7 @@ class MultimodalDataset(AlignmentDataset[MultimodalDatasetRecord], ABC):
 
 @MultimodalDatasetTypeRegistry.register(DatasetStrategy.TRAIN)
 class TrainMultimodalDataset(MultimodalDataset):
-    def __init__(self, tokenizer, source, settings) -> None:
+    def __init__(self, tokenizer, source, settings, seed: int) -> None:
         """
 
         :param n_modality_embeddings: сколько токенов выделяем под одно сообщение с нетекстовой модальностью
@@ -150,9 +150,11 @@ class TrainMultimodalDataset(MultimodalDataset):
         :param truncate_top: обрезаем диалог сверху или снизу, если он не влазит в max_tokens
         """
 
-        super().__init__(tokenizer=tokenizer, source=source, settings=settings)
+        super().__init__(tokenizer=tokenizer, source=source, settings=settings, seed=seed)
 
-        self._chat_dataset = TrainChatDataset(tokenizer=tokenizer, source=source, settings=settings, read=False)
+        self._chat_dataset = TrainChatDataset(
+            tokenizer=tokenizer, source=source, settings=settings, seed=seed, read=False
+        )
 
         self._read()
 
@@ -207,6 +209,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
     def __init__(
         self,
         *args,
+        seed: int,
         random_cut: bool = False,
         **kwargs,
     ) -> None:
@@ -214,7 +217,7 @@ class InferenceMultimodalDataset(MultimodalDataset):
         settings = kwargs['settings']
         settings.random_cut = random_cut
         self._chat_dataset = InferenceChatDataset(
-            tokenizer=kwargs['tokenizer'], source=kwargs['source'], settings=settings, read=False
+            tokenizer=kwargs['tokenizer'], source=kwargs['source'], settings=settings, read=False, seed=seed
         )
         self._read()
 

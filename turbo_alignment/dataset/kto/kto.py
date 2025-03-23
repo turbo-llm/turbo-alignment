@@ -27,15 +27,17 @@ class KTODataset(AlignmentDataset[KTODatasetRecord]):
         source: DatasetSourceSettings,
         settings: KTODatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
     ):
         self._chat_dataset = TrainChatDataset(
             source=source,
             settings=settings.chat_settings,
             tokenizer=tokenizer,
+            seed=seed,
             read=False,
         )
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer)
-        self.shuffle_generator = random.Random(settings.shuffle_seed)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
+        self.shuffle_generator = random.Random(self.seed)
 
         self._read()
 

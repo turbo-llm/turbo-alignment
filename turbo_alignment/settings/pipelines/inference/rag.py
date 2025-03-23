@@ -21,3 +21,4 @@ class RAGInferenceExperimentSettings(ExtraFieldsNotAllowedBaseModel):
 
     dataset_settings: ChatMultiDatasetSettings
     save_path: Path
+    seed: int = 42

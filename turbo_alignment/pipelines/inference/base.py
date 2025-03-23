@@ -45,6 +45,7 @@ class BaseInferenceStrategy(BaseStrategy, Generic[InferenceExperimentSettingsT])
                 experiment_settings.dataset_settings,
                 tokenizer=tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
             generations_output: list[BaseModel] = sum(
                 [gather_object(generator.generate_from_dataset(dataset)) for dataset in datasets], []

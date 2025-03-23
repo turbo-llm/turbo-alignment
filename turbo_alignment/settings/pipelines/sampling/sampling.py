@@ -25,6 +25,7 @@ class BaseSamplingWithRMSettings(BaseSamplingSettings):
     tokenizer_settings: TokenizerSettings
 
     rm_batch_size: int
+    seed: int = 42
 
 
 class SamplingWithRMSettings(BaseSamplingWithRMSettings):

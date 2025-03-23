@@ -43,7 +43,10 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
             return None
 
         cherry_pick_datasets = DatasetLoader[PairPreferenceDataset](PairPreferenceDataset).load_datasets(
-            cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.TRAIN
+            cherry_pick_settings.dataset_settings,
+            tokenizer=tokenizer,
+            strategy=DatasetStrategy.TRAIN,
+            seed=experiment_settings.seed,
         )
 
         metrics = [
