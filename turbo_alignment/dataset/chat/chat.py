@@ -78,13 +78,14 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             inference=inference,
         )
 
-        left_bound = 0
-        last_index = replicas_cum_len[-1]
-        for i, replica_end_index in enumerate(replicas_cum_len):
-            if last_index - replica_end_index <= max_tokens:
-                return left_bound, right_bound
+        total_length = replicas_cum_len[-1]
+        replicas_cum_len_padded = [0] + replicas_cum_len[:-1]
 
-            left_bound = i
+        for left_bound, prev_length in enumerate(replicas_cum_len_padded):
+            remaining_length = total_length - prev_length
+
+            if remaining_length <= max_tokens:
+                return left_bound, right_bound
 
         raise ValueError('Can\'t trim dialogue to fit all requirements')
 
