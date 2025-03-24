@@ -27,20 +27,23 @@ class KTODataset(AlignmentDataset[KTODatasetRecord]):
         source: DatasetSourceSettings,
         settings: KTODatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
     ):
         self._chat_dataset = TrainChatDataset(
             source=source,
             settings=settings.chat_settings,
             tokenizer=tokenizer,
+            seed=seed,
             read=False,
         )
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
+        self.shuffle_generator = random.Random(self.seed)
 
         self._read()
 
     def convert_records(self, records: list[KTODatasetRecord]) -> list[dict[str, Any] | None]:
         shuffled_records = deepcopy(records)
-        random.shuffle(shuffled_records)
+        self.shuffle_generator.shuffle(shuffled_records)
 
         kl_records = []
         chat_records = []

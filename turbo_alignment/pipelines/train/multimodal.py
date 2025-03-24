@@ -48,7 +48,10 @@ class TrainMultimodalStrategy(MultimodalMixin, BaseTrainStrategy[MultimodalTrain
             return None
 
         cherry_pick_datasets = DatasetLoader[InferenceMultimodalDataset](InferenceMultimodalDataset).load_datasets(
-            cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
+            cherry_pick_settings.dataset_settings,
+            tokenizer=tokenizer,
+            strategy=DatasetStrategy.INFERENCE,
+            seed=experiment_settings.seed,
         )
 
         metrics = [

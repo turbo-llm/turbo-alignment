@@ -53,7 +53,12 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
 
         cherry_pick_datasets = DatasetLoader[InferenceClassificationDataset](
             InferenceClassificationDataset
-        ).load_datasets(cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE)
+        ).load_datasets(
+            cherry_pick_settings.dataset_settings,
+            tokenizer=tokenizer,
+            strategy=DatasetStrategy.INFERENCE,
+            seed=experiment_settings.seed,
+        )
 
         metrics = [
             Metric.by_name(metric.type)(MetricSettingsRegistry.by_name(metric.type)(**metric.parameters))

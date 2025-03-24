@@ -91,6 +91,6 @@ def dpo_dataset(pair_preferences_dataset_source, tokenizer_llama2, chat_dataset_
     dataset_cls = DatasetRegistry.by_name(DatasetType.PAIR_PREFERENCES).by_name(DatasetStrategy.TRAIN)
 
     dataset_settings = PairPreferenceDatasetSettings(chat_settings=chat_dataset_settings)
-    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings)
+    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings, seed=42)
 
     return dataset

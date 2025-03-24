@@ -12,7 +12,7 @@ def test_kto_collator(tokenizer_llama2, chat_dataset_settings, kto_dataset_sourc
     dataset_cls = DatasetRegistry.by_name(DatasetType.KTO).by_name(DatasetStrategy.TRAIN)
 
     dataset_settings = KTODatasetSettings(chat_settings=chat_dataset_settings)
-    dataset = dataset_cls(tokenizer=tokenizer, source=source, settings=dataset_settings)
+    dataset = dataset_cls(tokenizer=tokenizer, source=source, settings=dataset_settings, seed=42)
 
     batch_size = min(len(dataset), 8)
     examples = list(dataset)[:batch_size]

@@ -32,6 +32,7 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
         source: DatasetSourceSettings,
         settings: PairPreferenceDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
         read: bool = True,
     ):
         self._add_labels = settings.add_labels
@@ -40,9 +41,10 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
             source=source,
             settings=settings.chat_settings,
             tokenizer=tokenizer,
+            seed=seed,
             read=False,
         )
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: PairPreferenceDatasetSettings = settings
 
         if read:
@@ -115,6 +117,7 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
             source=self.source,
             settings=self.settings,
             tokenizer=self.tokenizer,
+            seed=self.seed,
             read=False,
         )
 

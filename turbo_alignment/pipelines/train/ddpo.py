@@ -46,7 +46,10 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
             return None
 
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
-            cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
+            cherry_pick_settings.dataset_settings,
+            tokenizer=tokenizer,
+            strategy=DatasetStrategy.INFERENCE,
+            seed=experiment_settings.seed,
         )
 
         metrics = [
@@ -157,6 +160,7 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
                 experiment_settings.train_dataset_settings,
                 rm_tokenizer=self.rm_tokenizer,
                 chat_tokenizer=self.tokenizer,
+                seed=experiment_settings.seed,
             )
         )
         val_dataset: ConcatDataset = ConcatDataset(
@@ -164,6 +168,7 @@ class TrainDDPOStrategy(BaseTrainStrategy[DDPOTrainExperimentSettings]):
                 experiment_settings.val_dataset_settings,
                 rm_tokenizer=self.rm_tokenizer,
                 chat_tokenizer=self.tokenizer,
+                seed=experiment_settings.seed,
             )
         )
 

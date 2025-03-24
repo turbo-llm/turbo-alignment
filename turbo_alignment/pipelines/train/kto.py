@@ -41,7 +41,10 @@ class TrainKTOStrategy(BaseTrainStrategy[KTOTrainExperimentSettings]):
             return None
 
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
-            cherry_pick_settings.dataset_settings, tokenizer=tokenizer, strategy=DatasetStrategy.INFERENCE
+            cherry_pick_settings.dataset_settings,
+            tokenizer=tokenizer,
+            strategy=DatasetStrategy.INFERENCE,
+            seed=experiment_settings.seed,
         )
 
         metrics = [

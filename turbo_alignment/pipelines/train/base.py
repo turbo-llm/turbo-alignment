@@ -159,6 +159,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.TRAIN,
+                seed=experiment_settings.seed,
             )
         )
 
@@ -167,6 +168,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.TRAIN,
+                seed=experiment_settings.seed,
             )
         )
 

@@ -29,15 +29,17 @@ class ClassificationDataset(AlignmentDataset[ClassificationDatasetRecord], ABC):
         source: DatasetSourceSettings,
         settings: ClassificationDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
     ):
         settings.chat_settings.only_answer_loss = False
         self._chat_dataset = TrainChatDataset(
             source=source,
             settings=settings.chat_settings,
             tokenizer=tokenizer,
+            seed=seed,
             read=False,
         )
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ClassificationDatasetSettings = settings
 
         self._read()
@@ -99,6 +101,7 @@ class InferenceClassificationDataset(ClassificationDataset):
             source=self.source,
             settings=self.settings,
             tokenizer=self.tokenizer,
+            seed=self.seed,
         )
 
         dataset_records = [self[idx] for idx in range(len(self))]
