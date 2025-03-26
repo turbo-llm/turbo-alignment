@@ -113,7 +113,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
                     ChatInferenceOutput(
                         input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0).cuda(),
                         input_attention_mask=records['attention_mask'][i, :].unsqueeze(0).cuda(),
-                        id=sample_ids[0],
+                        id=sample_ids[i],
                         dataset_name=dataset_name,
                         messages=None,
                         label=None,
