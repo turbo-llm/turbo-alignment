@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+import yaml
 
 from tests.constants import FIXTURES_PATH
 from tests.sequence_parallel.consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH
@@ -60,11 +61,16 @@ def patch_settings(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    'launch_mode',
+    ['deepspeed', 'accelerate'],
+)
 def test_model_output(
     task_type: str,
     settings_path: pathlib.Path,
     model_path: str,
     model_type: str,
+    launch_mode: str,
     tmp_path_factory: pytest.TempPathFactory,
 ):
     env = os.environ.copy()
@@ -91,10 +97,44 @@ def test_model_output(
     env['FORWARD_HOOK_OUTPUT_DIR'] = str(forward_dir)
     env['CREATE_GRADIENT_HOOK'] = '1'
 
-    common_cmd_line = [
-        'deepspeed',
-        '--no_local_rank',
-    ]
+    if launch_mode == 'accelerate':
+        src_accelerate_config_path = pathlib.Path(__file__).parent / 'accelerate_config.yml'
+        with src_accelerate_config_path.open('r', encoding='utf-8') as input_:
+            accelerate_config = yaml.safe_load(input_)
+
+        deepspeed_cfg = new_settings['trainer_settings']['deepspeed']
+        config_dir = tmp_path_factory.mktemp('configs')
+        deepspeed_cfg_path = config_dir / 'deepspeed.json'
+        with deepspeed_cfg_path.open('w', encoding='utf-8') as output:
+            json.dump(deepspeed_cfg, output, indent=4)
+
+        accelerate_config['deepspeed_config']['deepspeed_config_file'] = str(deepspeed_cfg_path.absolute())
+        new_accelerate_config_path = config_dir / 'accelerate.yaml'
+        with new_accelerate_config_path.open('w', encoding='utf-8') as output:
+            yaml.safe_dump(accelerate_config, output)
+
+        common_cmd_line = [
+            'accelerate',
+            'launch',
+            '--config_file',
+            str(new_accelerate_config_path.absolute()),
+            '--machine_rank',
+            '0',
+            '--num_machines',
+            '1',
+        ]
+
+        def build_middle_args(num_gpus: int):
+            return ['--num_processes', str(num_gpus)]
+
+    elif launch_mode == 'deepspeed':
+        common_cmd_line = [
+            'deepspeed',
+            '--no_local_rank',
+        ]
+
+        def build_middle_args(num_gpus: int):
+            return ['--num_gpus', str(num_gpus)]
 
     script_args = [
         script_path,
@@ -105,9 +145,11 @@ def test_model_output(
     ]
 
     print('Run with ulessys')
-    subprocess.check_call(common_cmd_line + ['--num_gpus', '2'] + script_args, env=env)
+    # subprocess.check_call(common_cmd_line + ['--num_gpus', '2'] + script_args, env=env)
+    subprocess.check_call(common_cmd_line + build_middle_args(2) + script_args, env=env)
     print('Run vanilla')
-    subprocess.check_call(common_cmd_line + ['--num_gpus', '1'] + script_args + ['--make-model-vanilla'], env=env)
+
+    subprocess.check_call(common_cmd_line + build_middle_args(1) + script_args + ['--make-model-vanilla'], env=env)
 
     attention_mask_shape_file = forward_dir / 'attention_mask.shape'
     attention_mask = None
