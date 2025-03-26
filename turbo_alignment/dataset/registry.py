@@ -6,18 +6,8 @@ class DatasetRegistry(Registrable):
     ...
 
 
-@DatasetRegistry.register(DatasetType.DDPO)
-class DDPODatasetTypeRegistry(Registrable):
-    ...
-
-
 @DatasetRegistry.register(DatasetType.PAIR_PREFERENCES)
 class PairPreferenceDatasetTypeRegistry(Registrable):
-    ...
-
-
-@DatasetRegistry.register(DatasetType.KTO)
-class KTODatasetTypeRegistry(Registrable):
     ...
 
 
@@ -33,9 +23,4 @@ class ClassificationDatasetTypeRegistry(Registrable):
 
 @DatasetRegistry.register(DatasetType.SAMPLING)
 class SamplingRMDatasetTypeRegistry(Registrable):
-    ...
-
-
-@DatasetRegistry.register(DatasetType.MULTIMODAL)
-class MultimodalDatasetTypeRegistry(Registrable):
     ...

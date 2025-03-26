@@ -10,10 +10,7 @@ class DatasetType(str, Enum):
     CHAT = 'chat'
     PAIR_PREFERENCES = 'pair_preferences'
     SAMPLING = 'sampling'
-    DDPO = 'ddpo'
     CLASSIFICATION = 'classification'
-    MULTIMODAL = 'multimodal'
-    KTO = 'kto'
 
 
 class DatasetStrategy(str, Enum):

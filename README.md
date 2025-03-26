@@ -27,24 +27,16 @@ Turbo-Alignment is a library designed to streamline the fine-tuning and alignmen
 - **📚 Ready-to-Use Examples**: Convenient examples with configurations and instructions for basic tasks.
 - **⚡ Fast Inference**: Optimized for quick inference using vLLM.
 - **🔄 End-to-End Pipelines**: From data preprocessing to model alignment.
-- **🌐 Multimodal Capabilities**: Extensive support for various multimodal functions like Vision Language Modeling.
-- **🔍 RAG Pipeline**: Unique pipeline for end2end retrieval-augmented generation training.
 
 <a name="-supported-methods"></a>
 ## 🛠️ Supported Methods
 
 
 Turbo-Alignment supports a wide range of methods for model training and alignment, including:
-- **🎯** Supervised Fine-Tuning (SFT)
-- **🏆** Reward Modeling (RM)
-- **👍** Direct Preference Optimization (DPO)
-- **🧠** Kahneman & Tversky Optimization (KTO) Paired/Unpaired
-- **🔄** Contrastive Preference Optimization (CPO)
-- **🎭** Identity Preference Optimisation (IPO)
-- **🌟** Sequence Likelihood Calibration with Human Feedback (SLiC-HF)
-- **📊** Statistical Rejection Sampling Optimization (RSO)
-- **🌁** Vision Language Modeling using MLP from (LLaVA) or C-Abstractor from (HoneyBee) trainable projection model
-- **🗂️** Retrieval-Augmented Generation (RAG)
+- **🎯** Supervised Fine-Tuning
+- **🏆** Reward Modeling
+- **👍** Offline Preference Optimization
+- **🤗** Online Preference Optimization ⌛️ in progress..
 
 <a name="-implemented-metrics"></a>
 ## 🧮 Implemented Metrics
@@ -56,8 +48,6 @@ Turbo-Alignment supports a wide range of methods for model training and alignmen
 - **🏆** Reward
 - **📏** Length
 - **🌀** Perplexity
-- **🌟** METEOR
-- **🔍** Retrieval Utility
 
 <a name="-how-to-use"></a>
 ## 🤖 How to Use
@@ -72,14 +62,9 @@ Examples of datasets are available [here](docs/dataset_example.md).
   - [Supervised Fine-Tuning](#-sft-train)
   - [Preference Tuning](#-preftune-train)
     - [Reward Modeling](#-rm-train)
-    - [DPO, CPO, IPO, KTO (Paired)](#-dpo-train)
-    - [KTO (Unpaired)](#-kto-train)
-  - [Multimodal](#-multimodal-train)
-  - [RAG](#-rag-train)
+    - [Offline Preference Optimization](#-dpo-train)
 - [Inference](#-inference)
   - [Supervised Fine-Tuning](#-sft-inference)
-  - [Multimodal](#-multimodal-inference)
-  - [RAG](#-rag-inference)
 - [Sampling](#-sampling)
   - [Random](#-random-sampling)
   - [RM](#-rm-sampling)
@@ -100,7 +85,7 @@ Examples of datasets are available [here](docs/dataset_example.md).
 python -m turbo_alignment train_sft --experiment_settings_path tutorials/sft/sft.json
 ```
 <a name="-preftune-train"></a>
-## Preference Tuning
+## Offine Preference Tuning
 <a name="-rm-train"></a>
 ### Reward Modeling
 - **📚 Dataset type** prepare your dataset  in the `PairPreferencesDataset` format, examples available [here](docs/dataset_example.md#-pair-preferences)
@@ -111,45 +96,12 @@ python -m turbo_alignment train_rm --experiment_settings_path tutorials/rm/rm.js
 ```
 
 <a name="-dpo-train"></a>
-### DPO, IPO, CPO, KTO (Paired)
+### DPO
 - **📚 Dataset type** prepare your dataset in the `PairPreferencesDataset` format, examples available [here](docs/dataset_example.md#pair-preferences)
 - **📝 Configs Example**: [dpo.json](tutorials/dpo/dpo.json)
 - **🖥️ CLI launch command**
 ```bash
 python -m turbo_alignment train_dpo --experiment_settings_path tutorials/dpo/dpo.json
-```
-
-<a name="-kto-train"></a>
-### KTO (Unpaired)
-- **📚 Dataset type** prepare your dataset in the `KTODataset` format, examples available [here](docs/dataset_example.md#-kto-dataset)
-- **📝 Configs Examples**: [kto.json](tutorials/kto/kto.json)
-- **🖥️ CLI launch command**
-```bash
-python -m turbo_alignment train_kto --experiment_settings_path tutorials/kto/kto.json
-```
-
-<a name="-multimodal-train"></a>
-## Multimodal train
-⌛️  in progress..
-
-
-<a name="-rag-train"></a>
-## RAG (Retrieval-Augmented Generation) 
-<a name="-sft-rag-train"></a>
-### SFT-RAG
-- **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [sft_retrieval_utility.json](tests/fixtures/configs/train/sft/sft_retrieval_utility.json)
-- **🖥️ CLI launch command**: 
-```bash
-python -m turbo_alignment train_sft --experiment_settings_path tests/fixtures/configs/train/sft/sft_retrieval_utility.json
-```
-<a name="-e2e-rag-train"></a>
-### End2End-RAG
-- **📚 Dataset type**: prepare your dataset in `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [end2end.json](tests/fixtures/configs/train/rag/end2end.json)
-- **🖥️ CLI launch command**:
-```bash
-python -m turbo_alignment train_rag --experiment_settings_path tests/fixtures/configs/train/rag/end2end.json
 ```
 
 <a name="-inference"></a>
@@ -170,24 +122,6 @@ python -m turbo_alignment inference_chat --inference_settings_path tests/fixture
 - **🖥️ CLI launch command**
 ```bash
 python -m turbo_alignment inference_classification --inference_settings_path tests/fixtures/configs/inference/classification/base.json
-```
-
-<a name="-multimodal-inference"></a>
-## Multimodal Inference
-- **📚 Dataset type** prepare your dataset  in the `MultimodalDataset`, examples available [here](docs/dataset_example.md#-multimodal-dataset) format.
-- **📝 Configs Example**: [llama_llava_clip_pickle.json](tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json)
-- **🖥️ CLI launch command**
-```bash
-python -m turbo_alignment inference_multimodal --inference_settings_path tests/fixtures/configs/inference/multimodal/llama_llava_clip_pickle.json
-```
-
-<a name="-rag-inference"></a>
-## RAG Inference
-- **📚 Dataset type** prepare your dataset  in the `ChatDataset`, examples available [here](docs/dataset_example.md#-chat-dataset) format.
-- **📝 Configs Example**: [rag_inference.json](tests/fixtures/configs/inference/rag/base.json)
-- **🖥️ CLI launch command**
-```bash
-python -m turbo_alignment inference_rag --inference_settings_path tests/fixtures/configs/inference/rag/base.json
 ```
 
 <a name="-sampling"></a>
@@ -228,15 +162,6 @@ python -m turbo_alignment rm_sample --experiment_settings_path tests/fixtures/co
 ```bash
 python -m turbo_alignment merge_adapters_to_base --settings_path tests/fixtures/configs/utils/merge_adapters_to_base/merge.json
 ```
-
-<a name="-preprocess_multimodal_dataset"></a>
-## Preprocess Multimodal Dataset
-- **📝 Configs Example**: [coco2014_clip.json](tutorials/utils/preprocess/coco2014_clip.json)
-- **🖥️ CLI launch command**
-```bash
-python -m turbo_alignment preprocess_multimodal_dataset --settings_path tutorials/utils/preprocess/coco2014_clip.json
-```
-
 
 <a name="-installation"></a>
 ## 🚀 Installation

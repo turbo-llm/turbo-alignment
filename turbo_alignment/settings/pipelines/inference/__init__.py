@@ -1,4 +1,2 @@
 from .base import InferenceExperimentSettings
 from .chat import ChatInferenceExperimentSettings
-from .multimodal import MultimodalInferenceExperimentSettings
-from .rag import RAGInferenceExperimentSettings

@@ -42,8 +42,3 @@ def write_labels(labels: list[str], path: Path) -> None:
 def create_placeholder_file(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     write_string_to_file('Placeholder', path)
-
-
-def read_text_file(path: Path) -> str:
-    with path.open(encoding='utf8') as f:
-        return f.read()
