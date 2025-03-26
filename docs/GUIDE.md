@@ -12,17 +12,12 @@ More configs you can find [here](../tests/fixtures/configs)
   - [Default Generation](#default-generation-inference)
   - [vLLM Generation](#vllm-generation-inference)
   - [Classification](#classification-inference)
-  - [RAG](#rag-inference)
-    - [Offline RAG](#offline-rag-inference)
-    - [Online RAG](#online-rag-inference)
 - [Train](#train-stuff)
   - [LORA](#lora-adapter-train)
   - [P-tune](#p-tuning-train)
   - [Custom](#custom-modifications)
   - [Classification](#llm-for-classification)
-  - [RAG](#end-2-end-rag)
   - [Reward Model](#reward-model)
-- [Multimodal](#multimodal-tasks)
 
 
 
@@ -151,7 +146,7 @@ Don't forget to specify that your model is for classification😏   [classificat
     "<super_bot>": "the best bot ever"
 }
 ``` 
-During training, you might want to add your special tokens, e.g., for RAG **<doc_sep>** is useful, for multimodal tasks you might want to specify a particular **<modal_name>**.
+During training, you might want to add your special tokens.
 
 In this case, we add the token **<RS>** by initializing its weights with the token **<bos>**, and the token "<super_bot>" by averaging the tokens that split the string "the best bot ever"
 
