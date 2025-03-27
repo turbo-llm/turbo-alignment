@@ -24,7 +24,8 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
 
             rewards = []
 
-            exact_match_goldens = read_jsonl(Path("/app/turbo-alignment/tests/fixtures/datasets/chat/chat_id_x_gold.jsonl"))
+            # exact_match_goldens = read_jsonl(Path("/app/turbo-alignment/tests/fixtures/datasets/chat/chat_id_x_gold.jsonl"))
+            exact_match_goldens = read_jsonl(Path("/from_s3/data/chat_id_x_gold.jsonl"))
             id_x_pred_answer = [{'id': id, 'pred_answer': answer} for id, answer in zip(records['sample_ids'], records['sample_contents'])]
             id_x_golden_answer = [{'id': s['id'], 'gold_answer': s['gold']} for s in exact_match_goldens]
 
@@ -43,8 +44,10 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             exact_match_rewards = exact_match_rewards.to(rewards.device)
 
             new_rewards = torch.where(exact_match_mask == 0, rewards, exact_match_rewards)
+            normalized_rewards = torch.sigmoid(new_rewards)
+            normalized_rewards = normalized_rewards.to(rewards.device)
 
-        return rewards
+        return normalized_rewards
 
     def generate_from_batch(
         self,
