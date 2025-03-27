@@ -38,16 +38,20 @@ logger = get_project_logger()
 
 class ReinforceDataCollator(DataCollatorForTokenClassification):
     def torch_call(self, features):
+        
         import torch
         from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
         label_name = 'label' if 'label' in features[0].keys() else 'labels'
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
+        
+        ids = [feature['id'] for feature in features]
 
         no_labels_features = [
             {k: v for k, v in feature.items() if k != label_name and isinstance(v, torch.Tensor)}
             for feature in features
         ]
+
 
         batch = pad_without_fast_tokenizer_warning(
             self.tokenizer,
@@ -57,6 +61,7 @@ class ReinforceDataCollator(DataCollatorForTokenClassification):
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors='pt',
         )
+        batch['id'] = ids
 
         if labels is None:
             return batch

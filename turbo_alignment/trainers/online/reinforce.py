@@ -460,10 +460,14 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
             end = time.time()
             self.time_profiler.padding_time.append(end - start)
 
+        sample_ids = [g.id for g in generations for _ in g.answers]
+        sample_contents = [ans.content for g in generations for ans in g.answers]
         rm_inputs = {
             'input_ids': response_ids,
             'attention_mask': response_attention_mask,
             'position_ids': position_ids,
+            'sample_ids': sample_ids,
+            'sample_contents': sample_contents
         }
 
         if torch.distributed.get_rank() == 0:
