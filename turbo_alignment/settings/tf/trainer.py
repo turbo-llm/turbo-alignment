@@ -1,11 +1,14 @@
+import warnings
 from pathlib import Path
 from typing import Any
+
+from pydantic import model_validator
 
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
-    evaluation_strategy: str = 'steps'
+    eval_strategy: str = 'steps'
     save_strategy: str = 'steps'
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 4
@@ -47,3 +50,16 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     gradient_checkpointing_kwargs: dict[str, Any] = {}
     neftune_noise_alpha: float | None = None
     report_to: list[str] = []
+
+    # TODO: remove in future
+    @model_validator(mode='before')
+    @classmethod
+    def handle_deprecated_evaluation_strategy(cls, values):
+        if 'evaluation_strategy' in values:
+            warnings.warn(
+                "'evaluation_strategy' is deprecated and will be removed in a future version. "
+                "Use 'eval_strategy' instead.",
+                FutureWarning,
+            )
+            values['eval_strategy'] = values.pop('evaluation_strategy')
+        return values
