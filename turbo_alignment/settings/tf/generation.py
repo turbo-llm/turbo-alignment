@@ -11,6 +11,8 @@ class BaseGeneratorSettings(ExtraFieldsNotAllowedBaseModel):
 
 class GeneratorTransformersSettings(BaseGeneratorSettings):
     num_beams: int = 1
+    num_beam_groups: int = 1
+    diversity_penalty: float = 0.0
     max_new_tokens: int = 15
     num_return_sequences: int = 1
     do_sample: bool = True
