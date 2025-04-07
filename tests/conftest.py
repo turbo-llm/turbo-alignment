@@ -55,11 +55,6 @@ def pair_preferences_dataset_path() -> str:
     return 'tests/fixtures/datasets/rm/train_preferences.jsonl'
 
 
-@fixture(scope='session')
-def kto_dataset_path() -> str:
-    return 'tests/fixtures/datasets/rm/train_kto.jsonl'
-
-
 def load_dataset_source(dataset_path: str) -> tuple[DatasetSourceSettings, list[dict]]:
     with open(dataset_path, 'r', encoding='utf-8') as f:
         data_dicts = [json.loads(line) for line in f]
@@ -77,11 +72,6 @@ def classification_dataset_source(classification_dataset_path) -> tuple[DatasetS
 @fixture(scope='session')
 def pair_preferences_dataset_source(pair_preferences_dataset_path) -> tuple[DatasetSourceSettings, list[dict]]:
     return load_dataset_source(pair_preferences_dataset_path)
-
-
-@fixture(scope='session')
-def kto_dataset_source(kto_dataset_path) -> tuple[DatasetSourceSettings, list[dict]]:
-    return load_dataset_source(kto_dataset_path)
 
 
 @fixture(scope='session')

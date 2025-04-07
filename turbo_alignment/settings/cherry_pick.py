@@ -4,7 +4,6 @@ from turbo_alignment.settings.datasets.chat import ChatMultiDatasetSettings
 from turbo_alignment.settings.datasets.classification import (
     ClassificationMultiDatasetSettings,
 )
-from turbo_alignment.settings.datasets.multimodal import MultimodalMultiDatasetSettings
 from turbo_alignment.settings.datasets.pair_preference import (
     PairPreferenceMultiDatasetSettings,
 )
@@ -33,7 +32,3 @@ class GenerationSettings(CherryPickSettings):
 
 class ChatCherryPickSettings(GenerationSettings):
     dataset_settings: ChatMultiDatasetSettings
-
-
-class MultimodalCherryPickSettings(GenerationSettings):
-    dataset_settings: MultimodalMultiDatasetSettings

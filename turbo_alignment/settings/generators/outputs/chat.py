@@ -20,8 +20,3 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
 
 class ChatInferenceOutput(BaseInferenceOutput, ChatDatasetRecord):
     answers: list[AnswerMessage]
-
-
-class RagInferenceOutput(ChatInferenceOutput):
-    documents: list[str]
-    doc_scores: list[float]
