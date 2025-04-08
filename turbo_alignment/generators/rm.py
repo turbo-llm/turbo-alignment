@@ -22,7 +22,7 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
 
             rank = torch.distributed.get_rank()
 
-            rewards = []
+            original_rewards = []
 
             # exact_match_goldens = read_jsonl(Path("/app/turbo-alignment/tests/fixtures/datasets/chat/chat_id_x_gold.jsonl"))
             exact_match_goldens = read_jsonl(Path("/from_s3/data/chat_id_x_gold.jsonl"))
@@ -37,8 +37,11 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             ]
             
             exact_match_mask = torch.tensor([0 if 'exact_match' not in sample['id'] else 1 for sample in merged_list])
+            for sample in merged_list:
+                print(f"Gold: {sample['gold_answer']}, Pred: {sample['pred_answer']}", sample['gold_answer'] == sample['pred_answer'], exact_match_mask)
+
             exact_match_rewards = torch.tensor([sample['gold_answer'] == sample['pred_answer'] for sample in merged_list])
-            original_rewards = ray.get(self._model.reward_forward(records=rm_records, index=rank % self.model_replicas))
+            original_rewards = ray.get(self._model.reward_forward(records=rm_records, index=rank % self.model_replicas)).squeeze(-1)
             with torch.no_grad():
                 normalized_original_rewards = torch.sigmoid(original_rewards) # скейлинг оригинальных ревардов в [0,1]
 
@@ -47,7 +50,9 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             new_rewards = torch.where(exact_match_mask == 0, normalized_original_rewards, exact_match_rewards)
             new_rewards = new_rewards.to(normalized_original_rewards.device)
 
-        return new_rewards
+            print(f"Original rewards: {original_rewards}, Exact match rewards {exact_match_rewards}, New rewards: {new_rewards}")
+
+        return new_rewards.unsqueeze(-1)
 
     def generate_from_batch(
         self,
