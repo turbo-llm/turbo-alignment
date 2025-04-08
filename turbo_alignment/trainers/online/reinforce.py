@@ -475,6 +475,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
 
         rewards = self.critic_generator.generate_from_batch_records(rm_inputs)
 
+        print(f"Rewards: {rewards}")
+
         if torch.distributed.get_rank() == 0:
             end = time.time()
             self.time_profiler.reward_model_time.append(end - start)

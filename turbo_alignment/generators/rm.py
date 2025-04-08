@@ -38,16 +38,16 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             
             exact_match_mask = torch.tensor([0 if 'exact_match' not in sample['id'] else 1 for sample in merged_list])
             exact_match_rewards = torch.tensor([sample['gold_answer'] == sample['pred_answer'] for sample in merged_list])
-            rewards = ray.get(self._model.reward_forward(records=rm_records, index=rank % self.model_replicas))
+            original_rewards = ray.get(self._model.reward_forward(records=rm_records, index=rank % self.model_replicas))
+            with torch.no_grad():
+                normalized_original_rewards = torch.sigmoid(original_rewards) # скейлинг оригинальных ревардов в [0,1]
 
-            exact_match_mask = exact_match_mask.to(rewards.device)
-            exact_match_rewards = exact_match_rewards.to(rewards.device)
+            exact_match_mask = exact_match_mask.to(normalized_original_rewards.device)
+            exact_match_rewards = exact_match_rewards.to(normalized_original_rewards.device) # бинарный ревард
+            new_rewards = torch.where(exact_match_mask == 0, normalized_original_rewards, exact_match_rewards)
+            new_rewards = new_rewards.to(normalized_original_rewards.device)
 
-            new_rewards = torch.where(exact_match_mask == 0, rewards, exact_match_rewards)
-            normalized_rewards = torch.sigmoid(new_rewards)
-            normalized_rewards = normalized_rewards.to(rewards.device)
-
-        return normalized_rewards
+        return new_rewards
 
     def generate_from_batch(
         self,

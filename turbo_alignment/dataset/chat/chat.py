@@ -95,12 +95,15 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         inference: bool,
         max_tokens: int | None = None,
     ) -> tuple[int, int]:
+        bot_message_was_presented = False
         for i, (message, end_index) in enumerate(zip(conversation.messages[::-1], replicas_cum_len[::-1])):
             if self.settings.only_answer_loss:
-                if inference and message.role == ChatMessageRole.BOT:
+                if inference and message.role == ChatMessageRole.BOT and not bot_message_was_presented:
+                    bot_message_was_presented = True
                     continue
                 if not inference and message.role != ChatMessageRole.BOT:
                     continue
+                bot_message_was_presented = False
 
             if max_tokens is None or end_index < max_tokens:
                 return 0, len(replicas_cum_len) - i
