@@ -55,8 +55,3 @@ class PreTrainedAdaptersModelSettings(PreTrainedModelSettings):
 
 class ModelForPeftSettings(PreTrainedModelSettings):
     peft_settings: PEFT_TYPE
-
-
-class PreTrainedMultiModalModel(PreTrainedAdaptersModelSettings):
-    projections_path: Path
-    n_modality_embeddings: int

@@ -25,9 +25,12 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
         self,
         source: DatasetSourceSettings,
         settings: BaseDatasetSettings,
+        seed: int,
     ) -> None:
         self.source = source
         self.settings = settings
+        self.seed = seed
+        self.sampler = random.Random(seed)
 
         self.original_records_map: dict[str, RecordT] = {}
         self.records: list[dict[str, torch.Tensor]] = []
@@ -54,7 +57,7 @@ class BaseDataset(Dataset, ABC, Generic[RecordT]):
         if self.source.sample_rate is not None:
             logger.info(f'Sampling dataset {self.source.name} with sample rate: {self.source.sample_rate}')
             sampled_original_records = {
-                record.id: record for record in original_records if random.random() <= self.source.sample_rate
+                record.id: record for record in original_records if self.sampler.random() <= self.source.sample_rate
             }
         elif self.source.num_samples is not None:
             logger.info(f'Sampling {self.source.num_samples} from dataset {self.source.name}')
@@ -109,8 +112,9 @@ class AlignmentDataset(BaseDataset, ABC, Generic[RecordT]):
         source: DatasetSourceSettings,
         settings: BaseDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
     ) -> None:
-        super().__init__(source=source, settings=settings)
+        super().__init__(source=source, settings=settings, seed=seed)
 
         self.tokenizer = tokenizer
         self._logged = False

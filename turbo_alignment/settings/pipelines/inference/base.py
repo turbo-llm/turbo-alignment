@@ -8,7 +8,6 @@ from turbo_alignment.settings.datasets.chat import ChatMultiDatasetSettings
 from turbo_alignment.settings.datasets.classification import (
     ClassificationMultiDatasetSettings,
 )
-from turbo_alignment.settings.datasets.multimodal import MultimodalMultiDatasetSettings
 from turbo_alignment.settings.model import (
     PreTrainedAdaptersModelSettings,
     PreTrainedModelSettings,
@@ -16,7 +15,7 @@ from turbo_alignment.settings.model import (
 from turbo_alignment.settings.tf.tokenizer import TokenizerSettings
 
 INFERENCE_DATASETS_SETTINGS = Annotated[
-    ChatMultiDatasetSettings | ClassificationMultiDatasetSettings | MultimodalMultiDatasetSettings,
+    ChatMultiDatasetSettings | ClassificationMultiDatasetSettings,
     Field(discriminator='dataset_type'),
 ]
 
@@ -34,3 +33,4 @@ class InferenceExperimentSettings(ExtraFieldsNotAllowedBaseModel):
 
     dataset_settings: INFERENCE_DATASETS_SETTINGS
     save_path: Path
+    seed: int = 42

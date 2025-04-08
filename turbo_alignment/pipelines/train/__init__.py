@@ -1,5 +1,4 @@
 from .classification import TrainClassificationStrategy
-from .ddpo import TrainDDPOStrategy
 from .dpo import TrainDPOStrategy
 from .grpo import TrainGRPOStrategy
 from .kto import TrainKTOStrategy

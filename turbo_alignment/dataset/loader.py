@@ -22,6 +22,7 @@ class DatasetLoader(Generic[DatasetType]):
         multi_dataset_settings: MultiDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
         strategy: DatasetStrategy,
+        seed: int,
     ) -> list[DatasetType]:
         logger.info(
             f'Loading dataset {multi_dataset_settings.dataset_type} with settings:\n{multi_dataset_settings.dict()}'
@@ -35,6 +36,7 @@ class DatasetLoader(Generic[DatasetType]):
                 tokenizer=tokenizer,
                 source=source,
                 settings=multi_dataset_settings,
+                seed=seed,
             )
 
             if self._dataset_cls is not None:

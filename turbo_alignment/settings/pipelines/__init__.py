@@ -7,7 +7,6 @@ from turbo_alignment.settings.pipelines.sampling import (
 from turbo_alignment.settings.pipelines.train.classification import (
     ClassificationTrainExperimentSettings,
 )
-from turbo_alignment.settings.pipelines.train.ddpo import DDPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.dpo import DPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.grpo import GRPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.kto import KTOTrainExperimentSettings

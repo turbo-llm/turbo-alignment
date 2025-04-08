@@ -55,11 +55,6 @@ def pair_preferences_dataset_path() -> str:
     return 'tests/fixtures/datasets/rm/train_preferences.jsonl'
 
 
-@fixture(scope='session')
-def kto_dataset_path() -> str:
-    return 'tests/fixtures/datasets/rm/train_kto.jsonl'
-
-
 def load_dataset_source(dataset_path: str) -> tuple[DatasetSourceSettings, list[dict]]:
     with open(dataset_path, 'r', encoding='utf-8') as f:
         data_dicts = [json.loads(line) for line in f]
@@ -80,17 +75,12 @@ def pair_preferences_dataset_source(pair_preferences_dataset_path) -> tuple[Data
 
 
 @fixture(scope='session')
-def kto_dataset_source(kto_dataset_path) -> tuple[DatasetSourceSettings, list[dict]]:
-    return load_dataset_source(kto_dataset_path)
-
-
-@fixture(scope='session')
 def dpo_dataset(pair_preferences_dataset_source, tokenizer_llama2, chat_dataset_settings):
     source, _ = pair_preferences_dataset_source
 
     dataset_cls = DatasetRegistry.by_name(DatasetType.PAIR_PREFERENCES).by_name(DatasetStrategy.TRAIN)
 
     dataset_settings = PairPreferenceDatasetSettings(chat_settings=chat_dataset_settings)
-    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings)
+    dataset = dataset_cls(tokenizer=tokenizer_llama2, source=source, settings=dataset_settings, seed=42)
 
     return dataset

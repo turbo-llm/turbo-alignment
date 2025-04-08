@@ -26,6 +26,7 @@ class SamplingRMDataset(AlignmentDataset[SamplingDatasetRecord]):
         source: DatasetSourceSettings,
         settings: ChatDatasetSettings,
         tokenizer: PreTrainedTokenizerBase,
+        seed: int,
         read: bool = True,
     ) -> None:
         settings.keep_end = True
@@ -33,9 +34,10 @@ class SamplingRMDataset(AlignmentDataset[SamplingDatasetRecord]):
             settings=settings,
             source=source,
             tokenizer=tokenizer,
+            seed=seed,
             read=False,
         )
-        super().__init__(source=source, settings=settings, tokenizer=tokenizer)
+        super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
 
         if read:
