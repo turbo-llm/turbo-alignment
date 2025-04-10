@@ -125,6 +125,7 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
 
@@ -133,6 +134,7 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
         return train_dataset, val_dataset
@@ -175,6 +177,7 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
 
@@ -183,6 +186,7 @@ class TrainGRPOStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings], Dis
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
 

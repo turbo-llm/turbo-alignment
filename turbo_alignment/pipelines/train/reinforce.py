@@ -175,6 +175,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
 
@@ -183,6 +184,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
         return train_dataset, val_dataset
@@ -225,6 +227,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
                 experiment_settings.train_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
 
@@ -233,6 +236,7 @@ class TrainREINFORCEStrategy(BaseTrainStrategy[REINFORCETrainExperimentSettings]
                 experiment_settings.val_dataset_settings,
                 tokenizer=self.tokenizer,
                 strategy=DatasetStrategy.INFERENCE,
+                seed=experiment_settings.seed,
             )
         )
 

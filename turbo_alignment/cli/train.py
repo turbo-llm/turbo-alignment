@@ -59,32 +59,6 @@ def classification_training(
     pipelines.TrainClassificationStrategy().run(experiment_settings)
 
 
-@app.command(name='train_multimodal', help='Train Multimodal')
-def multimodal_training(
-    experiment_settings_path: Path = typer.Option(
-        ...,
-        '--experiment_settings_path',
-        exists=True,
-        help='Path to experiment config file',
-    ),
-) -> None:
-    experiment_settings = pipeline_settings.MultimodalTrainExperimentSettings.parse_file(experiment_settings_path)
-    pipelines.TrainMultimodalStrategy().run(experiment_settings)
-
-
-@app.command(name='train_rag', help='Train RAG')
-def rag_training(
-    experiment_settings_path: Path = typer.Option(
-        ...,
-        '--experiment_settings_path',
-        exists=True,
-        help='Path to experiment config file',
-    ),
-) -> None:
-    experiment_settings = pipeline_settings.RAGTrainExperimentSettings.parse_file(experiment_settings_path)
-    pipelines.TrainRAGStrategy().run(experiment_settings)
-
-
 @app.command(name='train_reinforce', help='Train REINFORCE pipeline')
 def reinforce_training(
     experiment_settings_path: Path = typer.Option(
@@ -132,12 +106,6 @@ def reinforce_training(
         reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path)
     )
     # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
-
-    '''
-    TODO_RLOO:
-    2. PARAMS to REINFORCETrainExperimentSettings
-    3. if possible hide creating of vllm engines inside trainer
-    '''
 
     vllm_engines = create_vllm_engines(
         num_engines=experiment_settings.trainer_settings.actor_settings.vllm_num_engines,
@@ -206,12 +174,6 @@ def grpo_training(
         reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path)
     )
     # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
-
-    '''
-    TODO_GRPO:
-    2. PARAMS to GRPOTrainExperimentSettings
-    3. if possible hide creating of vllm engines inside trainer
-    '''
 
     vllm_engines = create_vllm_engines(
         num_engines=experiment_settings.trainer_settings.actor_settings.vllm_num_engines,

@@ -422,7 +422,8 @@ class REINFORCETrainer(MultiGPUCherryPicksTrainer):
         if torch.distributed.get_rank() == 0:
             print(f'Prompt with completion at index [0] shape: {response_ids[0].shape}', flush=True)
             print(
-                f'Prompt with completion decoded: {self.tokenizer.batch_decode(response_ids[0], skip_special_tokens=False)}',
+                'Prompt with completion decoded: ',
+                self.tokenizer.batch_decode(response_ids[0], skip_special_tokens=False),
                 flush=True,
             )
 

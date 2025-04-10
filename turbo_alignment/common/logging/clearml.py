@@ -1,8 +1,8 @@
 from typing import Any
 
-from turbo_alignment.settings.logging.clearml import ClearMLSettings
-
 from clearml import Task
+
+from turbo_alignment.settings.logging.clearml import ClearMLSettings
 
 
 def create_clearml_task(parameters: ClearMLSettings, config: dict[str, Any] | None = None):

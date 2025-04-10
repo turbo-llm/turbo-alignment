@@ -116,17 +116,17 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
         self._tokenizer.padding_side = 'left'
         self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 
-        merged_inputs = [inputs for record in records for key, inputs in record['answers'].items()]
+        # merged_inputs = [inputs for record in records for key, inputs in record['answers'].items()]
 
-        input_ids = [record['input_ids'].tolist() for record in merged_inputs]
-        attention_mask = [record['attention_mask'].tolist() for record in merged_inputs]
+        # input_ids = [record['input_ids'].tolist() for record in merged_inputs]
+        # attention_mask = [record['attention_mask'].tolist() for record in merged_inputs]
 
         rewards = []
-        for i in range(0, len(input_ids), self._micro_batch):
-            input_ids_batch = input_ids[i : i + self._micro_batch]
-            attn_mask_batch = attention_mask[i : i + self._micro_batch]
+        # for i in range(0, len(input_ids), self._micro_batch):
+        # input_ids_batch = input_ids[i : i + self._micro_batch]
+        # attn_mask_batch = attention_mask[i : i + self._micro_batch]
 
-            max_input_length = max(len(sample) for sample in input_ids_batch)
+        # max_input_length = max(len(sample) for sample in input_ids_batch)
 
         reward_index = 0
         record_rewards = []
@@ -137,7 +137,7 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
                 reward_index += 1
             record_rewards.append(mapped_rewards)
 
-            rewards.extend(self.generate_from_batch_records(records_batch).tolist())
+            # rewards.extend(self.generate_from_batch_records(records_batch).tolist())
 
         outputs = []
         for i, record in enumerate(original_records):

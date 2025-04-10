@@ -388,7 +388,8 @@ class GRPOTrainer(MultiGPUCherryPicksTrainer):
             print(f'Input shape: {inputs["input_ids"].shape}', flush=True)
             print(f'Input ids example at index [0]: {inputs["input_ids"][0, :]}')
             print(
-                f'Input Example at index [0]: {self.processing_class.batch_decode(inputs["input_ids"][0, :].unsqueeze(0))}'
+                'Input Example at index [0]: ',
+                self.processing_class.batch_decode(inputs['input_ids'][0, :].unsqueeze(0)),
             )
 
         if do_broadcast:
