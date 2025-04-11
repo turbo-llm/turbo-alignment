@@ -9,6 +9,20 @@ from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.settings.generators.outputs.rm import RMSamplingInferenceOutput
 from pathlib import Path
 
+
+def get_global_min_max_normalization(values: torch.Tensor):
+    global_min = values.clone()
+    global_max = values.clone()
+    torch.distributed.all_reduce(global_min, op=torch.distributed.ReduceOp.MIN)
+    torch.distributed.all_reduce(global_max, op=torch.distributed.ReduceOp.MAX)
+    local_normalized_values = (values - global_min.item()) / (global_max.item() - global_min.item() + 1e-8)
+
+    if torch.distributed.get_rank() == 0:
+        print(f"input valued={values}, {global_min=}, {global_max=}, {local_normalized_values=}")
+
+    return local_normalized_values
+
+
 class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, model_replicas: int = 1, **kwargs):
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
@@ -24,7 +38,7 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
 
             original_rewards = []
 
-            # exact_match_goldens = read_jsonl(Path("/app/turbo-alignment/tests/fixtures/datasets/chat/chat_id_x_gold.jsonl"))
+            exact_match_goldens = read_jsonl(Path("/app/turbo-alignment/tests/fixtures/datasets/chat/chat_id_x_gold.jsonl"))
             exact_match_goldens = read_jsonl(Path("/from_s3/data/chat_id_x_gold.jsonl"))
             id_x_pred_answer = [{'id': id, 'pred_answer': answer} for id, answer in zip(records['sample_ids'], records['sample_contents'])]
             id_x_golden_answer = [{'id': s['id'], 'gold_answer': s['gold']} for s in exact_match_goldens]
@@ -42,13 +56,14 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
 
             exact_match_rewards = torch.tensor([sample['gold_answer'] == sample['pred_answer'] for sample in merged_list])
             original_rewards = ray.get(self._model.reward_forward(records=rm_records, index=rank % self.model_replicas)).squeeze(-1)
-            with torch.no_grad():
-                normalized_original_rewards = torch.sigmoid(original_rewards) # скейлинг оригинальных ревардов в [0,1]
+            # return original_rewards.unsqueeze(-1)
+
+            # min/max scaling
+            normalized_original_rewards = get_global_min_max_normalization(original_rewards) # min-max нормализация ревардов
 
             exact_match_mask = exact_match_mask.to(normalized_original_rewards.device)
             exact_match_rewards = exact_match_rewards.to(normalized_original_rewards.device) # бинарный ревард
             new_rewards = torch.where(exact_match_mask == 0, normalized_original_rewards, exact_match_rewards)
-            new_rewards = new_rewards.to(normalized_original_rewards.device)
 
             print(f"Original rewards: {original_rewards}, Exact match rewards {exact_match_rewards}, New rewards: {new_rewards}")
 
