@@ -3,10 +3,24 @@ from typing import Any
 import ray
 import torch
 from transformers import BatchEncoding, DataCollatorWithPadding, PreTrainedTokenizerBase
-
+from turbo_alignment.common.data.io import read_jsonl
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.settings.generators.outputs.rm import RMSamplingInferenceOutput
+from pathlib import Path
+
+
+def get_global_min_max_normalization(values: torch.Tensor):
+    global_min = values.clone()
+    global_max = values.clone()
+    torch.distributed.all_reduce(global_min, op=torch.distributed.ReduceOp.MIN)
+    torch.distributed.all_reduce(global_max, op=torch.distributed.ReduceOp.MAX)
+    local_normalized_values = (values - global_min.item()) / (global_max.item() - global_min.item() + 1e-8)
+
+    if torch.distributed.get_rank() == 0:
+        print(f"input valued={values}, {global_min=}, {global_max=}, {local_normalized_values=}")
+
+    return local_normalized_values
 
 
 class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
@@ -18,33 +32,42 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
 
     def generate_from_batch_records(self, records: dict[str, torch.Tensor] | BatchEncoding) -> torch.Tensor:
         with torch.no_grad():
-            records = {k: v.cuda() for k, v in records.items()}
+            rm_records = {k: v.cuda() for k, v in records.items() if k not in ('sample_ids', 'sample_contents')}
 
             rank = torch.distributed.get_rank()
 
-            rewards = []
+            original_rewards = []
 
-            # for sample in records['input_ids']:
-            #     print('RECORDS INSIDE RM', sample)
+            exact_match_goldens = read_jsonl(Path("/app/turbo-alignment/tests/fixtures/datasets/chat/chat_id_x_gold.jsonl"))
+            exact_match_goldens = read_jsonl(Path("/from_s3/data/chat_id_x_gold.jsonl"))
+            id_x_pred_answer = [{'id': id, 'pred_answer': answer} for id, answer in zip(records['sample_ids'], records['sample_contents'])]
+            id_x_golden_answer = [{'id': s['id'], 'gold_answer': s['gold']} for s in exact_match_goldens]
 
-            #     if sample[-1] == 4:
-            #         rewards.append(10)
-            #     elif sample[-1] == 10:
-            #         rewards.append(15)
-            #     elif sample[-1] == 2:
-            #         rewards.append(0.1)
-            #     elif sample[-1] == 0:
-            #         rewards.append(-10)
-            #     elif sample[-1] == -5:
-            #         rewards.append(-100)
-            #     else:
-            #         rewards.append(-1)
+            golden_lookup = {d['id']: d['gold_answer'] for d in id_x_golden_answer}
 
-            rewards = ray.get(self._model.reward_forward(records=records, index=rank % self.model_replicas))
+            merged_list = [
+                {'id': d['id'], 'pred_answer': d['pred_answer'], 'gold_answer': golden_lookup.get(d['id'])}
+                for d in id_x_pred_answer
+            ]
+            
+            exact_match_mask = torch.tensor([0 if 'exact_match' not in sample['id'] else 1 for sample in merged_list])
+            for sample in merged_list:
+                print(f"Gold: {sample['gold_answer']}, Pred: {sample['pred_answer']}", sample['gold_answer'] == sample['pred_answer'], exact_match_mask)
 
-            # print('FINAL REWARDS, ', rewards)
-            # print('FINAL REAL REWARDS, ', rewards.shape, rewards)
-        return rewards  # .squeeze()
+            exact_match_rewards = torch.tensor([sample['gold_answer'] == sample['pred_answer'] for sample in merged_list])
+            original_rewards = ray.get(self._model.reward_forward(records=rm_records, index=rank % self.model_replicas)).squeeze(-1)
+            # return original_rewards.unsqueeze(-1)
+
+            # min/max scaling
+            normalized_original_rewards = get_global_min_max_normalization(original_rewards) # min-max нормализация ревардов
+
+            exact_match_mask = exact_match_mask.to(normalized_original_rewards.device)
+            exact_match_rewards = exact_match_rewards.to(normalized_original_rewards.device) # бинарный ревард
+            new_rewards = torch.where(exact_match_mask == 0, normalized_original_rewards, exact_match_rewards)
+
+            print(f"Original rewards: {original_rewards}, Exact match rewards {exact_match_rewards}, New rewards: {new_rewards}")
+
+        return new_rewards.unsqueeze(-1)
 
     def generate_from_batch(
         self,

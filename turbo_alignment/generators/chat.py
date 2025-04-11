@@ -73,6 +73,8 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         # (Assuming micro_rollout_batch_size equal to micro_batch_size)
         input_ids = records['input_ids'].tolist()
 
+        sample_ids = records['id']
+        
         rank = torch.distributed.get_rank()
         llm = self.vllm_engines[rank % len(self.vllm_engines)]
 
@@ -111,7 +113,7 @@ class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
                     ChatInferenceOutput(
                         input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0).cuda(),
                         input_attention_mask=records['attention_mask'][i, :].unsqueeze(0).cuda(),
-                        id=None,
+                        id=sample_ids[i],
                         dataset_name=dataset_name,
                         messages=None,
                         label=None,
