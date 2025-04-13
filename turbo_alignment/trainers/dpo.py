@@ -798,9 +798,9 @@ class DPOTrainer(Trainer):
                 torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
                 - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
             )
-            ratio = -F.logsigmoid(log_odds)
-            or_loss = self.dpo_loss_registry.beta * ratio
-            nll_loss = -policy_chosen_logps
+            ratio = -F.logsigmoid(self.dpo_loss_registry.beta * log_odds)
+            or_loss = self.dpo_loss_registry.lambda_ * ratio
+            nll_loss = -(self.dpo_loss_registry.ce_coef * policy_chosen_logps)
 
             metrics[f'{prefix}orpo/nll_loss'] = nll_loss.detach().cpu().mean().item()
             metrics[f'{prefix}orpo/or_loss'] = or_loss.detach().cpu().mean().item()
@@ -814,11 +814,11 @@ class DPOTrainer(Trainer):
             rejected_ratio = policy_rejected_logps - (
                 torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
             )
-            chosen_logsig = -F.logsigmoid(chosen_ratio)
-            rejected_logsig = -F.logsigmoid(-rejected_ratio)
+            chosen_logsig = -F.logsigmoid(self.dpo_loss_registry.beta * chosen_ratio)
+            rejected_logsig = -F.logsigmoid(-self.dpo_loss_registry.beta * rejected_ratio)
 
-            asft_loss = self.dpo_loss_registry.beta * (chosen_logsig + rejected_logsig)
-            nll_loss = -policy_chosen_logps
+            asft_loss = self.dpo_loss_registry.lambda_ * (chosen_logsig + rejected_logsig)
+            nll_loss = -(self.dpo_loss_registry.ce_coef * policy_chosen_logps)
 
             metrics[f'{prefix}asft/nll_loss'] = nll_loss.detach().cpu().mean().item()
             metrics[f'{prefix}asft/asft_loss'] = asft_loss.detach().cpu().mean().item()
