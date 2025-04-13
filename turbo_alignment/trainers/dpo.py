@@ -30,6 +30,7 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     APODownLossSettings,
     APOZeroLossSettings,
     ASFTLossSettings,
+    CALDPOLossSettings,
     CPOLossSettings,
     DPOLossesType,
     DPOPLossSettings,
@@ -279,8 +280,10 @@ class SimPOLoss(DPOLossRegistry):
 
 @DPOLossRegistry.register(DPOLossesType.ORPO)
 class ORPOLoss(DPOLossRegistry):
-    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+    def __init__(self, *args, beta: float = 1.0, lambda_: float = 1.0, ce_coef: float = 1.0, **kwargs) -> None:
         self.beta = beta
+        self.ce_coef = ce_coef
+        self.lambda_ = lambda_
         super().__init__(*args, **kwargs)
 
     def compute_loss(
@@ -296,8 +299,8 @@ class ORPOLoss(DPOLossRegistry):
             - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
         )
 
-        ratio = -F.logsigmoid(log_odds)
-        losses = -policy_chosen_logps + self.beta * ratio
+        ratio = -F.logsigmoid(self.beta * log_odds)
+        losses = -(self.ce_coef * policy_chosen_logps) + self.lambda_ * ratio
 
         chosen_rewards = self.beta * policy_chosen_logps.detach()
         rejected_rewards = self.beta * policy_rejected_logps.detach()
@@ -307,8 +310,10 @@ class ORPOLoss(DPOLossRegistry):
 
 @DPOLossRegistry.register(DPOLossesType.ASFT)
 class ASFTLoss(DPOLossRegistry):
-    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+    def __init__(self, *args, beta: float = 1.0, lambda_: float = 1.0, ce_coef: float = 1.0, **kwargs) -> None:
         self.beta = beta
+        self.lambda_ = lambda_
+        self.ce_coef = ce_coef
         super().__init__(*args, **kwargs)
 
     def compute_loss(
@@ -323,9 +328,9 @@ class ASFTLoss(DPOLossRegistry):
         rejected_ratio = policy_rejected_logps - (
             torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
         )
-        sigm_diff = -F.logsigmoid(chosen_ratio) - F.logsigmoid(-rejected_ratio)
+        sigm_diff = -F.logsigmoid(self.beta * chosen_ratio) - F.logsigmoid(-self.beta * rejected_ratio)
 
-        losses = -policy_chosen_logps + self.beta * sigm_diff
+        losses = -(self.ce_coef * policy_chosen_logps) + self.lambda_ * sigm_diff
 
         chosen_rewards = self.beta * policy_chosen_logps.detach()
         rejected_rewards = self.beta * policy_rejected_logps.detach()
@@ -489,6 +494,36 @@ class NCAPairLoss(DPOLossRegistry):
         return loss, chosen_rewards, rejected_rewards
 
 
+@DPOLossRegistry.register(DPOLossesType.CAL_DPO)
+class CALDPOLoss(DPOLossRegistry):
+    def __init__(self, *args, beta: float = 0.1, **kwargs) -> None:
+        self.beta = beta
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(
+        self,
+        policy_chosen_logps: torch.FloatTensor,
+        policy_rejected_logps: torch.FloatTensor,
+        reference_chosen_logps: torch.FloatTensor,
+        reference_rejected_logps: torch.FloatTensor,
+        precomputed_margins: torch.FloatTensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        chosen_reward = policy_chosen_logps - reference_chosen_logps
+        reject_reward = policy_rejected_logps - reference_rejected_logps
+
+        dpo_losses = -F.logsigmoid(chosen_reward - reject_reward)
+
+        cal_losses = F.mse_loss(chosen_reward, torch.full_like(chosen_reward, 0.5 * (1 / self.beta))) + F.mse_loss(
+            reject_reward, torch.full_like(reject_reward, -0.5 * (1 / self.beta))
+        )
+        loss = dpo_losses + cal_losses
+
+        chosen_rewards = (policy_chosen_logps - reference_chosen_logps).detach()
+        rejected_rewards = (policy_rejected_logps - reference_rejected_logps).detach()
+
+        return loss, chosen_rewards, rejected_rewards
+
+
 @dataclass
 class DPOTrainingArguments(TrainingArguments):
     loss_settings: (
@@ -507,6 +542,7 @@ class DPOTrainingArguments(TrainingArguments):
         | APODownLossSettings
         | DPOPLossSettings
         | NCAPairLossSettings
+        | CALDPOLossSettings
     ) = field(
         default_factory=SigmoidLossSettings(loss_type=DPOLossesType.SIGMOID)
     )  # type: ignore[call-overload]
@@ -762,9 +798,9 @@ class DPOTrainer(Trainer):
                 torch.log1p(-torch.clamp(torch.exp(policy_chosen_logps), max=1 - 1e-7))
                 - torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
             )
-            ratio = -F.logsigmoid(log_odds)
-            or_loss = self.dpo_loss_registry.beta * ratio
-            nll_loss = -policy_chosen_logps
+            ratio = -F.logsigmoid(self.dpo_loss_registry.beta * log_odds)
+            or_loss = self.dpo_loss_registry.lambda_ * ratio
+            nll_loss = -(self.dpo_loss_registry.ce_coef * policy_chosen_logps)
 
             metrics[f'{prefix}orpo/nll_loss'] = nll_loss.detach().cpu().mean().item()
             metrics[f'{prefix}orpo/or_loss'] = or_loss.detach().cpu().mean().item()
@@ -778,11 +814,11 @@ class DPOTrainer(Trainer):
             rejected_ratio = policy_rejected_logps - (
                 torch.log1p(-torch.clamp(torch.exp(policy_rejected_logps), max=1 - 1e-7))
             )
-            chosen_logsig = -F.logsigmoid(chosen_ratio)
-            rejected_logsig = -F.logsigmoid(-rejected_ratio)
+            chosen_logsig = -F.logsigmoid(self.dpo_loss_registry.beta * chosen_ratio)
+            rejected_logsig = -F.logsigmoid(-self.dpo_loss_registry.beta * rejected_ratio)
 
-            asft_loss = self.dpo_loss_registry.beta * (chosen_logsig + rejected_logsig)
-            nll_loss = -policy_chosen_logps
+            asft_loss = self.dpo_loss_registry.lambda_ * (chosen_logsig + rejected_logsig)
+            nll_loss = -(self.dpo_loss_registry.ce_coef * policy_chosen_logps)
 
             metrics[f'{prefix}asft/nll_loss'] = nll_loss.detach().cpu().mean().item()
             metrics[f'{prefix}asft/asft_loss'] = asft_loss.detach().cpu().mean().item()
