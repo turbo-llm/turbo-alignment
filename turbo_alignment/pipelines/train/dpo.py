@@ -76,7 +76,7 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
         train_dataset: Dataset,
         val_dataset: Dataset,
         data_collator: Callable,
-    ):
+    ) -> DPOTrainer:
         model.config.use_cache = not training_args.gradient_checkpointing
 
         extra_args = {}
