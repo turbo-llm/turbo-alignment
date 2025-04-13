@@ -156,6 +156,8 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             with torch.no_grad():
                 logits = self._model(output_indices).logits
 
+        print('🐙' * 5, logits)
+
         postprocessed_output_indices, answers_attention_mask, postprocessed_logits, answers = self._postprocess(
             input_indices=batched_input_ids,
             output_indices=output_indices,
@@ -177,20 +179,22 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             ):
                 answer_logits = None if postprocessed_logits is None else postprocessed_logits[i + j, :, :]
 
+                # print('🦈'*5, postprocessed_logits)
+
                 outputs.append(
                     ChatInferenceOutput(
                         dataset_name=dataset_name,
                         messages=original_records[i].messages if original_records else None,
                         label=original_records[i].label if original_records else None,
                         meta=original_records[i].meta if original_records else None,
-                        input_token_ids=input_ids,
-                        input_attention_mask=attention_mask,
                         answers=[
                             AnswerMessage(
                                 id=str(i),
                                 content=answer,
                                 answer_token_ids=answer_tokens,
                                 logits=answer_logits,
+                                input_token_ids=input_ids,
+                                input_attention_mask=attention_mask,
                                 answer_attention_mask=answer_attention_mask,
                             )
                         ],
@@ -218,9 +222,11 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
 
         logits: torch.Tensor | None = None
 
-        if self._custom_generation_settings.return_logits:
+        if self._return_logits:
             with torch.no_grad():
                 logits = self._model(output_indices).logits.cpu()
+
+        print('👀' * 15, logits, self._custom_generation_settings.return_logits)
 
         postprocessed_output_indices, answers_attention_mask, postprocessed_logits, answers = self._postprocess(
             input_indices=input_ids,
@@ -235,12 +241,15 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             zip(answers, postprocessed_output_indices, answers_attention_mask)
         ):
             answer_logits = None if postprocessed_logits is None else postprocessed_logits[i, :, :].unsqueeze(0)
+            print('🦈' * 5, postprocessed_logits)
             answer_messages.append(
                 AnswerMessage(
                     id=str(i),
                     content=answer,
                     answer_token_ids=answer_tokens.unsqueeze(0),
                     answer_attention_mask=answer_attention_mask,
+                    input_token_ids=input_ids,
+                    input_attention_mask=attention_mask,
                     logits=answer_logits,
                 )
             )
@@ -251,6 +260,4 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             label=original_record.label,
             meta=original_record.meta,
             answers=answer_messages,
-            input_token_ids=input_ids,
-            input_attention_mask=attention_mask,
         )

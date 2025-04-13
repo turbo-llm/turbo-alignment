@@ -28,7 +28,6 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
         tokenizer: PreTrainedTokenizerBase,
         accelerator: Accelerator | None = None,
         batch: int = 1,
-        return_logits: bool = False,
     ) -> None:
         if accelerator is not None:
             self._model = accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
@@ -98,9 +97,12 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         transformers_settings: GeneratorTransformersSettings,
         custom_generation_settings: CustomChatGenerationSettings,
         tokenizer: PreTrainedTokenizerBase,
+        return_logits: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(tokenizer=tokenizer, **kwargs)
+
+        self._return_logits = return_logits
 
         self._transformers_generator_parameters = GenerationConfig(
             bos_token_id=self._tokenizer.bos_token_id,

@@ -12,6 +12,8 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
     content: str
     answer_token_ids: torch.Tensor
     answer_attention_mask: torch.Tensor
+    input_token_ids: torch.Tensor | None = None
+    input_attention_mask: torch.Tensor | None = None
     sequence_score: float | None = None
     logits: torch.Tensor | None = None
 
@@ -21,8 +23,6 @@ class AnswerMessage(ExtraFieldsNotAllowedBaseModel):
 
 class ChatInferenceOutput(BaseInferenceOutput):
     id: str | None = None
-    input_token_ids: torch.Tensor | None = None
-    input_attention_mask: torch.Tensor | None = None
     answers: list[AnswerMessage]
     messages: list[ChatMessage] | None = None
     label: str | None = None
@@ -30,8 +30,3 @@ class ChatInferenceOutput(BaseInferenceOutput):
 
     class Config:
         arbitrary_types_allowed = True
-
-
-class RagInferenceOutput(ChatInferenceOutput):
-    documents: list[str]
-    doc_scores: list[float]
