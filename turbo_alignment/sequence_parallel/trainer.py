@@ -19,6 +19,7 @@ from packaging import version
 from torch import nn
 from torch.utils.data import RandomSampler
 from transformers import Trainer
+from transformers.modeling_utils import unwrap_model
 from transformers.trainer import (
     TRAINER_STATE_NAME,
     DebugOption,
@@ -263,11 +264,17 @@ class TrainerWithSeqP(Trainer):
         # this is for unhandled cases such as
         # FSDP-XLA, SageMaker MP/DP, DataParallel, IPEX
         use_accelerator_prepare = True if model is self.model else False
+        if use_accelerator_prepare and self.is_fsdp_enabled:
+            # In case of auto_find_batch_size=True
+            # Remove FSDP wrapping from sub-models.
+            self.model = unwrap_model(self.model, recursive=True)
 
         if delay_optimizer_creation:
             if use_accelerator_prepare:
+                # configure fsdp plugin for qlora if any
                 self._fsdp_qlora_plugin_updates()
-                self.model = self.accelerator.prepare(self.model)
+                if self.accelerator.mixed_precision != "fp8":
+                    self.model = self.accelerator.prepare(self.model)
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         # prepare using `accelerator` prepare
@@ -458,12 +465,7 @@ class TrainerWithSeqP(Trainer):
                 for i, inputs in enumerate(batch_samples):
                     step += 1
                     total_batched_samples += 1
-                    is_last_step_and_steps_less_than_grad_acc = (
-                        steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch
-                    )
-                    do_sync_step = is_last_step_and_steps_less_than_grad_acc or (
-                        total_batched_samples % args.gradient_accumulation_steps == 0
-                    )
+                    do_sync_step = (step + 1) % args.gradient_accumulation_steps == 0 or (step + 1) == steps_in_epoch
                     # Since we perform prefetching, we need to manually set sync_gradients
                     if not do_sync_step:
                         self.accelerator.gradient_state._set_sync_gradients(False)
@@ -504,7 +506,8 @@ class TrainerWithSeqP(Trainer):
                     # We explicitly want to avoid relying on `accelerator.accumulate` for generation training
                     context = (
                         functools.partial(self.accelerator.no_sync, model=model)
-                        if i == len(batch_samples) - 1
+                        if i != len(batch_samples) - 1
+                        and self.accelerator.distributed_type != DistributedType.DEEPSPEED
                         else contextlib.nullcontext
                     )
 
