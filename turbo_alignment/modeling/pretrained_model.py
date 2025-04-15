@@ -967,7 +967,8 @@ class PreTrainedModelWithMPU(PreTrainedModel):
                     mpu=mpu if mpu_inited else None,
                     # sequence_data_parallel_group=mpu.get_sequence_data_parallel_group() if mpu_inited else None,
                     # data_parallel_group=mpu.get_data_parallel_group() if mpu_inited else None,
-                )
+                ),
+                set_zero3_state(),
             ] + init_contexts
         elif low_cpu_mem_usage:
             init_contexts.append(init_empty_weights())
