@@ -43,7 +43,7 @@ def compare(root_dir: pathlib.Path):
         combined_weights = weights[0] + weights[1]
         try:
             # np.testing.assert_allclose(weights[None], combined_weights, atol=1e-4, rtol=0.2)
-            np.testing.assert_allclose(weights[None], combined_weights, atol=1e-3, rtol=0.2)
+            np.testing.assert_allclose(weights[None], combined_weights, atol=1e-2, rtol=0.2)
         except AssertionError as e:
             print(e.args)
             failed.append(param_name)

@@ -61,7 +61,7 @@
     },
     "cherry_pick_settings": {
         "generator_transformers_settings": {
-            "num_beams": 3,
+            "num_beams": 1,
             "stop_strings": ["</RS>", "</s>"],
             "max_new_tokens": 8
         },
