@@ -5,7 +5,7 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import nn
-from transformers.cache_utils import DynamicCache, StaticCache
+from transformers.cache_utils import DynamicCache, SlidingWindowCache, StaticCache
 from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
@@ -204,10 +204,18 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
         input_tensor: torch.Tensor,
         cache_position: torch.Tensor,
         past_key_values: Cache,
-        output_attentions: bool,
+        output_attentions: bool = False,
     ):
         if self.config._attn_implementation == "flash_attention_2":
-            if attention_mask is not None and (attention_mask == 0.0).any():
+            if attention_mask is not None and past_key_values is not None:
+                is_padding_right = attention_mask[:, -1].sum().item() != input_tensor.size()[0]
+                if is_padding_right:
+                    raise ValueError(
+                        "You are attempting to perform batched generation with padding_side='right'"
+                        " this may lead to unexpected behaviour for Flash Attention version of Qwen2. Make sure to "
+                        " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
+                    )
+            if attention_mask is not None and 0.0 in attention_mask:
                 return attention_mask
             return None
 
@@ -216,24 +224,34 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
         # to infer the attention mask.
         past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
         using_static_cache = isinstance(past_key_values, StaticCache)
+        using_sliding_window_cache = isinstance(past_key_values, SlidingWindowCache)
 
         # When output attentions is True, sdpa implementation's forward method calls the eager implementation's forward
-        if self.config._attn_implementation == "sdpa" and not using_static_cache and not output_attentions:
+        if (
+            self.config._attn_implementation == "sdpa"
+            and not (using_static_cache or using_sliding_window_cache)
+            and not output_attentions
+        ):
             if AttentionMaskConverter._ignore_causal_mask_sdpa(
                 attention_mask,
                 inputs_embeds=input_tensor,
                 past_key_values_length=past_seen_tokens,
+                sliding_window=self.config.sliding_window,
                 is_training=self.training,
             ):
                 return None
 
         dtype, device = input_tensor.dtype, input_tensor.device
+        min_dtype = torch.finfo(dtype).min
         sequence_length = input_tensor.shape[1]
+        # BEGIN OF PATCH
         if parallel_states.sequence_parallel_is_initialized():
             sequence_length = sequence_length * parallel_states.get_sequence_parallel_world_size()
-
-        if using_static_cache:
+        # END OF PATCH
+        # SlidingWindowCache or StaticCache
+        if using_sliding_window_cache or using_static_cache:
             target_length = past_key_values.get_max_cache_shape()
+        # DynamicCache or no cache
         else:
             target_length = (
                 attention_mask.shape[-1]
@@ -252,18 +270,19 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
             device=device,
             cache_position=cache_position,
             batch_size=input_tensor.shape[0],
+            config=self.config,
+            past_key_values=past_key_values,
         )
 
         if (
             self.config._attn_implementation == "sdpa"
             and attention_mask is not None
-            and attention_mask.device.type == "cuda"
+            and attention_mask.device.type in ["cuda", "xpu"]
             and not output_attentions
         ):
             # Attend to all tokens in fully masked rows in the causal_mask, for example the relevant first rows when
             # using left padding. This is required by F.scaled_dot_product_attention memory-efficient attention path.
             # Details: https://github.com/pytorch/pytorch/issues/110213
-            min_dtype = torch.finfo(dtype).min
             causal_mask = AttentionMaskConverter._unmask_unattended(causal_mask, min_dtype)
 
         return causal_mask
