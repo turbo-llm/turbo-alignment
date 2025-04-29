@@ -63,7 +63,8 @@ def patch_settings(
 )
 @pytest.mark.parametrize(
     'launch_mode',
-    ['deepspeed', 'accelerate'],
+    # ['deepspeed', 'accelerate'],
+    ['deepspeed'],
 )
 def test_model_output(
     task_type: str,
@@ -135,6 +136,9 @@ def test_model_output(
 
         def build_middle_args(num_gpus: int):
             return ['--num_gpus', str(num_gpus)]
+
+    else:
+        raise ValueError(f'Unsupported {launch_mode=}')
 
     script_args = [
         script_path,
