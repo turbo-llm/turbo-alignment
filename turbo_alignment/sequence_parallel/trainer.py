@@ -5,10 +5,8 @@ import contextlib
 import gc
 import functools
 import logging
-import math
 import os
 import shutil
-import sys
 import time
 from pathlib import Path
 from typing import Dict, Optional
@@ -26,7 +24,6 @@ from transformers.trainer import (
     DebugUnderflowOverflow,
     DistributedType,
     ExportableState,
-    HPSearchBackend,
     OptimizerNames,
     ParallelMode,
     TrainerState,
@@ -35,8 +32,6 @@ from transformers.trainer import (
     deepspeed_init,
     deepspeed_load_checkpoint,
     get_model_param_count,
-    has_length,
-    hp_params,
     is_accelerate_available,
     is_apex_available,
     is_sagemaker_mp_enabled,
@@ -54,9 +49,7 @@ from .utils import create_forward_hook, create_hook
 
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
-
-if is_sagemaker_mp_enabled():
-    import smdistributed.modelparallel.torch as smp
+    import torch_xla.debug.metrics as met
 
 if is_apex_available():
     from apex import amp
@@ -68,12 +61,6 @@ if is_sagemaker_mp_enabled():
 
     IS_SAGEMAKER_MP_POST_1_10 = version.parse(SMP_VERSION) >= version.parse("1.10")
 
-    from transformers.trainer_pt_utils import (
-        smp_forward_backward,
-        smp_forward_only,
-        smp_gather,
-        smp_nested_concat,
-    )
 else:
     IS_SAGEMAKER_MP_POST_1_10 = False
 
@@ -137,7 +124,7 @@ class TrainerWithSeqP(Trainer):
                 (self.model_wrapped,) = release_memory(self.model_wrapped)
                 self.model_wrapped = self.model
 
-                # Check for DeepSpeed *after* the intial pass and modify the config
+                # Check for DeepSpeed *after* the initial pass and modify the config
                 if self.is_deepspeed_enabled:
                     # Temporarily unset `self.args.train_batch_size`
                     original_bs = self.args.per_device_train_batch_size
@@ -165,45 +152,25 @@ class TrainerWithSeqP(Trainer):
         )
         # END OF PATCH
 
-        len_dataloader = None
+        (
+            num_train_epochs,
+            num_update_steps_per_epoch,
+            num_examples,
+            num_train_samples,
+            epoch_based,
+            len_dataloader,
+            max_steps,
+        ) = self.set_initial_training_values(args, train_dataloader, total_train_batch_size)
+
         num_train_tokens = None
-        if has_length(train_dataloader):
-            len_dataloader = len(train_dataloader)
-            num_update_steps_per_epoch = len_dataloader // args.gradient_accumulation_steps
-            num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-            num_examples = self.num_examples(train_dataloader)
-            if args.max_steps > 0:
-                max_steps = args.max_steps
-                num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
-                    args.max_steps % num_update_steps_per_epoch > 0
-                )
-                # May be slightly incorrect if the last batch in the training dataloader has a smaller size but it's
-                # the best we can do.
-                num_train_samples = args.max_steps * total_train_batch_size
-                if args.include_tokens_per_second:
-                    num_train_tokens = (
-                        self.num_tokens(train_dataloader, args.max_steps) * args.gradient_accumulation_steps
-                    )
+        if self.args.include_tokens_per_second:
+            num_train_tokens = self.num_tokens(train_dataloader, None if epoch_based else max_steps)
+            # If going by epochs, multiply tokens linearly
+            if len_dataloader is not None and epoch_based:
+                num_train_tokens *= args.num_train_epochs
+            # Otherwise since its steps, we just multiply by grad accum
             else:
-                max_steps = math.ceil(args.num_train_epochs * num_update_steps_per_epoch)
-                num_train_epochs = math.ceil(args.num_train_epochs)
-                num_train_samples = self.num_examples(train_dataloader) * args.num_train_epochs
-                if args.include_tokens_per_second:
-                    num_train_tokens = self.num_tokens(train_dataloader) * args.num_train_epochs
-        elif args.max_steps > 0:  # Rely on max_steps when dataloader does not have a working size
-            max_steps = args.max_steps
-            # Setting a very large number of epochs so we go as many times as necessary over the iterator.
-            num_train_epochs = sys.maxsize
-            num_update_steps_per_epoch = max_steps
-            num_examples = total_train_batch_size * args.max_steps
-            num_train_samples = args.max_steps * total_train_batch_size
-            if args.include_tokens_per_second:
-                num_train_tokens = self.num_tokens(train_dataloader, args.max_steps) * args.gradient_accumulation_steps
-        else:
-            raise ValueError(
-                "args.max_steps must be set to a positive value if dataloader does not have a length, was"
-                f" {args.max_steps}"
-            )
+                num_train_tokens *= args.gradient_accumulation_steps
 
         if DebugOption.UNDERFLOW_OVERFLOW in self.args.debug:
             if self.args.n_gpu > 1:
@@ -238,21 +205,7 @@ class TrainerWithSeqP(Trainer):
         self.state.train_batch_size = self._train_batch_size
 
         # Compute absolute values for logging, eval, and save if given as ratio
-        if args.logging_steps is not None:
-            if args.logging_steps < 1:
-                self.state.logging_steps = math.ceil(max_steps * args.logging_steps)
-            else:
-                self.state.logging_steps = args.logging_steps
-        if args.eval_steps is not None:
-            if args.eval_steps < 1:
-                self.state.eval_steps = math.ceil(max_steps * args.eval_steps)
-            else:
-                self.state.eval_steps = args.eval_steps
-        if args.save_steps is not None:
-            if args.save_steps < 1:
-                self.state.save_steps = math.ceil(max_steps * args.save_steps)
-            else:
-                self.state.save_steps = args.save_steps
+        self.state.compute_steps(args, max_steps)
 
         # Activate gradient checkpointing if needed
         if args.gradient_checkpointing:
@@ -316,6 +269,7 @@ class TrainerWithSeqP(Trainer):
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        self._load_scaler(resume_from_checkpoint)
 
         # important: at this point:
         # self.model         is the Transformers Model
@@ -364,25 +318,11 @@ class TrainerWithSeqP(Trainer):
                 )
 
         # Update the references
-        self.callback_handler.model = self.model
-        self.callback_handler.optimizer = self.optimizer
-        self.callback_handler.lr_scheduler = self.lr_scheduler
+        for attr in ("model", "optimizer", "lr_scheduler"):
+            setattr(self.callback_handler, attr, getattr(self, attr))
         self.callback_handler.train_dataloader = train_dataloader
-        if self.hp_name is not None and self._trial is not None:
-            # use self._trial because the SigOpt/Optuna hpo only call `_hp_search_setup(trial)` instead of passing trial
-            # parameter to Train when using DDP.
-            self.state.trial_name = self.hp_name(self._trial)
-        if trial is not None:
-            assignments = trial.assignments if self.hp_search_backend == HPSearchBackend.SIGOPT else trial
-            self.state.trial_params = hp_params(assignments)
-        else:
-            self.state.trial_params = None
-        # This should be the same if the state has been saved but in case the training arguments changed, it's safer
-        # to set this after the load.
-        self.state.max_steps = max_steps
-        self.state.num_train_epochs = num_train_epochs
-        self.state.is_local_process_zero = self.is_local_process_zero()
-        self.state.is_world_process_zero = self.is_world_process_zero()
+
+        self.state.init_training_references(self, max_steps, num_train_epochs, trial)
 
         # tr_loss is a tensor to avoid synchronization of TPUs through .item()
         tr_loss = torch.tensor(0.0).to(args.device)
@@ -398,29 +338,7 @@ class TrainerWithSeqP(Trainer):
 
         total_batched_samples = 0
 
-        if os.getenv('CREATE_GRADIENT_HOOK'):
-            m: nn.Module = self.model
-            for name, param in m.named_parameters():
-                if not param.requires_grad:
-                    continue
-
-                param.register_hook(
-                    create_hook(
-                        name,
-                        seq_p_inited=self.args.sequence_parallel > 1,
-                        output_dir=os.getenv('GRADIENT_HOOK_OUTPUT_DIR', '/mnt/p.geyn/gradients'),
-                    )
-                )
-
-            for name, module in m.named_modules():
-                module.register_forward_hook(
-                    create_forward_hook(
-                        name,
-                        seq_p_inited=self.args.sequence_parallel > 1,
-                        output_dir=os.getenv('FORWARD_HOOK_OUTPUT_DIR', '/mnt/p.geyn/forward'),
-                    ),
-                    with_kwargs=True,
-                )
+        self._create_hooks()
 
         for epoch in range(epochs_trained, num_train_epochs):
             epoch_dataloader = train_dataloader
@@ -461,16 +379,13 @@ class TrainerWithSeqP(Trainer):
             for _ in range(total_updates):
                 update_step += 1
                 num_batches = args.gradient_accumulation_steps if update_step != (total_updates - 1) else remainder
-                batch_samples, num_items_in_batch = self.get_batch_samples(epoch_iterator, num_batches)
+                batch_samples, num_items_in_batch = self.get_batch_samples(epoch_iterator, num_batches, args.device)
                 for i, inputs in enumerate(batch_samples):
                     step += 1
                     total_batched_samples += 1
                     do_sync_step = (step + 1) % args.gradient_accumulation_steps == 0 or (step + 1) == steps_in_epoch
                     # Since we perform prefetching, we need to manually set sync_gradients
-                    if not do_sync_step:
-                        self.accelerator.gradient_state._set_sync_gradients(False)
-                    else:
-                        self.accelerator.gradient_state._set_sync_gradients(True)
+                    self.accelerator.gradient_state._set_sync_gradients(do_sync_step)
 
                     if self.args.include_num_input_tokens_seen:
                         main_input_name = getattr(self.model, "main_input_name", "input_ids")
@@ -584,8 +499,7 @@ class TrainerWithSeqP(Trainer):
 
                         self.control = self.callback_handler.on_optimizer_step(args, self.state, self.control)
 
-                        optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
-                        if optimizer_was_run:
+                        if not self.accelerator.optimizer_step_was_skipped:
                             # Delay optimizer scheduling until metrics are generated
                             if not isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                                 self.lr_scheduler.step()
@@ -794,3 +708,28 @@ class TrainerWithSeqP(Trainer):
         # Push to the Hub when `save_model` is called by the user.
         if self.args.push_to_hub and not _internal_call:
             self.push_to_hub(commit_message="Model save")
+
+    def _create_hooks(self):
+        if os.getenv('CREATE_GRADIENT_HOOK'):
+            m: nn.Module = self.model
+            for name, param in m.named_parameters():
+                if not param.requires_grad:
+                    continue
+
+                param.register_hook(
+                    create_hook(
+                        name,
+                        seq_p_inited=self.args.sequence_parallel > 1,
+                        output_dir=os.getenv('GRADIENT_HOOK_OUTPUT_DIR', '/mnt/p.geyn/gradients'),
+                    )
+                )
+
+            for name, module in m.named_modules():
+                module.register_forward_hook(
+                    create_forward_hook(
+                        name,
+                        seq_p_inited=self.args.sequence_parallel > 1,
+                        output_dir=os.getenv('FORWARD_HOOK_OUTPUT_DIR', '/mnt/p.geyn/forward'),
+                    ),
+                    with_kwargs=True,
+                )
