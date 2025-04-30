@@ -1,5 +1,6 @@
 # pylint: disable=line-too-long,protected-access,abstract-method
 # flake8: noqa
+# mypy: ignore-errors
 
 from typing import Optional, Tuple, Union, Callable
 
@@ -247,7 +248,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
 
     def forward(  # pylint: disable=arguments-differ
         self,
-        input_ids: torch.LongTensor = None,
+        input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[HybridCache] = None,

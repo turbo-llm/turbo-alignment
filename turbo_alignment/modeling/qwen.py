@@ -1,5 +1,6 @@
 # pylint: disable=line-too-long,protected-access,abstract-method
 # flake8: noqa
+# mypy: ignore-errors
 
 from typing import Callable, List, Optional, Tuple, Union
 

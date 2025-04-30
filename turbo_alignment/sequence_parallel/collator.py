@@ -112,7 +112,7 @@ class DataCollatorForSequenceParallism:
 
         return padded
 
-    def _split_value(self, value: torch.Tensor, dim: int = -1) -> torch.tensor:
+    def _split_value(self, value: torch.Tensor, dim: int = -1) -> torch.Tensor:
         start, end = self._get_slice_for_length(value.size(dim))
         return tensor_dim_slice(value, dim, slice(start, end))
 

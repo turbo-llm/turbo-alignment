@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import torch
 
@@ -143,7 +143,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
         if self._return_logits:
             with torch.no_grad():
                 actual_output_indices = output_indices
-                attention_mask = None
+                attention_mask: torch.Tensor | None = None  # type: ignore[no-redef]
                 if parallel_states.sequence_parallel_is_enabled():
                     attention_mask = torch.full_like(output_indices, fill_value=1)
                     attention_mask = pad_for_sequence_parallel(
@@ -161,7 +161,7 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
                         padding_side='left',
                     )
 
-                logits = self._model(actual_output_indices, attention_mask=attention_mask).logits
+                logits = cast(torch.Tensor, self._model(actual_output_indices, attention_mask=attention_mask).logits)
                 ws = parallel_states.get_sequence_parallel_world_size_or_one()
                 assert logits.size(-2) == actual_output_indices.size(-1), (logits.size(), actual_output_indices.size())
                 if ws != 1:

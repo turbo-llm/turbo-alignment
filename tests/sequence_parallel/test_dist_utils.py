@@ -59,6 +59,8 @@ def do_test_all_gather_variable(n_ranks: int = 4, group_size: int = 2):
         if rank in ranks:
             group = local_group
 
+    assert group is not None
+
     input_on_rank = inputs_per_rank[rank].to(device=device)
     result = torch.cat(all_gather_variable(input_on_rank, group=group), dim=-1)
     assert result.tolist() == sum((inputs_per_rank[r].tolist() for r in dist.get_process_group_ranks(group)), [])

@@ -1,12 +1,14 @@
+# mypy: ignore-errors
+
 import torch
 import torch.distributed as dist
 
 
 def create_and_broadcast(
-    tensor: torch.Tensor,
-    src,
-    group,
-    device,
+    tensor: torch.Tensor | None,
+    src: int,
+    group: dist.ProcessGroup | None,
+    device: 'torch.Device',
 ):
     """
     All the arguments are the same as of torch.distributed.broadcast

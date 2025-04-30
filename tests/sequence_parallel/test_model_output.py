@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from tests.constants import FIXTURES_PATH
 from tests.sequence_parallel.consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH
