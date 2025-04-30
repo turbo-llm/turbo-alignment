@@ -63,7 +63,7 @@ def gemma_model(model_path: str = GEMMA_MODEL_PATH):
     ).to(current_device)
 
     config = DEEPSPEED_CONFIG
-    config['bf16']['enabled'] = False
+    config['bf16']['enabled'] = False  # type: ignore[index]
 
     model, *_ = deepspeed.initialize(model=model, mpu=parallel_states, config=config)
     model.train()

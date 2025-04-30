@@ -1,5 +1,8 @@
+# mypy: ignore-errors
+
 import argparse
 import pathlib
+from typing import Type
 
 from turbo_alignment.pipelines.train.dpo import TrainDPOStrategy
 from turbo_alignment.pipelines.train.sft import TrainSFTStrategy
@@ -14,7 +17,7 @@ TASK_TYPE_TO_STRATEGY = {
 
 def run_pipeline(
     settings: DPOTrainExperimentSettings | SftTrainExperimentSettings,
-    pipeline_cls: TrainDPOStrategy | TrainSFTStrategy,
+    pipeline_cls: Type[TrainDPOStrategy] | Type[TrainSFTStrategy],
 ):
     print(settings)
     pipeline_cls().run(settings)

@@ -1,5 +1,6 @@
 # flake8: noqa
 # pylint: skip-file
+# mypy: ignore-errors
 
 import inspect
 import warnings
