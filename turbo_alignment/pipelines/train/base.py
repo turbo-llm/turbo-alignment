@@ -224,6 +224,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
                 experiment_metadata, Path(self.trainer.args.output_dir) / 'experiment_metadata.json'
             )
 
+            set_random_seed(training_args.seed)
             self.trainer.train()
 
             self.trainer.save_model()
