@@ -5,7 +5,7 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
-    evaluation_strategy: str = 'steps'
+    eval_strategy: str = 'steps'
     save_strategy: str = 'steps'
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 4
