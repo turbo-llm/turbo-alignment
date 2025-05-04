@@ -1,147 +1,40 @@
 from typing import Any
 
-import ray
 import torch
-from transformers import BatchEncoding, PreTrainedTokenizerBase
-from vllm import SamplingParams
-from vllm.lora.request import LoRARequest
 
 from turbo_alignment.dataset.chat.models import ChatDatasetRecord
-from turbo_alignment.generators.base import BaseGenerator, ChatGeneratorBase
-from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
+from turbo_alignment.generators.base import ChatGeneratorBase
 from turbo_alignment.settings.generators.outputs.chat import (
     AnswerMessage,
     ChatInferenceOutput,
 )
-from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
-
-
-class vLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
-    def __init__(
-        self,
-        transformers_settings: GeneratorTransformersSettings,
-        custom_generation_settings: CustomChatGenerationSettings,
-        vllm_engines: list,
-        tokenizer: PreTrainedTokenizerBase,
-        return_logits: bool = False,
-        lora_request: LoRARequest | None = None,
-    ):
-        super().__init__(vllm_engines, tokenizer)
-
-        if isinstance(transformers_settings.stop_strings, list):
-            raise ValueError('You should use only 1 eos token with VLLM')
-
-        # TODO separate stop_strings and eos_token
-        self.eos_token_id: int = self._tokenizer.encode(transformers_settings.stop_strings, add_special_tokens=False)
-        assert len(self.eos_token_id) == 1, 'Currently stop_strings == stop_token'
-        # TODO beam search was deprecated in vllm 0.6.2
-
-        # beam_search_params: dict[str, Any] = {
-        #     'best_of': transformers_settings.num_return_sequences,
-        #     'use_beam_search': False,
-        # }
-        # if transformers_settings.num_beams > 1:
-        #     beam_search_params['use_beam_search'] = True
-        #     beam_search_params['best_of'] = transformers_settings.num_beams
-
-        self._sampling_params = SamplingParams(
-            n=transformers_settings.num_return_sequences,
-            repetition_penalty=transformers_settings.repetition_penalty,
-            temperature=transformers_settings.temperature,
-            top_p=transformers_settings.top_p,
-            top_k=transformers_settings.top_k,
-            skip_special_tokens=custom_generation_settings.skip_special_tokens,
-            stop_token_ids=self.eos_token_id,
-            max_tokens=transformers_settings.max_new_tokens,
-            # **beam_search_params,
-        )
-        self._lora_request = lora_request
-        self.vllm_engines = vllm_engines
-        self._custom_generation_settings = custom_generation_settings
-
-    # TODO ?
-    def generate_from_batch(self, dataset_name, records, original_records=None):
-        return super().generate_from_batch(dataset_name, records, original_records)
-
-    def generate_from_batch_records(
-        self, dataset_name: str, records: list[dict[str, Any]], original_records: bool = False, time_profiler=None
-    ) -> list[ChatInferenceOutput]:
-        import logging
-        import time
-
-        # TODO Make sure that records are already splitted between ranks
-        # (Assuming micro_rollout_batch_size equal to micro_batch_size)
-        input_ids = records['input_ids'].tolist()
-
-        rank = torch.distributed.get_rank()
-        llm = self.vllm_engines[rank % len(self.vllm_engines)]
-
-        if torch.distributed.get_rank() == 0:
-            start = time.time()
-
-        request_outputs = ray.get(
-            llm.generate.remote(
-                sampling_params=self._sampling_params, prompt_token_ids=input_ids, lora_request=self._lora_request
-            )
-        )
-
-        if torch.distributed.get_rank() == 0:
-            end = time.time()
-            logging.info(f'Generation elapsed time:{end - start}')
-            time_profiler.completions_time.append(end - start)
-
-        outputs = []
-        for i, request_output in enumerate(request_outputs):  # FIXME
-            answers = []
-            for a in request_output.outputs:
-                answer_token_ids = torch.tensor(a.token_ids).unsqueeze(0).cuda()
-                # TODO assuming len(eos_token_id) == 1 FIXME
-                answer_token_ids[:, -1] = self.eos_token_id[0]
-                ans_msg = AnswerMessage(
-                    id=str(a.index),
-                    content=a.text,
-                    sequence_score=a.cumulative_logprob,
-                    answer_token_ids=answer_token_ids,
-                    answer_attention_mask=torch.ones_like(answer_token_ids, device=answer_token_ids.device),
-                )
-
-                answers.append(ans_msg)
-            if original_records:
-                outputs.append(
-                    ChatInferenceOutput(
-                        input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0).cuda(),
-                        input_attention_mask=records['attention_mask'][i, :].unsqueeze(0).cuda(),
-                        id=None,
-                        dataset_name=dataset_name,
-                        messages=None,
-                        label=None,
-                        answers=answers,
-                    )
-                )
-            else:
-                outputs.append(
-                    ChatInferenceOutput(
-                        input_token_ids=torch.tensor(request_output.prompt_token_ids).unsqueeze(0),
-                        dataset_name=dataset_name,
-                        answers=answers,
-                    )
-                )
-
-        return outputs
 
 
 class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
-    def generate_from_batch_records(
+    def _generate_from_batch_records(
         self,
+        records: list[dict[str, torch.Tensor]],
+        original_records: list[ChatDatasetRecord],
         dataset_name: str,
-        records_batch: dict[str, torch.Tensor] | BatchEncoding,
-        original_records: list[ChatDatasetRecord] | None = None,
-        return_logits: bool = None,
     ) -> list[ChatInferenceOutput]:
-        batched_input_ids = records_batch['input_ids'].to(self.device)
-        batched_attention_mask = records_batch['attention_mask'].to(self.device)
+        input_ids = [record['input_ids'].tolist() for record in records]
+        attention_mask = [record['attention_mask'].tolist() for record in records]
 
-        assert self._tokenizer.padding_side == 'left'
+        max_input_length = max(len(sample) for sample in input_ids)
+
+        batch = self._tokenizer.pad(
+            {
+                'input_ids': input_ids,
+                'attention_mask': attention_mask,
+            },
+            padding='max_length',
+            max_length=max_input_length,
+            return_tensors='pt',
+        )
+
+        batched_input_ids = batch['input_ids'].to(self.device)
+        batched_attention_mask = batch['attention_mask'].to(self.device)
+
         output_indices = self._model.generate(
             inputs=batched_input_ids,
             attention_mask=batched_attention_mask,
@@ -150,64 +43,39 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
-        logits: torch.Tensor | None = None
-
-        if return_logits:
-            with torch.no_grad():
-                logits = self._model(output_indices).logits
-
-        print('🐙' * 5, logits)
-
-        postprocessed_output_indices, answers_attention_mask, postprocessed_logits, answers = self._postprocess(
+        postprocessed_output_indices = self._postprocess(
             input_indices=batched_input_ids,
             output_indices=output_indices,
-            logits=logits,
             remove_prompt=self._custom_generation_settings.remove_prompt,
-            only_answer_logits=self._custom_generation_settings.only_answer_logits,
         )
 
-        outputs = []
-        for i, (input_ids, attention_mask) in enumerate(zip(batched_input_ids, batched_attention_mask)):
-            ans_batch_start = i * self._transformers_generator_parameters.num_return_sequences
-            ans_batch_end = (i + 1) * self._transformers_generator_parameters.num_return_sequences
-            batch_answer_tokens = postprocessed_output_indices[ans_batch_start:ans_batch_end, :]
-            batch_answer_attention_masks = answers_attention_mask[ans_batch_start:ans_batch_end, :]
-            batch_answers = answers[ans_batch_start:ans_batch_end]
+        answers = self._decode(token_indices=postprocessed_output_indices)
 
-            for j, (answer, answer_tokens, answer_attention_mask) in enumerate(
-                zip(batch_answers, batch_answer_tokens, batch_answer_attention_masks)
-            ):
-                answer_logits = None if postprocessed_logits is None else postprocessed_logits[i + j, :, :]
-
-                # print('🦈'*5, postprocessed_logits)
-
-                outputs.append(
-                    ChatInferenceOutput(
-                        dataset_name=dataset_name,
-                        messages=original_records[i].messages if original_records else None,
-                        label=original_records[i].label if original_records else None,
-                        meta=original_records[i].meta if original_records else None,
-                        answers=[
-                            AnswerMessage(
-                                id=str(i),
-                                content=answer,
-                                answer_token_ids=answer_tokens,
-                                logits=answer_logits,
-                                input_token_ids=input_ids,
-                                input_attention_mask=attention_mask,
-                                answer_attention_mask=answer_attention_mask,
-                            )
-                        ],
+        return [
+            ChatInferenceOutput(
+                id=original_record.id,
+                dataset_name=dataset_name,
+                messages=original_record.messages,
+                label=original_record.label,
+                meta=original_record.meta,
+                answers=[
+                    AnswerMessage(
+                        id='0',
+                        content=answer,
+                        input_token_ids=None,
+                        answer_token_ids=None,
+                        logits=None,
                     )
-                )
+                ],
+            )
+            for original_record, answer in zip(original_records, answers)
+        ]
 
-        return outputs
-
-    def generate_from_single_record(
+    def _generate_from_single_record(
         self,
-        dataset_name: str,
         record: dict[str, Any],
-        original_record: ChatDatasetRecord | None = None,
+        original_record: ChatDatasetRecord,
+        dataset_name: str,
     ) -> ChatInferenceOutput:
         input_ids = torch.unsqueeze(record['input_ids'], 0).to(self.device)
         attention_mask = torch.unsqueeze(record['attention_mask'], 0).to(self.device)
@@ -220,41 +88,49 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             pad_token_id=self._tokenizer.pad_token_id,
         )
 
+        postprocessed_output_indices = self._postprocess(
+            input_indices=input_ids,
+            output_indices=output_indices,
+            remove_prompt=self._custom_generation_settings.remove_prompt,
+        )
+
+        answers = self._decode(token_indices=postprocessed_output_indices)
+
         logits: torch.Tensor | None = None
+        input_token_ids: torch.Tensor | None = None
+        answer_tokens_ids: torch.Tensor | None = None
 
         if self._return_logits:
             with torch.no_grad():
                 logits = self._model(output_indices).logits.cpu()
 
-        print('👀' * 15, logits, self._custom_generation_settings.return_logits)
+            answer_tokens_ids = postprocessed_output_indices
+            input_token_ids = input_ids
 
-        postprocessed_output_indices, answers_attention_mask, postprocessed_logits, answers = self._postprocess(
-            input_indices=input_ids,
-            output_indices=output_indices,
-            logits=logits,
-            remove_prompt=self._custom_generation_settings.remove_prompt,
-            only_answer_logits=self._custom_generation_settings.only_answer_logits,
-        )
-
-        answer_messages = []
-        for i, (answer, answer_tokens, answer_attention_mask) in enumerate(
-            zip(answers, postprocessed_output_indices, answers_attention_mask)
-        ):
-            answer_logits = None if postprocessed_logits is None else postprocessed_logits[i, :, :].unsqueeze(0)
-            print('🦈' * 5, postprocessed_logits)
-            answer_messages.append(
+            answer_messages = [
                 AnswerMessage(
                     id=str(i),
-                    content=answer,
-                    answer_token_ids=answer_tokens.unsqueeze(0),
-                    answer_attention_mask=answer_attention_mask,
-                    input_token_ids=input_ids,
-                    input_attention_mask=attention_mask,
-                    logits=answer_logits,
+                    content=a,
+                    input_token_ids=input_token_ids,
+                    answer_token_ids=a_t_ids.unsqueeze(0),
+                    logits=l.unsqueeze(0),
                 )
-            )
+                for i, (a, a_t_ids, l) in enumerate(zip(answers, answer_tokens_ids, logits))  # type: ignore[arg-type]
+            ]
+        else:
+            answer_messages = [
+                AnswerMessage(
+                    id=str(i),
+                    content=a,
+                    input_token_ids=input_token_ids,
+                    answer_token_ids=answer_tokens_ids,
+                    logits=logits,
+                )
+                for i, a in enumerate(answers)
+            ]
 
         return ChatInferenceOutput(
+            id=original_record.id,
             dataset_name=dataset_name,
             messages=original_record.messages,
             label=original_record.label,

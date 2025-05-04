@@ -14,7 +14,7 @@ def train_sft_entrypoint(
         '--experiment_settings_path',
         exists=True,
         help='Path to experiment config file',
-    ),
+    )
 ) -> None:
     experiment_settings = pipeline_settings.SftTrainExperimentSettings.parse_file(experiment_settings_path)
     pipelines.TrainSFTStrategy().run(experiment_settings)
@@ -27,7 +27,7 @@ def train_dpo_entrypoint(
         '--experiment_settings_path',
         exists=True,
         help='Path to experiment config file',
-    ),
+    )
 ) -> None:
     experiment_settings = pipeline_settings.DPOTrainExperimentSettings.parse_file(experiment_settings_path)
     pipelines.TrainDPOStrategy().run(experiment_settings)
@@ -40,7 +40,7 @@ def train_rm_entrypoint(
         '--experiment_settings_path',
         exists=True,
         help='Path to experiment config file',
-    ),
+    )
 ) -> None:
     experiment_settings = pipeline_settings.RMTrainExperimentSettings.parse_file(experiment_settings_path)
     pipelines.TrainRMStrategy().run(experiment_settings)
@@ -53,143 +53,7 @@ def classification_training(
         '--experiment_settings_path',
         exists=True,
         help='Path to experiment config file',
-    ),
+    )
 ) -> None:
     experiment_settings = pipeline_settings.ClassificationTrainExperimentSettings.parse_file(experiment_settings_path)
     pipelines.TrainClassificationStrategy().run(experiment_settings)
-
-
-@app.command(name='train_reinforce', help='Train REINFORCE pipeline')
-def reinforce_training(
-    experiment_settings_path: Path = typer.Option(
-        ...,
-        '--experiment_settings_path',
-        exists=True,
-        help='Path to experiment config file',
-    ),
-) -> None:
-    import ray
-
-    from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
-    from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
-    from turbo_alignment.trainers.online.reward_actor import RewardModel
-
-    ray.init(address='auto')
-
-    experiment_settings = pipeline_settings.REINFORCETrainExperimentSettings.parse_file(experiment_settings_path)
-
-    policy_models = RayGroup(
-        num_nodes=experiment_settings.trainer_settings.num_nodes,
-        num_gpus_per_node=8,
-        ray_actor_type=pipelines.TrainREINFORCEStrategy,
-    )
-
-    assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
-    reward_model = RayGroup(
-        num_nodes=1,
-        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas,
-        ray_actor_type=RewardModel,
-    )
-
-    # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
-    # assert 1 <= experiment_settings.trainer_settings.reference_model_replicas <= 8
-    # reference_model = RayGroup(
-    #     num_nodes=1,
-    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas,
-    #     ray_actor_type=ReferenceModel,
-    # )
-
-    # TODO_RLOO if possible hide init inside RayGroup
-    # TODO add settings fields to reward model
-    ray.get(policy_models.async_init_model_from_pretrained())
-    ray.get(
-        reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path)
-    )
-    # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
-
-    vllm_engines = create_vllm_engines(
-        num_engines=experiment_settings.trainer_settings.actor_settings.vllm_num_engines,
-        tensor_parallel_size=experiment_settings.trainer_settings.actor_settings.vllm_tensor_parallel_size,
-        pretrain=str(experiment_settings.model_settings.model_path),
-        seed=experiment_settings.seed,
-        enable_prefix_caching=False,
-        enforce_eager=False,
-        max_model_len=experiment_settings.trainer_settings.actor_settings.max_model_len,
-    )
-
-    ray.get(
-        policy_models.async_fit_actor_model(
-            experiment_settings=experiment_settings,
-            vllm_engines=vllm_engines,
-            # reference_model=reference_model,
-            reward_model=reward_model,
-        )
-    )
-
-
-@app.command(name='train_grpo', help='Train GRPO pipeline')
-def grpo_training(
-    experiment_settings_path: Path = typer.Option(
-        ...,
-        '--experiment_settings_path',
-        exists=True,
-        help='Path to experiment config file',
-    ),
-) -> None:
-    import ray
-
-    from turbo_alignment.trainers.online.ray.rayactor_group import RayGroup
-    from turbo_alignment.trainers.online.ray.vllm_engine import create_vllm_engines
-    from turbo_alignment.trainers.online.reward_actor import RewardModel
-
-    ray.init(address='auto')
-
-    experiment_settings = pipeline_settings.GRPOTrainExperimentSettings.parse_file(experiment_settings_path)
-
-    policy_models = RayGroup(
-        num_nodes=experiment_settings.trainer_settings.num_nodes,
-        num_gpus_per_node=8,
-        ray_actor_type=pipelines.TrainGRPOStrategy,
-    )
-
-    assert 1 <= experiment_settings.trainer_settings.reward_model_replicas <= 8
-    reward_model = RayGroup(
-        num_nodes=1,
-        num_gpus_per_node=experiment_settings.trainer_settings.reward_model_replicas,
-        ray_actor_type=RewardModel,
-    )
-
-    # from turbo_alignment.trainers.online.reference_actor import ReferenceModel
-    # assert 1 <= experiment_settings.trainer_settings.reference_model_replicas <= 8
-    # reference_model = RayGroup(
-    #     num_nodes=1,
-    #     num_gpus_per_node=experiment_settings.trainer_settings.reference_model_replicas,
-    #     ray_actor_type=ReferenceModel,
-    # )
-
-    # TODO_GRPO if possible hide init inside RayGroup
-    # TODO add settings fields to reward model
-    ray.get(policy_models.async_init_model_from_pretrained())
-    ray.get(
-        reward_model.async_init_model_from_pretrained(rm_model=experiment_settings.reward_model_settings.model_path)
-    )
-    # ray.get(reference_model.async_init_model_from_pretrained(pretrain=experiment_settings.model_settings.model_path))
-
-    vllm_engines = create_vllm_engines(
-        num_engines=experiment_settings.trainer_settings.actor_settings.vllm_num_engines,
-        tensor_parallel_size=experiment_settings.trainer_settings.actor_settings.vllm_tensor_parallel_size,
-        pretrain=str(experiment_settings.model_settings.model_path),
-        seed=experiment_settings.seed,
-        enable_prefix_caching=False,
-        enforce_eager=False,
-        max_model_len=experiment_settings.trainer_settings.actor_settings.max_model_len,
-    )
-
-    ray.get(
-        policy_models.async_fit_actor_model(
-            experiment_settings=experiment_settings,
-            vllm_engines=vllm_engines,
-            # reference_model=reference_model,
-            reward_model=reward_model,
-        )
-    )

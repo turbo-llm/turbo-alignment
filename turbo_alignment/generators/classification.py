@@ -16,11 +16,8 @@ class ClassificationGenerator(BaseGenerator[ClassificationDatasetRecord, Classif
 
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
 
-    def generate_from_batch(
-        self,
-        dataset_name: str,
-        records: list[dict[str, Any]],
-        original_records: list[ClassificationDatasetRecord] | None = None,
+    def _generate_from_batch(
+        self, records: list[dict[str, Any]], original_records: list[ClassificationDatasetRecord], dataset_name: str
     ) -> list[ClassificationInferenceOutput]:
         inputs = [{'input_ids': record['input_ids']} for record in records]
 

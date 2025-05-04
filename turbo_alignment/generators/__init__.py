@@ -1,3 +1,3 @@
-from .chat import ChatGenerator, vLLMChatGenerator
+from .chat import ChatGenerator
 from .classification import ClassificationGenerator
-from .rm import RayRMSamplingGenerator, RMSamplingGenerator
+from .rm import RMSamplingGenerator

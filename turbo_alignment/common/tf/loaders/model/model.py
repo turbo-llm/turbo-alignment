@@ -37,12 +37,6 @@ def _load_pretrained_adapters(
     )
 
 
-def disable_dropout_in_model(model: torch.nn.Module) -> None:
-    for module in model.modules():
-        if isinstance(module, torch.nn.Dropout):
-            module.p = 0
-
-
 def unfreeze_params(layer):
     for param in layer.parameters():
         param.requires_grad = True

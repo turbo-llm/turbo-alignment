@@ -53,7 +53,7 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
                 accelerator=accelerator,
             )
 
-        generations = generator.generate_from_dataset(dataset=dataset)
+        generations = generator.generate_from_dataset(dataset)
 
         prompts = [record['prompt'] for record in dataset]
         string_answers = [[answer.content for answer in g.answers] for g in generations]
@@ -64,55 +64,51 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
         answer_tokens_ids = [answer.answer_token_ids.cpu() for answer in flattened_answers]
         input_tokens_ids = [answer.input_token_ids.cpu() for answer in flattened_answers]
 
-        # for answer in flattened_answers:
-        # print('🐙'*5, answer)
+        logits = [answer.logits[:, answer.input_token_ids.size(-1) :, :].cpu() for answer in flattened_answers]
 
-        # logits = [answer.logits[:, answer.input_token_ids.size(-1) :, :].cpu() for answer in flattened_answers]
+        if ref_model is not None:
+            metrics_kwargs[KLType.REFERENCE_MODEL] = get_logits(input_tokens_ids, answer_tokens_ids, ref_model)
 
-        # if ref_model is not None:
-        #     metrics_kwargs[KLType.REFERENCE_MODEL] = get_logits(input_tokens_ids, answer_tokens_ids, ref_model)
-
-        # if sft_model is not None:
-        #     metrics_kwargs[KLType.SFT_MODEL] = get_logits(input_tokens_ids, answer_tokens_ids, sft_model)
+        if sft_model is not None:
+            metrics_kwargs[KLType.SFT_MODEL] = get_logits(input_tokens_ids, answer_tokens_ids, sft_model)
 
         metric_outputs = [
-            # MetricResults(
-            #     element_wise_scores=[
-            #         ElementWiseScores(
-            #             label=dataset.source.name + '@@' + 'prompt',
-            #             values=[prompt for prompt in prompts for _ in range(batch_size)],
-            #         )
-            #     ]
-            # ),
-            # MetricResults(
-            #     element_wise_scores=[
-            #         ElementWiseScores(label=dataset.source.name + '@@' + 'labels', values=string_labels)
-            #     ]
-            # ),
-            # MetricResults(
-            #     element_wise_scores=[
-            #         ElementWiseScores(label=dataset.source.name + '@@' + 'answer', values=string_answers)
-            #     ]
-            # ),
+            MetricResults(
+                element_wise_scores=[
+                    ElementWiseScores(
+                        label=dataset.source.name + '@@' + 'prompt',
+                        values=[prompt for prompt in prompts for _ in range(batch_size)],
+                    )
+                ]
+            ),
+            MetricResults(
+                element_wise_scores=[
+                    ElementWiseScores(label=dataset.source.name + '@@' + 'labels', values=string_labels)
+                ]
+            ),
+            MetricResults(
+                element_wise_scores=[
+                    ElementWiseScores(label=dataset.source.name + '@@' + 'answer', values=string_answers)
+                ]
+            ),
         ]
 
-        # for metric in self._metrics:
-        #     metric_results = metric.compute(
-        #         model=model,
-        #         dataset=dataset,
-        #         references=string_labels,
-        #         predictions=string_answers,
-        #         accelerator=accelerator,
-        #         # logits=logits,
-        #         logits=None,
-        #         answer_tokens_ids=answer_tokens_ids,
-        #         tokenizer=tokenizer,
-        #         input_token_ids=input_tokens_ids,
-        #         dataset_name=dataset.source.name,
-        #         metrics_kwargs=metrics_kwargs,
-        #     )
+        for metric in self._metrics:
+            metric_results = metric.compute(
+                model=model,
+                dataset=dataset,
+                references=string_labels,
+                predictions=string_answers,
+                accelerator=accelerator,
+                logits=logits,
+                answer_tokens_ids=answer_tokens_ids,
+                tokenizer=tokenizer,
+                input_token_ids=input_tokens_ids,
+                dataset_name=dataset.source.name,
+                metrics_kwargs=metrics_kwargs,
+            )
 
-        #     metric_outputs.extend(metric_results)
+            metric_outputs.extend(metric_results)
         return metric_outputs
 
     @staticmethod

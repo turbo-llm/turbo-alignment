@@ -40,4 +40,3 @@ class ClearMLLoggingMixin(LoggingMixin):
         logging_settings: ClearMLSettings = ClearMLSettings(**experiment_settings.logging_settings.dict())
         clearml_task = create_clearml_task(parameters=logging_settings, config=experiment_settings.dict())
         return ClearMLLoggingCallback(clearml_task=clearml_task)
-        # return None

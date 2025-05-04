@@ -1,14 +1,25 @@
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
-class GeneratorTransformersSettings(ExtraFieldsNotAllowedBaseModel):
-    num_beams: int = 1
-    max_new_tokens: int | None = None
+class BaseGeneratorSettings(ExtraFieldsNotAllowedBaseModel):
     repetition_penalty: float = 1.0
-    num_return_sequences: int = 1
-    do_sample: bool = True
+    temperature: float = 1.0
     top_p: float = 1.0
     top_k: int = 50
-    temperature: float = 1.0
     stop_strings: str | list[str] = '</s>'
-    max_length: int = 20
+
+
+class GeneratorTransformersSettings(BaseGeneratorSettings):
+    num_beams: int = 1
+    max_new_tokens: int = 15
+    num_return_sequences: int = 1
+    do_sample: bool = True
+
+
+class VLLMGeneratorSettings(BaseGeneratorSettings):
+    n: int = 1
+    max_tokens: int = 15
+    logprobs: int | None = None
+    best_of: int = 1
+    use_beam_search: bool = False
+    filter_token_ids: list[int] | None = None

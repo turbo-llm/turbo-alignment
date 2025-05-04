@@ -1,100 +1,17 @@
 from typing import Any
 
-import ray
 import torch
-from transformers import BatchEncoding, DataCollatorWithPadding, PreTrainedTokenizerBase
+from torch import nn
+from transformers import DataCollatorWithPadding, PreTrainedTokenizerBase
 
-from turbo_alignment.dataset.pair_preferences.models import PairPreferenceRecord
+from turbo_alignment.dataset.pair_preferences import PairPreferenceRecord
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
-from turbo_alignment.settings.generators.outputs.rm import RMPairInferenceOutput, RMSamplingInferenceOutput
+from turbo_alignment.settings.generators.outputs.rm import (
+    RMPairInferenceOutput,
+    RMSamplingInferenceOutput,
+)
 
-
-class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, model_replicas: int = 1, **kwargs):
-        self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
-        self._micro_batch = micro_batch
-        self.model_replicas = model_replicas
-        super().__init__(tokenizer=tokenizer, **kwargs)
-
-    def generate_from_batch_records(self, records: dict[str, torch.Tensor] | BatchEncoding) -> torch.Tensor:
-        with torch.no_grad():
-            records = {k: v.cuda() for k, v in records.items()}
-
-            rank = torch.distributed.get_rank()
-
-            rewards = []
-
-            # for sample in records['input_ids']:
-            #     print('RECORDS INSIDE RM', sample)
-
-            #     if sample[-1] == 4:
-            #         rewards.append(10)
-            #     elif sample[-1] == 10:
-            #         rewards.append(15)
-            #     elif sample[-1] == 2:
-            #         rewards.append(0.1)
-            #     elif sample[-1] == 0:
-            #         rewards.append(-10)
-            #     elif sample[-1] == -5:
-            #         rewards.append(-100)
-            #     else:
-            #         rewards.append(-1)
-
-            rewards = ray.get(self._model.reward_forward(records=records, index=rank % self.model_replicas))
-
-            # print('FINAL REWARDS, ', rewards)
-            # print('FINAL REAL REWARDS, ', rewards.shape, rewards)
-        return rewards  # .squeeze()
-
-    def generate_from_batch(
-        self,
-        dataset_name: str,
-        records: list[dict[str, Any]],
-        original_records: list[SamplingDatasetRecord] | None = None,
-    ) -> list[RMSamplingInferenceOutput]:
-        self._tokenizer.padding_side = 'left'
-        self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
-
-        merged_inputs = [inputs for record in records for key, inputs in record['answers'].items()]
-
-        input_ids = [record['input_ids'].tolist() for record in merged_inputs]
-        attention_mask = [record['attention_mask'].tolist() for record in merged_inputs]
-
-        rewards = []
-        for i in range(0, len(input_ids), self._micro_batch):
-            input_ids_batch = input_ids[i : i + self._micro_batch]
-            attn_mask_batch = attention_mask[i : i + self._micro_batch]
-
-            max_input_length = max(len(sample) for sample in input_ids_batch)
-
-            records_batch = self._tokenizer.pad(
-                {
-                    'input_ids': input_ids_batch,
-                    'attention_mask': attn_mask_batch,
-                },
-                padding='max_length',
-                max_length=max_input_length,
-                return_tensors='pt',
-            ).to(self.device)
-
-            rewards.extend(self.generate_from_batch_records(records_batch).tolist())
-
-        outputs = []
-        for i, record in enumerate(original_records):
-            record_rewards = {answer.id: rewards[i + j] for j, answer in enumerate(record.answers)}
-
-            outputs.append(
-                RMSamplingInferenceOutput(
-                    id=record.id,
-                    answers=record.answers,
-                    dataset_name=record.dataset_name,
-                    messages=record.messages,
-                    rewards=record_rewards,
-                )
-            )
-
-        return outputs
 
 class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, **kwargs):
@@ -102,10 +19,9 @@ class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]
 
         super().__init__(tokenizer=tokenizer, **kwargs)
 
-    def generate_from_batch(
+    def _generate_from_batch(
         self, records: list[dict[str, Any]], original_records: list[PairPreferenceRecord], dataset_name: str
     ) -> list[RMPairInferenceOutput]:
-        # print('👀'*5, records)
         merged_inputs = [r['inputs_w'] for r in records] + [r['inputs_l'] for r in records]
         batch = self._collator(merged_inputs)
         input_ids = batch['input_ids'].to(self.device)
@@ -129,38 +45,38 @@ class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]
         ]
 
 
-
 class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, **kwargs):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int, **kwargs):
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
         self._micro_batch = micro_batch
         super().__init__(tokenizer=tokenizer, **kwargs)
 
-    def generate_from_batch_records(self, records: dict[str, torch.Tensor] | BatchEncoding) -> torch.Tensor:
-        with torch.no_grad():
-            rewards = self._model(**records).logits.cpu()
-        return rewards  # .squeeze()
-
-    def generate_from_batch(
-        self,
-        dataset_name: str,
-        records: list[dict[str, Any]],
-        original_records: list[SamplingDatasetRecord] | None = None,
+    def _generate_from_batch(
+        self, records: list[dict[str, Any]], original_records: list[SamplingDatasetRecord], dataset_name: str
     ) -> list[RMSamplingInferenceOutput]:
-        self._tokenizer.padding_side = 'left'
-        self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
+        merged_inputs = [inputs for record in records for key, inputs in record['answers'].items()]
 
-        # merged_inputs = [inputs for record in records for key, inputs in record['answers'].items()]
-
-        # input_ids = [record['input_ids'].tolist() for record in merged_inputs]
-        # attention_mask = [record['attention_mask'].tolist() for record in merged_inputs]
+        if len(merged_inputs) == 0:
+            return []
 
         rewards = []
-        # for i in range(0, len(input_ids), self._micro_batch):
-        # input_ids_batch = input_ids[i : i + self._micro_batch]
-        # attn_mask_batch = attention_mask[i : i + self._micro_batch]
+        with torch.no_grad():
+            input_ids = nn.utils.rnn.pad_sequence(
+                [item['input_ids'] for item in merged_inputs],
+                padding_value=self._tokenizer.pad_token_id,
+                batch_first=True,
+            )
+            attn_mask = nn.utils.rnn.pad_sequence(
+                [item['attention_mask'] for item in merged_inputs],
+                padding_value=0,
+                batch_first=True,
+            )
+            for i in range(0, len(input_ids), self._micro_batch):
+                input_ids_batch = input_ids[i : i + self._micro_batch].to(self.device)
+                attn_mask_batch = attn_mask[i : i + self._micro_batch].to(self.device)
+                rewards.extend(self._model(input_ids=input_ids_batch, attention_mask=attn_mask_batch).logits.cpu())
 
-        # max_input_length = max(len(sample) for sample in input_ids_batch)
+        rewards = torch.cat(rewards, dim=0)
 
         reward_index = 0
         record_rewards = []
@@ -171,20 +87,13 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
                 reward_index += 1
             record_rewards.append(mapped_rewards)
 
-            # rewards.extend(self.generate_from_batch_records(records_batch).tolist())
-
-        outputs = []
-        for i, record in enumerate(original_records):
-            record_rewards = {answer.id: rewards[i + j] for j, answer in enumerate(record.answers)}
-
-            outputs.append(
-                RMSamplingInferenceOutput(
-                    id=record.id,
-                    answers=record.answers,
-                    dataset_name=record.dataset_name,
-                    messages=record.messages,
-                    rewards=record_rewards,
-                )
+        return [
+            RMSamplingInferenceOutput(
+                id=record.id,
+                rewards=rewards,
+                messages=record.messages,
+                dataset_name=dataset_name,
+                answers=record.answers,
             )
-
-        return outputs
+            for record, rewards in zip(original_records, record_rewards)
+        ]
