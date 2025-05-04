@@ -4,9 +4,10 @@ import ray
 import torch
 from transformers import BatchEncoding, DataCollatorWithPadding, PreTrainedTokenizerBase
 
+from turbo_alignment.dataset.pair_preferences.models import PairPreferenceRecord
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
-from turbo_alignment.settings.generators.outputs.rm import RMSamplingInferenceOutput
+from turbo_alignment.settings.generators.outputs.rm import RMPairInferenceOutput, RMSamplingInferenceOutput
 
 
 class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
@@ -94,6 +95,39 @@ class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInfe
             )
 
         return outputs
+
+class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, **kwargs):
+        self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+        super().__init__(tokenizer=tokenizer, **kwargs)
+
+    def generate_from_batch(
+        self, records: list[dict[str, Any]], original_records: list[PairPreferenceRecord], dataset_name: str
+    ) -> list[RMPairInferenceOutput]:
+        # print('👀'*5, records)
+        merged_inputs = [r['inputs_w'] for r in records] + [r['inputs_l'] for r in records]
+        batch = self._collator(merged_inputs)
+        input_ids = batch['input_ids'].to(self.device)
+        attn_mask = batch['attention_mask'].to(self.device)
+
+        with torch.no_grad():
+            rewards = self._model(input_ids=input_ids, attention_mask=attn_mask).logits.cpu()
+            rewards_w, rewards_l = rewards[: len(records)], rewards[len(records) :]
+
+        return [
+            RMPairInferenceOutput(
+                id=record.id,
+                context=record.context,
+                answer_w=record.answer_w,
+                answer_l=record.answer_l,
+                reward_w=reward_w.item(),
+                reward_l=reward_l.item(),
+                dataset_name=dataset_name,
+            )
+            for record, reward_w, reward_l in zip(original_records, rewards_w, rewards_l)
+        ]
+
 
 
 class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):

@@ -79,11 +79,13 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
             with self._accelerator.split_between_processes(
                 list(zip(records_batches, original_records_batches)), apply_padding=True
             ) as accelerator_records:
+                
+                print('🐙'*5, accelerator_records)
                 generations = [
                     self.generate_from_batch(
-                        dataset.source.name,
-                        records_batch,
-                        original_records_batch,
+                        dataset_name=dataset.source.name,
+                        records=records_batch,
+                        original_records=original_records_batch,
                     )
                     for records_batch, original_records_batch in accelerator_records
                 ][: len(records_batches)]
