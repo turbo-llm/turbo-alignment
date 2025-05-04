@@ -94,7 +94,7 @@ class SamplingStrategyWithRM(BaseSamplingStrategyWithRM[SamplingWithRMSettings])
         records = []
 
         for record_id, record in dataset.original_records_map.items():
-            record.rewards = rewards[record_id]
+            record.rewards = rewards[record_id] if record_id in rewards else None
             records.append(record)
 
         return records

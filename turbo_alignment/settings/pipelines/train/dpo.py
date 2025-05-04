@@ -27,6 +27,7 @@ class DPOLossesType(str, Enum):
     ASFT = 'asft'
     DPOP = 'dpop'
     NCA_PAIR = 'nca_pair'
+    CAL_DPO = 'cal_dpo'
 
 
 class DPOLossSettings(ExtraFieldsNotAllowedBaseModel):
@@ -75,10 +76,14 @@ class SimPOLossSettings(DPOLossSettings):
 
 class ORPOLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.ORPO]
+    lambda_: float = 1.0
+    ce_coef: float = 1.0
 
 
 class ASFTLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.ASFT]
+    lambda_: float = 1.0
+    ce_coef: float = 1.0
 
 
 class APOZeroLossSettings(DPOLossSettings):
@@ -96,6 +101,10 @@ class DPOPLossSettings(DPOLossSettings):
 
 class NCAPairLossSettings(DPOLossSettings):
     loss_type: Literal[DPOLossesType.NCA_PAIR]
+
+
+class CALDPOLossSettings(DPOLossSettings):
+    loss_type: Literal[DPOLossesType.CAL_DPO]
 
 
 class SyncRefModelSettings(ExtraFieldsNotAllowedBaseModel):
@@ -120,6 +129,7 @@ class DPOTrainerSettings(TrainerSettings):
         | APODownLossSettings
         | DPOPLossSettings
         | NCAPairLossSettings
+        | CALDPOLossSettings
     )
     sync_ref_settings: SyncRefModelSettings
     use_ref_model: bool = True
