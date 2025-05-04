@@ -42,6 +42,12 @@ def unfreeze_params(layer):
         param.requires_grad = True
 
 
+def disable_dropout_in_model(model: torch.nn.Module) -> None:
+    for module in model.modules():
+        if isinstance(module, torch.nn.Dropout):
+            module.p = 0
+
+
 def load_model(
     model_settings: PreTrainedModelSettings,
     tokenizer: PreTrainedTokenizerBase,

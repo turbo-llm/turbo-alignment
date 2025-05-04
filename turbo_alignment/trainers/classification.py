@@ -51,7 +51,7 @@ def classification_loss(
 
     ce_loss = F.cross_entropy(logits, labels, weight=alpha, reduction='none')
 
-    p_t = torch.exp(-ce_loss)
+    p_t = torch.exp(-1 * ce_loss)
 
     focal_loss = ((1 - p_t) ** loss_settings.gamma) * ce_loss
 
