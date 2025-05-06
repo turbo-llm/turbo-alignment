@@ -137,3 +137,10 @@ class ChatGenerator(ChatGeneratorBase[ChatDatasetRecord, ChatInferenceOutput]):
             meta=original_record.meta,
             answers=answer_messages,
         )
+
+    def generate_from_records(  # FIXME # pylint: disable=unused-argument
+        self,
+        records,
+        dataset_name: str,
+    ) -> list[ChatInferenceOutput]:
+        return []
