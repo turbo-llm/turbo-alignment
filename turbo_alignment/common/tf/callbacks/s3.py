@@ -25,6 +25,10 @@ class CheckpointUploaderCallback(TrainerCallback):
     def on_train_begin(
         self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs
     ) -> TrainerControl:
+        if args.output_dir is None:
+            logger.info('No output_dir in args, skip')
+            return control
+
         logger.info(f"💾 Saving experiment metadata to {Path(args.output_dir) / 'experiment_metadata.json'}")
 
         last_checkpoint_directory = get_last_checkpoint(args.output_dir)
@@ -40,6 +44,8 @@ class CheckpointUploaderCallback(TrainerCallback):
     def on_save(
         self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs
     ) -> TrainerControl:
+        if args.output_dir is None:
+            raise ValueError('Cannot save without output_dir')
         last_checkpoint_directory = get_last_checkpoint(args.output_dir)
         last_checkpoint_basename = str(last_checkpoint_directory).rsplit('/', maxsplit=1)[-1]
 

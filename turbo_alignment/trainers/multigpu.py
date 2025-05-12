@@ -11,12 +11,12 @@ from transformers import (
     PrinterCallback,
     ProcessorMixin,
     ProgressCallback,
-    Trainer,
     TrainerCallback,
     TrainerControl,
     TrainingArguments,
 )
 from transformers.integrations import get_reporting_integration_callbacks
+from transformers.trainer import Trainer
 
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 

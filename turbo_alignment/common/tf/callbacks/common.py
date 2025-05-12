@@ -30,8 +30,8 @@ class MetricsCallbackHandler(CallbackHandler):
         self.metrics_kwargs = kwargs.pop('metrics_kwargs', {})
         super().__init__(*args, **kwargs)
 
-    def on_evaluate(
-        self, args: TrainingArguments, state: TrainerState, control: TrainerControl, metrics
+    def on_evaluate(  # type: ignore[override]
+        self, args: TrainingArguments, state: TrainerState, control: TrainerControl, metrics: Any
     ) -> TrainerControl:
         control.should_evaluate = False
 

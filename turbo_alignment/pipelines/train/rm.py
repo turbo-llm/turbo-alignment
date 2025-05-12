@@ -1,8 +1,7 @@
-from typing import Callable
-
 from torch.utils.data import Dataset
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainingArguments
-from transformers.data.data_collator import DataCollatorMixin
+from transformers import PreTrainedTokenizerBase, TrainingArguments
+from transformers.data.data_collator import DataCollator
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.cherry_picks.rm import RmCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
@@ -23,13 +22,13 @@ from turbo_alignment.trainers.rm import RMTrainer
 logger = get_project_logger()
 
 
-class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
+class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings, TrainingArguments]):
     @staticmethod
-    def _get_data_collator(
+    def _get_data_collator(  # type: ignore[override]
         experiment_settings: RMTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **_kwargs,
-    ) -> Callable:
+    ) -> PairPreferenceDataCollator:
         return PairPreferenceDataCollator(tokenizer=tokenizer, add_labels=False)
 
     @staticmethod
@@ -77,7 +76,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
         tokenizer: PreTrainedTokenizerBase,
         train_dataset: Dataset,
         val_dataset: Dataset,
-        data_collator: DataCollatorMixin,
+        data_collator: DataCollator,
         **_kwargs,
     ):
         return RMTrainer(
@@ -91,7 +90,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings]):
             callbacks=[],
         )
 
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
         logger.info(f'Train sample input_ids:\n{dataset[0]}')
         logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["inputs_w"]["input_ids"])}')
         logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["inputs_l"]["input_ids"])}')

@@ -5,7 +5,7 @@ from typing import Any
 import torch
 from peft import PeftModel
 from torch import nn
-from transformers import PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.trainer_pt_utils import nested_detach
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
@@ -45,14 +45,14 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
             return loss, {'rewards_w': rewards_w, 'rewards_l': rewards_l}
         return loss
 
-    def prediction_step(
+    def prediction_step(  # type: ignore[override]  #  pylint: disable=signature-differs
         self,
         model: PreTrainedModel | nn.Module,
         inputs: dict[str, dict[str, torch.Tensor]],
         prediction_loss_only: bool,
         ignore_keys: list[str] | None,
     ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
-        inputs = self._prepare_inputs(inputs)
+        inputs = self._prepare_inputs(inputs)  # type: ignore[arg-type]
         if ignore_keys is None:
             if hasattr(self.model, 'config'):
                 ignore_keys = getattr(self.model.config, 'keys_to_ignore_at_inference', [])

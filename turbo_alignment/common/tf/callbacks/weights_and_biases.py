@@ -21,9 +21,9 @@ class BaseWandbCallback(TrainerCallback):
 
     def on_log(
         self,
-        _args: TrainingArguments,
+        args: TrainingArguments,
         state: TrainerState,
-        _control: TrainerControl,
+        control: TrainerControl,
         **kwargs,
     ) -> None:
         logs = kwargs.get('logs', {})

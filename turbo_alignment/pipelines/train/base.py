@@ -1,16 +1,17 @@
 import os
 from abc import abstractmethod
 from pathlib import Path
-from typing import Callable, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import torch
 from torch.utils.data import ConcatDataset, Dataset
 from transformers import (
-    PreTrainedModel,
     PreTrainedTokenizerBase,
-    Trainer,
     TrainingArguments,
 )
+from transformers.data.data_collator import DataCollator
+from transformers.modeling_utils import PreTrainedModel
+from transformers.trainer import Trainer
 
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.common.data.io import write_json
@@ -30,9 +31,10 @@ logger = get_project_logger()
 
 
 ExperimentSettingsT = TypeVar('ExperimentSettingsT', bound=BaseTrainExperimentSettings)
+TrainingArgumentsT = TypeVar('TrainingArgumentsT', bound=TrainingArguments)
 
 
-class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
+class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, TrainingArgumentsT]):
     tokenizer: PreTrainedTokenizerBase
     model: PreTrainedModel
     trainer: Trainer
@@ -62,19 +64,19 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
     @abstractmethod
     def _get_data_collator(
         experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase, **kwargs
-    ) -> Callable:
+    ) -> DataCollator:
         ...
 
     @staticmethod
     @abstractmethod
     def _get_trainer(
-        training_args: TrainingArguments,
+        training_args: TrainingArgumentsT,
         experiment_settings: ExperimentSettingsT,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         train_dataset: Dataset,
         val_dataset: Dataset,
-        data_collator: Callable,
+        data_collator: DataCollator,
     ) -> Trainer:
         ...
 
@@ -86,7 +88,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
 
     @staticmethod
     @abstractmethod
-    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArguments:
+    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArgumentsT:
         ...
 
     @staticmethod
@@ -94,7 +96,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
         return load_tokenizer(experiment_settings.tokenizer_settings, experiment_settings.model_settings)
 
     @abstractmethod
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: Callable) -> None:
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
         ...
 
     @staticmethod
@@ -148,7 +150,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
 
         logger.info('Special tokens added!')
 
-        self.model = self._load_model(experiment_settings, self.tokenizer)
+        self.model = self._load_model(experiment_settings, self.tokenizer)  # type: ignore[assignment]
 
         special_tokens_setter.setup_model_config(self.model)
 
@@ -189,9 +191,15 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT]):
 
         self._add_trainer_callbacks(experiment_settings)
 
+        if not self.trainer.args.output_dir:
+            raise ValueError('No output dir is set')
+
         os.makedirs(self.trainer.args.output_dir, exist_ok=True)
+
         self._save_experiment_config(
-            experiment_settings, self.trainer.model, Path(self.trainer.args.output_dir) / 'experiment.config'
+            experiment_settings,
+            self.trainer.model,  # type: ignore[arg-type]
+            Path(self.trainer.args.output_dir) / 'experiment.config',
         )
 
         experiment_metadata = ExperimentMetadata()
