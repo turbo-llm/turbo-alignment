@@ -1,11 +1,13 @@
 from pathlib import Path
 from typing import Any
 
+from pydantic import Field
+
 from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 
 class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
-    evaluation_strategy: str = 'steps'
+    eval_strategy: str = Field(default='steps', alias='evaluation_strategy')
     save_strategy: str = 'steps'
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 4
