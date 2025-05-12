@@ -37,8 +37,8 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         return_logits: bool = False,
         lora_request: LoRARequest | None = None,
     ):
-        model.set_tokenizer(tokenizer)
-        super().__init__(model, tokenizer, batch=batch)
+        model.set_tokenizer(tokenizer)  # type: ignore[arg-type]
+        super().__init__(model, tokenizer, batch=batch)  # type: ignore[arg-type]
 
         if isinstance(generator_settings.stop_strings, list):
             raise ValueError('You should use only 1 eos token with VLLM')
