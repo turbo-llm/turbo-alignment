@@ -7467,4 +7467,4 @@ gpu = ["liger-kernel", "vllm"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "081026438309f5355c3e07d50d0412edc191a09d98106813e097003393a1c6dd"
+content-hash = "f75722f2246dc20e45d38bb91cc36ff937e97bdd84d2fe3735d8b2f494e5ca4f"
