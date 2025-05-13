@@ -47,7 +47,7 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 )
 
             else:
-                model = load_model(model_inference_settings.model_settings, tokenizer)
+                model = load_model(model_inference_settings.model_settings, tokenizer)  # type: ignore[assignment]
                 model = (
                     accelerator.prepare_model(model, device_placement=True, evaluation_mode=True)
                     if torch.cuda.is_available()
@@ -63,13 +63,13 @@ class ChatInferenceStrategy(BaseInferenceStrategy[ChatInferenceExperimentSetting
                 }
                 generator = (
                     ChatGenerator(
-                        **generator_kwargs,
+                        **generator_kwargs,  # type: ignore[arg-type]
                         transformers_settings=generation_settings.transformers_settings,
                         accelerator=accelerator,
                     )
                     if not model_inference_settings.use_vllm
                     else VLLMChatGenerator(
-                        **generator_kwargs,
+                        **generator_kwargs,  # type: ignore[arg-type]
                         generator_settings=generation_settings.vllm_settings,
                         lora_request=lora_request,
                     )

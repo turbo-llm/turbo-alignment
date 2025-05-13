@@ -1,4 +1,4 @@
-from transformers import PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from turbo_alignment.common.logging import get_project_logger

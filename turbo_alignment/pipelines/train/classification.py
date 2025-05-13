@@ -1,8 +1,9 @@
-from typing import Callable, cast
+from typing import cast
 
 from torch.utils.data import Dataset
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainingArguments
-from transformers.data.data_collator import DataCollatorMixin, DataCollatorWithPadding
+from transformers import PreTrainedTokenizerBase, TrainingArguments
+from transformers.data.data_collator import DataCollator, DataCollatorWithPadding
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.cherry_picks.classification import ClassificationCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
@@ -29,17 +30,19 @@ from turbo_alignment.trainers.classification import (
 logger = get_project_logger()
 
 
-class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimentSettings]):
+class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimentSettings, TrainingArguments]):
     @staticmethod
     def _get_data_collator(
         experiment_settings: ClassificationTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **_kwargs,
-    ) -> Callable:
+    ) -> DataCollator:
         dataset_settings: ClassificationMultiDatasetSettings = cast(
             ClassificationMultiDatasetSettings, experiment_settings.train_dataset_settings
         )
-        return DataCollatorWithPadding(tokenizer=tokenizer, max_length=dataset_settings.chat_settings.max_tokens_count)
+        return DataCollatorWithPadding(  # type: ignore[return-value]
+            tokenizer=tokenizer, max_length=dataset_settings.chat_settings.max_tokens_count
+        )
 
     @staticmethod
     def _get_cherry_pick_callback(
@@ -81,14 +84,14 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
         )
 
     @staticmethod
-    def _get_trainer(
+    def _get_trainer(  # type: ignore[override]
         training_args: TrainingArguments,
         experiment_settings: ClassificationTrainExperimentSettings,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         train_dataset: Dataset,
         val_dataset: Dataset,
-        data_collator: DataCollatorMixin,
+        data_collator: DataCollator,
     ):
         if experiment_settings.trainer_settings.loss_settings.alpha == 'auto':
             experiment_settings.trainer_settings.loss_settings.alpha = auto_class_weights(train_dataset)
@@ -105,7 +108,11 @@ class TrainClassificationStrategy(BaseTrainStrategy[ClassificationTrainExperimen
             loss_settings=experiment_settings.trainer_settings.loss_settings,
         )
 
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
+    def _dataset_and_collator_sanity_check(  # type: ignore[override]
+        self,
+        dataset: Dataset,
+        collator: DataCollator,
+    ) -> None:
         logger.info('Input check: {input_ids}'.format(input_ids=collator([dataset[0], dataset[1]])['input_ids'][0]))
 
         logger.info('Label check: {labels}'.format(labels=collator([dataset[0], dataset[1]])['labels'][0]))

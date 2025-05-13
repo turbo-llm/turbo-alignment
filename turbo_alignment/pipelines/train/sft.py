@@ -1,11 +1,10 @@
-from typing import Callable
-
 from torch.utils.data import Dataset
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, TrainingArguments
+from transformers import PreTrainedTokenizerBase, TrainingArguments
 from transformers.data.data_collator import (
     DataCollatorForTokenClassification,
     DataCollatorMixin,
 )
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
@@ -22,13 +21,13 @@ from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 logger = get_project_logger()
 
 
-class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
+class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings, TrainingArguments]):
     @staticmethod
-    def _get_data_collator(
+    def _get_data_collator(  # type: ignore[override]
         experiment_settings: SftTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> Callable:
+    ) -> DataCollatorForTokenClassification:
         return DataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8)
 
     @staticmethod
@@ -89,7 +88,9 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings]):
             processing_class=tokenizer,
         )
 
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
+    def _dataset_and_collator_sanity_check(
+        self, dataset: Dataset, collator: DataCollatorMixin
+    ) -> None:  # type: ignore[override]
         logger.info(f'Train sample example:\n{dataset[0]}')
         logger.info('Example text check: {example}'.format(example=self.tokenizer.decode(dataset[0]['input_ids'])))
         labels_ids = dataset[0]['labels'].clone()

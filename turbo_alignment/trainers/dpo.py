@@ -10,17 +10,17 @@ from transformers import (
     BaseImageProcessor,
     DefaultFlowCallback,
     FeatureExtractionMixin,
-    PreTrainedModel,
     PreTrainedTokenizerBase,
     PrinterCallback,
     ProcessorMixin,
     ProgressCallback,
-    Trainer,
     TrainerCallback,
     TrainerControl,
     TrainingArguments,
 )
 from transformers.integrations import get_reporting_integration_callbacks
+from transformers.modeling_utils import PreTrainedModel
+from transformers.trainer import Trainer
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
@@ -619,10 +619,14 @@ class DPOTrainer(Trainer):
         self.sft_model = sft_model
 
         if self.ref_model is not None:
-            self.ref_model = prepare_model(self.ref_model, self.accelerator, self.is_deepspeed_enabled)
+            self.ref_model = prepare_model(  # type: ignore[arg-type,assignment]
+                self.ref_model, self.accelerator, self.is_deepspeed_enabled
+            )
 
         if self.sft_model is not None:
-            self.sft_model = prepare_model(self.sft_model, self.accelerator, self.is_deepspeed_enabled)
+            self.sft_model = prepare_model(  # type: ignore[arg-type,assignment]
+                self.sft_model, self.accelerator, self.is_deepspeed_enabled
+            )
 
         default_callbacks = [DefaultFlowCallback] + get_reporting_integration_callbacks(self.args.report_to)
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
@@ -705,7 +709,9 @@ class DPOTrainer(Trainer):
         rejected_logits = all_logits[chosen_idxs:]
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
 
-    def _get_logps(self, model: nn.Module | None, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
+    def _get_logps(
+        self, model: PreTrainedModel | nn.Module | None, batch: dict[str, Any]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         with torch.no_grad():
             if model is not None:
                 (chosen_logps, rejected_logps, *_) = self.concatenated_forward(model, batch)
@@ -737,7 +743,7 @@ class DPOTrainer(Trainer):
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
-        if self.args.use_ref_model or self.loss_type not in (
+        if self.args.use_ref_model or self.loss_type not in (  # type: ignore[attr-defined]
             DPOLossesType.SIMPO,
             DPOLossesType.ORPO,
             DPOLossesType.ASFT,
@@ -766,7 +772,7 @@ class DPOTrainer(Trainer):
         metrics[f'{prefix}logits/rejected'] = (policy_rejected_logits).detach().cpu().mean().item()
         metrics[f'{prefix}logits/chosen'] = (policy_chosen_logits).detach().cpu().mean().item()
 
-        if self.args.use_ref_model:
+        if self.args.use_ref_model:  # type: ignore[attr-defined]
             ref_logp_accuracies = (reference_chosen_logps > reference_rejected_logps).float()
             metrics[f'{prefix}logps/ref_accuracies'] = (ref_logp_accuracies).detach().cpu().mean().item()
             metrics[f'{prefix}logps/ref_rejected'] = (reference_rejected_logps).detach().cpu().mean().item()

@@ -1,8 +1,9 @@
 from typing import Callable
 
 from torch.utils.data import Dataset
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
-from transformers.data.data_collator import DataCollatorMixin
+from transformers import PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
+from transformers.data.data_collator import DataCollator
 
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
 from turbo_alignment.common.logging import get_project_logger
@@ -21,13 +22,13 @@ from turbo_alignment.trainers.dpo import DPOTrainer, DPOTrainingArguments
 logger = get_project_logger()
 
 
-class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
+class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings, DPOTrainingArguments]):
     @staticmethod
-    def _get_data_collator(
+    def _get_data_collator(  # type: ignore[override]
         experiment_settings: DPOTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> Callable:
+    ) -> PairPreferenceDataCollator:
         return PairPreferenceDataCollator(tokenizer=tokenizer, add_labels=True)
 
     @staticmethod
@@ -105,7 +106,7 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings]):
             **extra_args,
         )
 
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollatorMixin) -> None:
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
         logger.info(f'Train sample example:\n{dataset[0]}')
 
         logger.info(

@@ -2,7 +2,8 @@ import math
 from typing import Iterable
 
 from accelerate import Accelerator
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.dataset.chat import InferenceChatDataset
@@ -34,8 +35,8 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
     ) -> list[MetricResults]:
         accelerator: Accelerator = kwargs.get('accelerator', None)
         metrics_kwargs: dict = kwargs.get('metrics_kwargs', {})
-        ref_model: dict = kwargs.get('ref_model', None)
-        sft_model: dict = kwargs.get('sft_model', None)
+        ref_model: PreTrainedModel = kwargs.get('ref_model', None)
+        sft_model: PreTrainedModel = kwargs.get('sft_model', None)
 
         generator = ChatGenerator(
             model=model,

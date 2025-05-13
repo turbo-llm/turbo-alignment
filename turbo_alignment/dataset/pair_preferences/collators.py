@@ -36,7 +36,7 @@ class PairPreferenceDataCollator:
             )
         return batch
 
-    def __call__(self, examples: list[dict[str, dict[str, Any]]]) -> dict[str, Any]:
+    def __call__(self, examples: list[dict[str, dict[str, Any]]]) -> dict[str, Any]:  # type: ignore[override]
         max_length = 0
         for ex in examples:
             for t in ex:

@@ -4,7 +4,8 @@ from typing import Generic, TypeVar
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from accelerate.utils.operations import gather_object
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.common.tf.loaders.model.model import load_model
 from turbo_alignment.common.tf.loaders.tokenizer import load_tokenizer

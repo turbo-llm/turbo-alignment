@@ -1,6 +1,9 @@
+from typing import cast
+
 import torch
 from peft import PeftModel, get_peft_model, prepare_model_for_int8_training
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 
 from turbo_alignment.common import is_package_available
@@ -23,7 +26,7 @@ def _prepare_model_for_peft(model: PreTrainedModel, peft_settings: PEFT_TYPE) ->
 
     peft_config = PeftConfigRegistry.by_name(peft_settings.name)(**peft_params)
 
-    return get_peft_model(model, peft_config)
+    return cast(PeftModel, get_peft_model(model, peft_config))  # type: ignore[arg-type]
 
 
 def _load_pretrained_adapters(

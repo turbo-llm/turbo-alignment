@@ -3,13 +3,13 @@ from typing import Generic, Iterable, TypeVar
 
 from accelerate import Accelerator
 from transformers import (
-    PreTrainedModel,
     PreTrainedTokenizerBase,
     TrainerCallback,
     TrainerControl,
     TrainerState,
     TrainingArguments,
 )
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.dataset.base import BaseDataset
 from turbo_alignment.metrics.metric import Metric
@@ -43,9 +43,9 @@ class CherryPickCallbackBase(TrainerCallback, Generic[InferenceDatasetT]):
 
     def on_evaluate(
         self,
-        _args: TrainingArguments,
+        args: TrainingArguments,
         state: TrainerState,
-        _control: TrainerControl,
+        control: TrainerControl,
         **kwargs,
     ) -> list[list[MetricResults]]:
         tokenizer: PreTrainedTokenizerBase = kwargs.pop('processing_class', None)

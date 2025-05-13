@@ -1,5 +1,5 @@
 import torch
-from transformers import PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 
 
 def calculate_cross_entropy(logits: torch.Tensor, labels: torch.Tensor, pad_token_id: int, reduction: str):

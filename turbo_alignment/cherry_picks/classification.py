@@ -2,7 +2,8 @@ import math
 from typing import Iterable
 
 from accelerate import Accelerator
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.cherry_picks.base import CherryPickCallbackBase
 from turbo_alignment.dataset.chat.conversation import Conversation
