@@ -13,7 +13,7 @@ tests-%:
 	mv .coverage .coverage.$(subst tests-,,$@)
 
 
-tests: tests-unit tests-integration tests-cli
+tests: tests-unit tests-integration tests-cli test-sequence_parallel
 	coverage combine
 	[ -n $$CI ] && coverage xml -i || true # always success
 	coverage report -i
@@ -46,4 +46,3 @@ lock:
 clear:
 	rm -f test_*_answers.jsonl
 	rm -rf test_*_output
-	
