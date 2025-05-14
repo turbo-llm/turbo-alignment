@@ -13,7 +13,7 @@ tests-%:
 	mv .coverage .coverage.$(subst tests-,,$@)
 
 
-tests: tests-unit tests-integration tests-cli test-sequence_parallel
+tests: tests-unit tests-integration tests-cli tests-sequence_parallel
 	coverage combine
 	[ -n $$CI ] && coverage xml -i || true # always success
 	coverage report -i
