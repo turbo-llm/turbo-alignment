@@ -4,8 +4,8 @@ import copy
 
 import pytest
 import torch
-import torch.distributed
-from transformers import Trainer, TrainingArguments
+from transformers import TrainingArguments
+from transformers.trainer import Trainer
 from transformers.models.gemma2 import Gemma2Config, Gemma2Model
 from transformers.models.gemma2.modeling_gemma2 import (
     Gemma2RotaryEmbedding,

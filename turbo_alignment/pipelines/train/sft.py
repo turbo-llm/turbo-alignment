@@ -1,9 +1,4 @@
-<<<<<<< HEAD
-=======
-from typing import Callable
-
 import torch
->>>>>>> e7c6323 (fix collator)
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase, TrainingArguments
 from transformers.data.data_collator import (

@@ -2,30 +2,32 @@
 # flake8: noqa
 
 import contextlib
-import gc
 import functools
+import gc
 import logging
 import os
 import shutil
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Optional
 
 import torch
 import torch.distributed as dist
 from packaging import version
 from torch import nn
 from torch.utils.data import RandomSampler
-from transformers import Trainer
 from transformers.modeling_utils import unwrap_model
 from transformers.trainer import (
+    SAFE_WEIGHTS_NAME,
     TRAINER_STATE_NAME,
+    WEIGHTS_NAME,
     DebugOption,
     DebugUnderflowOverflow,
     DistributedType,
     ExportableState,
     OptimizerNames,
     ParallelMode,
+    Trainer,
     TrainerState,
     TrainOutput,
     _is_peft_model,
@@ -39,10 +41,9 @@ from transformers.trainer import (
     skip_first_batches,
     speed_metrics,
     tpu_spmd_dataloader,
-    SAFE_WEIGHTS_NAME,
-    WEIGHTS_NAME,
 )
 from transformers.trainer_pt_utils import remove_dummy_checkpoint
+
 from turbo_alignment.modeling import parallel_states
 
 from .utils import create_forward_hook, create_hook
@@ -185,6 +186,11 @@ class TrainerWithSeqP(Trainer):
 
         delay_optimizer_creation = is_sagemaker_mp_enabled() or self.is_fsdp_xla_enabled or self.is_fsdp_enabled
 
+        # Can't delay optimizer creation when using FSDP2: https://github.com/huggingface/accelerate/blob/3f636d626063ffcf9a337c7d3624d61b7d187d59/src/accelerate/accelerator.py#L1404
+        is_fsdp2 = self.is_fsdp_enabled and (getattr(self.accelerator.state.fsdp_plugin, "fsdp_version", 1) == 2)
+        if is_fsdp2:
+            delay_optimizer_creation = False
+
         # We need to reset the scheduler, as its parameters may be different on subsequent calls
         if self._created_lr_scheduler:
             self.lr_scheduler = None
@@ -325,18 +331,17 @@ class TrainerWithSeqP(Trainer):
         self.state.init_training_references(self, max_steps, num_train_epochs, trial)
 
         # tr_loss is a tensor to avoid synchronization of TPUs through .item()
-        tr_loss = torch.tensor(0.0).to(args.device)
+        tr_loss = torch.tensor(0.0, device=args.device)
         # _total_loss_scalar is updated everytime .item() has to be called on tr_loss and stores the sum of all losses
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
         model.zero_grad()
         grad_norm: Optional[float] = None
+        learning_rate = None
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
         if args.eval_on_start:
             self._evaluate(trial, ignore_keys_for_eval, skip_scheduler=True)
-
-        total_batched_samples = 0
 
         self._create_hooks()
 
@@ -376,13 +381,14 @@ class TrainerWithSeqP(Trainer):
                 remainder = args.gradient_accumulation_steps
             update_step = -1
             total_updates = steps_in_epoch // args.gradient_accumulation_steps + 1
+            if args.gradient_accumulation_steps == 1:
+                total_updates -= 1
             for _ in range(total_updates):
                 update_step += 1
                 num_batches = args.gradient_accumulation_steps if update_step != (total_updates - 1) else remainder
                 batch_samples, num_items_in_batch = self.get_batch_samples(epoch_iterator, num_batches, args.device)
                 for i, inputs in enumerate(batch_samples):
                     step += 1
-                    total_batched_samples += 1
                     do_sync_step = (step + 1) % args.gradient_accumulation_steps == 0 or (step + 1) == steps_in_epoch
                     # Since we perform prefetching, we need to manually set sync_gradients
                     self.accelerator.gradient_state._set_sync_gradients(do_sync_step)
@@ -398,7 +404,7 @@ class TrainerWithSeqP(Trainer):
                         else:
                             input_tokens = inputs[main_input_name].numel()
                             input_tokens = torch.tensor(input_tokens, device=self.args.device, dtype=torch.int64)
-                            self.state.num_input_tokens_seen += self.accelerator.gather(input_tokens).cpu().item()
+                            self.state.num_input_tokens_seen += self.accelerator.gather(input_tokens).sum().item()
                     if rng_to_sync:
                         self._load_rng_state(resume_from_checkpoint)
                         rng_to_sync = False
@@ -465,8 +471,6 @@ class TrainerWithSeqP(Trainer):
 
                         # Gradient clipping
                         if args.max_grad_norm is not None and args.max_grad_norm > 0:
-                            # deepspeed does its own clipping
-
                             if is_sagemaker_mp_enabled() and args.fp16:
                                 _grad_norm = self.optimizer.clip_master_grads(args.max_grad_norm)
                             elif self.use_apex:
@@ -489,7 +493,6 @@ class TrainerWithSeqP(Trainer):
                                 # In some cases the grad norm may not return a float
                                 if hasattr(grad_norm, "item"):
                                     grad_norm = grad_norm.item()
-
                             else:
                                 grad_norm = _grad_norm
 
@@ -498,6 +501,9 @@ class TrainerWithSeqP(Trainer):
                         self.optimizer.step()
 
                         self.control = self.callback_handler.on_optimizer_step(args, self.state, self.control)
+
+                        # get leaning rate before update
+                        learning_rate = self._get_learning_rate()
 
                         if not self.accelerator.optimizer_step_was_skipped:
                             # Delay optimizer scheduling until metrics are generated
@@ -515,7 +521,8 @@ class TrainerWithSeqP(Trainer):
                             trial,
                             epoch,
                             ignore_keys_for_eval,
-                            metrics=speed_metrics_,
+                            start_time,
+                            learning_rate=learning_rate,
                         )
                     else:
                         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
@@ -541,7 +548,9 @@ class TrainerWithSeqP(Trainer):
                 self.control.should_training_stop = True
 
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-            self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval)
+            self._maybe_log_save_evaluate(
+                tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, start_time, learning_rate=learning_rate
+            )
 
             if DebugOption.TPU_METRICS_DEBUG in self.args.debug:
                 if is_torch_xla_available():
@@ -615,41 +624,41 @@ class TrainerWithSeqP(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, metrics=None):
-        if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
-            if is_torch_xla_available():
-                xm.mark_step()
+    # def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, metrics=None):
+    #     if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
+    #         if is_torch_xla_available():
+    #             xm.mark_step()
 
-            logs: Dict[str, float] = {}
+    #         logs: Dict[str, float] = {}
 
-            # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+    #         # all_gather + mean() to get average loss over all processes
+    #         tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
 
-            # reset tr_loss to zero
-            tr_loss -= tr_loss
+    #         # reset tr_loss to zero
+    #         tr_loss -= tr_loss
 
-            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+    #         logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
 
-            if grad_norm is not None:
-                logs["grad_norm"] = grad_norm.detach().item() if isinstance(grad_norm, torch.Tensor) else grad_norm
-            logs["learning_rate"] = self._get_learning_rate()
+    #         if grad_norm is not None:
+    #             logs["grad_norm"] = grad_norm.detach().item() if isinstance(grad_norm, torch.Tensor) else grad_norm
+    #         logs["learning_rate"] = self._get_learning_rate()
 
-            self._total_loss_scalar += tr_loss_scalar
-            self._globalstep_last_logged = self.state.global_step
-            self.store_flos()
+    #         self._total_loss_scalar += tr_loss_scalar
+    #         self._globalstep_last_logged = self.state.global_step
+    #         self.store_flos()
 
-            if metrics:
-                logs.update(metrics)
+    #         if metrics:
+    #             logs.update(metrics)
 
-            self.log(logs)
+    #         self.log(logs)
 
-        metrics = None
-        if self.control.should_evaluate:
-            metrics = self._evaluate(trial, ignore_keys_for_eval)
+    #     metrics = None
+    #     if self.control.should_evaluate:
+    #         metrics = self._evaluate(trial, ignore_keys_for_eval)
 
-        if self.control.should_save:
-            self._save_checkpoint(model, trial)
-            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+    #     if self.control.should_save:
+    #         self._save_checkpoint(model, trial)
+    #         self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def save_model(self, output_dir: Optional[str] = None, _internal_call: bool = False):
         """
@@ -665,13 +674,13 @@ class TrainerWithSeqP(Trainer):
             self._save_tpu(output_dir)
         elif is_sagemaker_mp_enabled():
             # Calling the state_dict needs to be done on the wrapped model and on all processes.
-            os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)  # type: ignore[arg-type]
             state_dict = self.model_wrapped.state_dict()
             if self.args.should_save:
                 self._save(output_dir, state_dict=state_dict)
             if IS_SAGEMAKER_MP_POST_1_10:
                 # 'user_content.pt' indicates model state_dict saved with smp >= 1.10
-                Path(os.path.join(output_dir, "user_content.pt")).touch()
+                Path(os.path.join(output_dir, "user_content.pt")).touch()  # type: ignore[arg-type]
         elif self.is_fsdp_enabled:
             if ("FULL_STATE_DICT" in str(self.accelerator.state.fsdp_plugin.state_dict_type)) and (
                 version.parse(accelerate_version) > version.parse("0.24.1")

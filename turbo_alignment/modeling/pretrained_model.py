@@ -6,57 +6,47 @@ from typing import Type
 
 import torch
 from transformers.modeling_utils import (
-    ACCELERATE_MIN_VERSION,
     set_quantized_state,
     ContextManagers,
     PreTrainedModel,
-    SpecificPreTrainedModelType,
     _is_quantized,
     _is_ds_init_called,
     set_zero3_state,
     deepspeed_config,
     init_empty_weights,
-    is_accelerate_available,
     is_deepspeed_zero3_enabled,
     logger,
     no_init_weights,
+    restore_default_torch_dtype,
 )
+from transformers.integrations.deepspeed import is_deepspeed_available
+
+if is_deepspeed_available():
+    import deepspeed
 
 
 class PreTrainedModelWithMPU(PreTrainedModel):
     @classmethod
-    def get_init_context(
-        cls: Type[SpecificPreTrainedModelType],
-        _fast_init=True,
-        is_quantized=None,
-        _is_ds_init_called=None,
-        low_cpu_mem_usage=True,
-    ):
-        init_contexts = [no_init_weights(_enable=_fast_init)]
-
-        if is_deepspeed_zero3_enabled() and not is_quantized and not _is_ds_init_called:
-            import deepspeed
+    def get_init_context(cls, is_quantized: bool, _is_ds_init_called: bool):
+        if is_deepspeed_zero3_enabled():
             import turbo_alignment.modeling.parallel_states as mpu
 
-            logger.info("Detected DeepSpeed ZeRO-3: activating zero.init() for this model")
-            mpu_inited = mpu.sequence_parallel_is_initialized()
-            logger.info('MPU inited')
-            init_contexts = [
-                deepspeed.zero.Init(config_dict_or_path=deepspeed_config(), mpu=mpu if mpu_inited else None),
-                set_zero3_state(),
-            ] + init_contexts
-        elif low_cpu_mem_usage:
-            if not is_accelerate_available():
-                raise ImportError(
-                    f"Using `low_cpu_mem_usage=True` or a `device_map` requires Accelerate: `pip install 'accelerate>={ACCELERATE_MIN_VERSION}'`"
+            init_contexts = [no_init_weights()]
+            # We cannot initialize the model on meta device with deepspeed when not quantized
+            if not is_quantized and not _is_ds_init_called:
+                logger.info("Detected DeepSpeed ZeRO-3: activating zero.init() for this model")
+                init_contexts.extend(
+                    [deepspeed.zero.Init(config_dict_or_path=deepspeed_config(), mpu=mpu), set_zero3_state()]
                 )
-            init_contexts.append(init_empty_weights())
+            elif is_quantized:
+                init_contexts.extend([init_empty_weights(), set_quantized_state()])
+        else:
+            init_contexts = [no_init_weights(), init_empty_weights()]
 
-        if is_deepspeed_zero3_enabled() and is_quantized:
-            init_contexts.append(set_quantized_state())
         return init_contexts
 
     @classmethod
+    @restore_default_torch_dtype
     def _from_config(cls, config, **kwargs):
         """
         All context managers that the model should be initialized under go here.
@@ -68,7 +58,10 @@ class PreTrainedModelWithMPU(PreTrainedModel):
         # when we init a model from within another model (e.g. VLMs) and dispatch on FA2
         # a warning is raised that dtype should be fp16. Since we never pass dtype from within
         # modeling code, we can try to infer it here same way as done in `from_pretrained`
-        torch_dtype = kwargs.pop("torch_dtype", torch.get_default_dtype())
+        torch_dtype = kwargs.pop("torch_dtype", config.torch_dtype)
+        if isinstance(torch_dtype, str):
+            torch_dtype = getattr(torch, torch_dtype)
+
         use_flash_attention_2 = kwargs.pop("use_flash_attention_2", False)
 
         # override default dtype if needed
@@ -95,7 +88,6 @@ class PreTrainedModelWithMPU(PreTrainedModel):
             )
 
         if is_deepspeed_zero3_enabled() and not _is_quantized and not _is_ds_init_called:
-            import deepspeed
             import turbo_alignment.modeling.parallel_states as mpu
 
             logger.info("Detected DeepSpeed ZeRO-3: activating zero.init() for this model")

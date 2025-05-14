@@ -22,7 +22,6 @@ from transformers import (
 )
 from transformers.integrations import get_reporting_integration_callbacks, is_deepspeed_available
 from transformers.modeling_utils import PreTrainedModel
-from transformers.trainer import Trainer
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler

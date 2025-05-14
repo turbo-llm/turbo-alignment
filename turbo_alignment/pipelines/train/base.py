@@ -161,7 +161,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             training_args = self._get_training_args(experiment_settings)
 
             logger.info('Special tokens added!')
-            self.model = self._load_model(experiment_settings, self.tokenizer)
+            self.model = self._load_model(experiment_settings, self.tokenizer)  # type: ignore[assignment]
             logger.info('Model is loaded!')
 
             special_tokens_setter.setup_model_config(self.model)
@@ -187,7 +187,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             data_collator = self._get_data_collator(experiment_settings, self.tokenizer)
             if experiment_settings.trainer_settings.sequence_parallel > 1:
                 logger.info('Wrap data collator to support sequence parallelism')
-                data_collator = DataCollatorForSequenceParallism(
+                data_collator = DataCollatorForSequenceParallism(  # type: ignore[assignment]
                     data_collator,
                     seq_p_rank=get_sequence_parallel_rank(),
                     seq_p_world_size=get_sequence_parallel_world_size(),
