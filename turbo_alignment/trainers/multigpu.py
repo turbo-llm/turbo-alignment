@@ -16,7 +16,6 @@ from transformers import (
     TrainingArguments,
 )
 from transformers.integrations import get_reporting_integration_callbacks
-from transformers.trainer import Trainer
 
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
 from turbo_alignment.sequence_parallel.trainer import TrainerWithSeqP

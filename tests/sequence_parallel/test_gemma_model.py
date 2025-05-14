@@ -6,10 +6,10 @@ import deepspeed
 import deepspeed.comm as dist
 import pytest
 import torch
-import torch.distributed
-from transformers import AutoTokenizer, GenerationConfig, Trainer
+from transformers import AutoTokenizer, GenerationConfig
 from transformers.models.gemma2 import Gemma2ForCausalLM
 from transformers.data.data_collator import default_data_collator
+from transformers.trainer import Trainer
 from turbo_alignment.dist_utils.gather_and_split import all_gather_variable
 from turbo_alignment.dist_utils.order import run_in_order
 from turbo_alignment.modeling import parallel_states

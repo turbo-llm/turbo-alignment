@@ -2,7 +2,7 @@
 # flake8: noqa
 # mypy: ignore-errors
 
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from torch import nn
@@ -33,6 +33,8 @@ from transformers.models.qwen2.modeling_qwen2 import (
     eager_attention_forward,
     logger,
 )
+from transformers.utils.generic import can_return_tuple
+
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.modeling.ulysses_attn import _SeqAllToAll
 from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
@@ -288,6 +290,7 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
 
         return causal_mask
 
+    @can_return_tuple
     def forward(  # pylint: disable=arguments-differ
         self,
         input_ids: torch.LongTensor = None,
@@ -298,8 +301,8 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         if position_ids is None:
             if attention_mask is not None:
@@ -314,7 +317,6 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
         )
         # use_cache = use_cache if use_cache is not None else self.config.use_cache
         use_cache = False
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
@@ -383,7 +385,7 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     position_embeddings=position_embeddings,
-                    # **flash_attn_kwargs,
+                    **flash_attn_kwargs,
                 )
 
             hidden_states = layer_outputs[0]
@@ -403,7 +405,7 @@ class Qwen2ModelWithMPU(Qwen2PreTrainedModel, Qwen2Model):
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-        return output if return_dict else output.to_tuple()
+        return output
 
 
 class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Qwen2ForCausalLM):
@@ -416,22 +418,22 @@ class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
         # Initialize weights and apply final processing
         self.post_init()
 
+    @can_return_tuple
     def forward(
         self,
-        input_ids: torch.LongTensor = None,
+        input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
+        past_key_values: Optional[Cache] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        num_logits_to_keep: int = 0,
+        logits_to_keep: Union[int, torch.Tensor] = 0,
         **kwargs: Unpack[KwargsForCausalLM],
-    ) -> Union[Tuple, CausalLMOutputWithPast]:
+    ) -> CausalLMOutputWithPast:
         r"""
         Args:
             labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -473,7 +475,6 @@ class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
@@ -484,13 +485,13 @@ class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
             cache_position=cache_position,
+            **kwargs,
         )
 
         hidden_states = outputs[0]
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
-        logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :])
+        logits = self.lm_head(hidden_states[:, -logits_to_keep:, :])
 
         loss = None
         if labels is not None:
@@ -499,10 +500,6 @@ class Qwen2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
 
             else:
                 loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
-
-        if not return_dict:
-            output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
 
         return CausalLMOutputWithPast(
             loss=loss,

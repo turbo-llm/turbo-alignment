@@ -246,7 +246,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         )
         return causal_mask
 
-    def forward(  # pylint: disable=arguments-differ
+    def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -256,9 +256,10 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
+        last_cache_position: Optional[int] = None,
+        **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
+    ):
         if position_ids is None:
             if attention_mask is not None:
                 position_ids = attention_mask.long().cumsum(-1) - 1
@@ -275,8 +276,9 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
             use_cache,
             output_attentions,
             output_hidden_states,
-            return_dict,
             cache_position,
+            last_cache_position,
+            **flash_attn_kwargs,
         )
 
 
@@ -301,11 +303,10 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        num_logits_to_keep: int = 0,
+        logits_to_keep: Union[int, torch.Tensor] = 0,
         **loss_kwargs,
-    ) -> Union[Tuple, CausalLMOutputWithPast]:
+    ) -> CausalLMOutputWithPast:
         r"""
         Args:
             labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -313,19 +314,21 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
                 config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
                 (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
 
-            num_logits_to_keep (`int`, *optional*):
-                Calculate logits for the last `num_logits_to_keep` tokens. If `0`, calculate logits for all
+            logits_to_keep (`int` or `torch.Tensor`, *optional*):
+                If an `int`, compute logits for the last `logits_to_keep` tokens. If `0`, calculate logits for all
                 `input_ids` (special case). Only last token logits are needed for generation, and calculating them only for that
                 token can save memory, which becomes pretty significant for long sequences or large vocabulary size.
+                If a `torch.Tensor`, must be 1D corresponding to the indices to keep in the sequence length dimension.
+                This is useful when using packed tensor format (single dimension for batch and sequence length).
 
         Returns:
 
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, GemmaForCausalLM
+        >>> from transformers import AutoTokenizer, Gemma2ForCausalLM
 
-        >>> model = GemmaForCausalLM.from_pretrained("google/gemma-2-9b")
+        >>> model = Gemma2ForCausalLM.from_pretrained("google/gemma-2-9b")
         >>> tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
 
         >>> prompt = "What is your favorite condiment?"
@@ -347,9 +350,8 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.model(
+        outputs: BaseModelOutputWithPast = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -358,13 +360,14 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
             cache_position=cache_position,
+            **loss_kwargs,
         )
 
-        hidden_states = outputs[0]
+        hidden_states = outputs.last_hidden_state
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
-        logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :])
+        slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
+        logits = self.lm_head(hidden_states[:, slice_indices, :])
         if self.config.final_logit_softcapping is not None:
             logits = logits / self.config.final_logit_softcapping
             logits = torch.tanh(logits)
@@ -377,10 +380,6 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
 
             else:
                 loss = self.loss_function(logits, labels, self.vocab_size, **loss_kwargs)
-
-        if not return_dict:
-            output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
 
         return CausalLMOutputWithPast(
             loss=loss,
