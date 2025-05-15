@@ -6,6 +6,7 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.data.data_collator import DataCollator
 
 from turbo_alignment.cherry_picks.chat import ChatCherryPickCallback
+from turbo_alignment.common import set_random_seed
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.loaders.model import load_model
 from turbo_alignment.constants import TRAINER_LOGS_FOLDER
@@ -41,6 +42,7 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings, DPOTraining
         if cherry_pick_settings is None:
             return None
 
+        set_random_seed(experiment_settings.seed)
         cherry_pick_datasets = DatasetLoader[InferenceChatDataset](InferenceChatDataset).load_datasets(
             cherry_pick_settings.dataset_settings,
             tokenizer=tokenizer,
