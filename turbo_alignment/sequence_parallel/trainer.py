@@ -609,8 +609,29 @@ class TrainerWithSeqP(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
+    # Remove after https://github.com/huggingface/transformers/issues/38137 is resolved
+    def log(self, logs: dict[str, float], start_time: Optional[float] = None) -> None:
+        """
+        Log `logs` on the various objects watching training.
 
+        Subclass and override this method to inject custom behavior.
 
+        Args:
+            logs (`Dict[str, float]`):
+                The values to log.
+            start_time (`Optional[float]`):
+                The start of training.
+        """
+        if self.state.epoch is not None:
+            logs["epoch"] = self.state.epoch
+        if self.args.include_num_input_tokens_seen:
+            logs["num_input_tokens_seen"] = self.state.num_input_tokens_seen
+            if start_time is not None:
+                logs.update(speed_metrics("train", start_time, num_tokens=self.state.num_input_tokens_seen))
+
+        output = {**logs, **{"step": self.state.global_step}}
+        self.state.log_history.append(output)
+        self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs)
 
     def save_model(self, output_dir: Optional[str] = None, _internal_call: bool = False):
         """
