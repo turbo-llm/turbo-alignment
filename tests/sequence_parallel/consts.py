@@ -1,5 +1,6 @@
 GEMMA_MODEL_PATH = '/mnt/models/google/gemma2-2b'
 QWEN_MODEL_PATH = '/mnt/models/Qwen2.5-1.5B-Instruct/'
+QWEN3_MODEL_PATH = '/mnt/models/Qwen3-0.6B'
 
 
 DEEPSPEED_CONFIG = {
