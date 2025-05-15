@@ -376,7 +376,6 @@ class TrainerWithSeqP(Trainer):
             epoch_iterator = iter(epoch_dataloader)
             # We chunkify the epoch iterator into gradient accumulation steps `n` batches
             remainder = num_examples % args.gradient_accumulation_steps
-            num_items_in_batch = None
             if remainder == 0:
                 remainder = args.gradient_accumulation_steps
             update_step = -1
@@ -433,21 +432,7 @@ class TrainerWithSeqP(Trainer):
                     )
 
                     with context():
-                        start = time.time()
                         tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
-                        num_tokens = None
-                        if num_items_in_batch is not None:
-                            if isinstance(num_items_in_batch, torch.Tensor):
-                                num_items_in_batch = num_items_in_batch.item()
-
-                            num_tokens = num_items_in_batch
-
-                        speed_metrics_ = speed_metrics(
-                            'train',
-                            start,
-                            num_samples=len(inputs),
-                            num_tokens=num_tokens,
-                        )
 
                     if (
                         args.logging_nan_inf_filter
@@ -624,41 +609,8 @@ class TrainerWithSeqP(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    # def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, metrics=None):
-    #     if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
-    #         if is_torch_xla_available():
-    #             xm.mark_step()
 
-    #         logs: Dict[str, float] = {}
 
-    #         # all_gather + mean() to get average loss over all processes
-    #         tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-
-    #         # reset tr_loss to zero
-    #         tr_loss -= tr_loss
-
-    #         logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
-
-    #         if grad_norm is not None:
-    #             logs["grad_norm"] = grad_norm.detach().item() if isinstance(grad_norm, torch.Tensor) else grad_norm
-    #         logs["learning_rate"] = self._get_learning_rate()
-
-    #         self._total_loss_scalar += tr_loss_scalar
-    #         self._globalstep_last_logged = self.state.global_step
-    #         self.store_flos()
-
-    #         if metrics:
-    #             logs.update(metrics)
-
-    #         self.log(logs)
-
-    #     metrics = None
-    #     if self.control.should_evaluate:
-    #         metrics = self._evaluate(trial, ignore_keys_for_eval)
-
-    #     if self.control.should_save:
-    #         self._save_checkpoint(model, trial)
-    #         self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def save_model(self, output_dir: Optional[str] = None, _internal_call: bool = False):
         """
