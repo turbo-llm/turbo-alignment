@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from .consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH
+from .consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH, QWEN3_MODEL_PATH
 
 
 def has_two_gpus() -> bool:
@@ -19,3 +19,7 @@ def has_gemma_model() -> bool:
 
 def has_qwen_model() -> bool:
     return has_model(QWEN_MODEL_PATH)
+
+
+def has_qwen3_model() -> bool:
+    return has_model(QWEN3_MODEL_PATH)

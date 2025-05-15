@@ -15,6 +15,7 @@ class ModelType(str, Enum):
     ENC = 'encoder'
     GEMMA_WITH_ULYSSES = 'gemma_with_ulysses'
     QWEN_WITH_ULYSSES = 'qwen_with_ulysses'
+    QWEN3_WITH_ULYSSES = 'qwen3_with_ulysses'
 
 
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):

@@ -51,7 +51,7 @@ def compare(root_dir, attention_mask=None):
                 combined_weights = weights[0]
 
             else:
-                if len(half_shape) == 3:
+                if len(half_shape) in {3, 4}:
                     dim_to_merge = 1
                 else:
                     raise ValueError(f'Cannot merge: {half_shape}')

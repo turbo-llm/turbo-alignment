@@ -9,7 +9,7 @@ import pytest
 import yaml  # type: ignore[import-untyped]
 
 from tests.constants import FIXTURES_PATH
-from tests.sequence_parallel.consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH
+from tests.sequence_parallel.consts import GEMMA_MODEL_PATH, QWEN_MODEL_PATH, QWEN3_MODEL_PATH
 from tests.sequence_parallel.utils import read_first_line
 from tests.sequence_parallel.compare_gradients import compare as compare_gradients
 from tests.sequence_parallel.compare_values import compare as compare_values
@@ -58,6 +58,12 @@ def patch_settings(
             'qwen_with_ulysses',
             id='qwen',
             marks=pytest.mark.skipif(not has_qwen_model(), reason='Qwen model not found'),
+        ),
+        pytest.param(
+            QWEN3_MODEL_PATH,
+            'qwen3_with_ulysses',
+            id='qwen3',
+            marks=pytest.mark.skipif(not has_qwen_model(), reason='Qwen3 model not found'),
         ),
     ],
 )
