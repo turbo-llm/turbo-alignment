@@ -488,7 +488,6 @@ class Qwen3ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
@@ -499,7 +498,6 @@ class Qwen3ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
             cache_position=cache_position,
         )
 
