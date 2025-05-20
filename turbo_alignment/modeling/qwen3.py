@@ -431,6 +431,7 @@ class Qwen3ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
         # Initialize weights and apply final processing
         self.post_init()
 
+    @can_return_tuple
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -442,7 +443,6 @@ class Qwen3ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         num_logits_to_keep: int = 0,
         **kwargs: Unpack[KwargsForCausalLM],
@@ -514,10 +514,6 @@ class Qwen3ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, Q
 
             else:
                 loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
-
-        if not return_dict:
-            output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
 
         return CausalLMOutputWithPast(
             loss=loss,
