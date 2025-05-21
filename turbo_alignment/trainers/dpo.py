@@ -733,8 +733,6 @@ class DPOTrainer(TrainerWithSeqP):
         attention_mask = concatenated_batch['attention_mask']
         labels = concatenated_batch['labels']
 
-        add_kwargs = {}
-
         if parallel_states.sequence_parallel_is_initialized():
             input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
             labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
@@ -754,7 +752,6 @@ class DPOTrainer(TrainerWithSeqP):
         all_logits = model(
             input_ids,
             attention_mask,
-            **add_kwargs,
         ).logits.to(torch.float32)
 
         all_logps = self._get_batch_logps(
