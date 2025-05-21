@@ -76,9 +76,7 @@ def compare(root_dir, attention_mask=None):
 
                     else:
                         # Rotary embeddeings are propogated along first dimension inside attention module
-                        assert (
-                            weights[None].shape[0] == 1
-                        ), f'Unexpected shape in rotary_emb: {combined_weights.shape}'
+                        assert weights[None].shape[0] == 1, f'Unexpected shape in rotary_emb: {combined_weights.shape}'
                         for i in range(combined_weights.shape[0]):
                             attention_row = attention_mask[i]
                             np.testing.assert_allclose(

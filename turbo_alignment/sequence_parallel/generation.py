@@ -170,7 +170,6 @@ class GenerationMixinWithSeqP(GenerationMixin):
             # position_ids.masked_fill_(attention_mask == 0, 1)
             # kwargs["position_ids"] = position_ids  # placed in kwargs for further processing (see below)
 
-
         # 5. Slice model inputs if it's an input that should have the same length as `input_ids`
         for model_input_name in ["position_ids", "token_type_ids"]:
             model_input = kwargs.get(model_input_name)
