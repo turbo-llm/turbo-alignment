@@ -6,18 +6,21 @@ from typing import Type
 
 from turbo_alignment.pipelines.train.dpo import TrainDPOStrategy
 from turbo_alignment.pipelines.train.sft import TrainSFTStrategy
+from turbo_alignment.pipelines.train.rm import TrainRMStrategy
 from turbo_alignment.settings.pipelines.train.dpo import DPOTrainExperimentSettings
 from turbo_alignment.settings.pipelines.train.sft import SftTrainExperimentSettings
+from turbo_alignment.settings.pipelines.train.rm import RMTrainExperimentSettings
 
 TASK_TYPE_TO_STRATEGY = {
     'dpo': (TrainDPOStrategy, DPOTrainExperimentSettings),
     'sft': (TrainSFTStrategy, SftTrainExperimentSettings),
+    'rm': (TrainRMStrategy, RMTrainExperimentSettings),
 }
 
 
 def run_pipeline(
-    settings: DPOTrainExperimentSettings | SftTrainExperimentSettings,
-    pipeline_cls: Type[TrainDPOStrategy] | Type[TrainSFTStrategy],
+    settings: DPOTrainExperimentSettings | SftTrainExperimentSettings | RMTrainExperimentSettings,
+    pipeline_cls: Type[TrainDPOStrategy] | Type[TrainSFTStrategy] | Type[TrainRMStrategy],
 ):
     print(settings)
     pipeline_cls().run(settings)
@@ -31,7 +34,7 @@ def run(task_type: str, settings_path: pathlib.Path, make_model_vanilla: bool):
         vanilla_settings = experiment_settings.copy(deep=True)
         vanilla_settings.trainer_settings.sequence_parallel = 1
         vanilla_settings.model_settings.model_kwargs["attn_implementation"] = "eager"
-        vanilla_settings.model_settings.model_type = 'causal'
+        vanilla_settings.model_settings.model_type = 'seq_cls' if task_type == 'rm' else 'causal'
 
         experiment_settings = vanilla_settings
 

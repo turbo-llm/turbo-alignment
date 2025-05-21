@@ -18,6 +18,7 @@ from tests.sequence_parallel.marks import has_gemma_model, has_two_gpus, has_qwe
 DPO_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'dpo' / 'dpo_with_seq_p.json'
 SFT_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'base_with_seq_p.json'
 SFT_PEFT_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'sft' / 'peft_with_seq_p.json'
+RM_SETTINGS_PATH = FIXTURES_PATH / 'configs' / 'train' / 'rm' / 'base_with_seq_p.json'
 
 DIR = pathlib.Path(__file__).parent
 
@@ -41,6 +42,7 @@ def patch_settings(
         pytest.param('dpo', DPO_SETTINGS_PATH, id='dpo'),
         pytest.param('sft', SFT_SETTINGS_PATH, id='sft'),
         pytest.param('sft', SFT_PEFT_SETTINGS_PATH, id='sft_lora', marks=pytest.mark.xfail),
+        pytest.param('rm', RM_SETTINGS_PATH, id='rm')
     ],
 )
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
@@ -80,6 +82,12 @@ def test_model_output(
     launch_mode: str,
     tmp_path_factory: pytest.TempPathFactory,
 ):
+    if task_type == 'rm' and 'qwen3' not in model_type:
+        pytest.skip(reason='Only Qwen3 supported for rm')
+
+    if task_type == 'rm':
+        model_type = 'seq_cls_' + model_type
+
     env = os.environ.copy()
 
     script_path = str((DIR / 'test_dpo.py').absolute())
