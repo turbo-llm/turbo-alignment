@@ -737,7 +737,6 @@ class DPOTrainer(TrainerWithSeqP):
 
         if parallel_states.sequence_parallel_is_initialized():
             input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
-            seq_len = input_ids.size(1)
             labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
             attention_mask = pad_for_sequence_parallel(
                 attention_mask,
@@ -751,10 +750,6 @@ class DPOTrainer(TrainerWithSeqP):
             input_ids = input_ids[:, start:end].clone()
 
             labels = labels[:, start + 1 : end + 1]
-
-            if require_position_ids(model):
-                position_ids = torch.arange(0, seq_len, device=input_ids.device).unsqueeze(0)
-                add_kwargs['position_ids'] = position_ids
 
         all_logits = model(
             input_ids,

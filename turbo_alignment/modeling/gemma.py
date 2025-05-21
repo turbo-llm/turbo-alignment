@@ -82,15 +82,6 @@ class Gemma2Attention(nn.Module):
 
         cos, sin = position_embeddings
 
-        if parallel_states.sequence_parallel_is_enabled():
-            # sp_world_size = parallel_states.get_sequence_parallel_world_size()
-            chunk_size = input_shape[1]
-            rank = parallel_states.get_sequence_parallel_rank()
-            start = chunk_size * rank
-            end = chunk_size * (rank + 1)
-            cos = cos[:, start:end]
-            sin = sin[:, start:end]
-
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
         if past_key_value is not None:
@@ -264,6 +255,11 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
             if attention_mask is not None:
                 position_ids = attention_mask.long().cumsum(-1) - 1
                 position_ids.masked_fill_(attention_mask == 0, 0)
+                if parallel_states.sequence_parallel_is_initialized():
+                    start = parallel_states.get_sequence_parallel_rank()
+                    world_size = parallel_states.get_sequence_parallel_world_size()
+                    chunk_size = position_ids.size(1) // world_size
+                    position_ids = position_ids[:, start * chunk_size : (start + 1) * chunk_size]
             else:
                 raise RuntimeError('Attention mask must be set')
 
