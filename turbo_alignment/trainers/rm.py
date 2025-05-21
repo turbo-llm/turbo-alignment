@@ -13,6 +13,8 @@ from transformers.utils import logging
 
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 from turbo_alignment.trainers.utils import concatenated_inputs
+from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
+from turbo_alignment.modeling import parallel_states
 
 logger = logging.get_logger(__name__)
 
@@ -20,8 +22,25 @@ logger = logging.get_logger(__name__)
 class RMTrainer(MultiGPUCherryPicksTrainer):
     def concatenated_forward(self, model: nn.Module, batch: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
         concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
+
+        input_ids = concatenated_batch['input_ids']
+        attention_mask = concatenated_batch['attention_mask']
+
+        if parallel_states.sequence_parallel_is_initialized():
+            input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
+            attention_mask = pad_for_sequence_parallel(
+                attention_mask,
+                parallel_states.get_sequence_parallel_world_size(),
+                0,
+            )
+
+            chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
+            start = chunk_size * parallel_states.get_sequence_parallel_rank()
+            end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
+            input_ids = input_ids[:, start:end].clone()
+
         all_rewards = model(
-            concatenated_batch['input_ids'], attention_mask=concatenated_batch['attention_mask'], return_dict=True
+            input_ids, attention_mask=attention_mask, return_dict=True
         )[0]
 
         chosen_idxs = batch['inputs_w']['input_ids'].shape[0]

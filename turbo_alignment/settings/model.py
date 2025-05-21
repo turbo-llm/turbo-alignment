@@ -17,6 +17,8 @@ class ModelType(str, Enum):
     QWEN_WITH_ULYSSES = 'qwen_with_ulysses'
     QWEN3_WITH_ULYSSES = 'qwen3_with_ulysses'
 
+    SEQ_CLS_QWEN3_WITH_ULYSSES = 'seq_cls_qwen3_with_ulysses'
+
 
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):
     use_rope: bool = False
