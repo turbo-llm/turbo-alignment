@@ -97,8 +97,6 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, seed: int = 42
             cache_position = torch.arange(0, q.shape[1], device=q.device)
             position_ids = cache_position.unsqueeze(0)
 
-            positional_embeddings = rot_emb(q, position_ids)
-
             start = (seq_len // 2) * parallel_states.get_sequence_parallel_rank()
             end = (seq_len // 2) * (parallel_states.get_sequence_parallel_rank() + 1)
 
@@ -109,7 +107,7 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, seed: int = 42
 
             output = model(
                 q[:, start:end],
-                position_embeddings=positional_embeddings,
+                position_embeddings=rot_emb(q, position_ids[:, start:end]),
                 attention_mask=attention_mask,
             )[0]
 
@@ -121,9 +119,8 @@ def run_with_seq_p(config=CONFIG, seq_len=10, num_items: int = 6, seed: int = 42
             vanilla = vanilla.to(q.device)
             vanilla_output = vanilla(
                 q,
-                position_embeddings=positional_embeddings,
+                position_embeddings=rot_emb(q, position_ids),
                 attention_mask=attention_mask,
-                # position_ids=position_ids,
             )[0]
             print(f'{vanilla_output.size()=}')
             vanilla_loss = torch.nn.functional.mse_loss(vanilla_output, torch.zeros_like(vanilla_output))

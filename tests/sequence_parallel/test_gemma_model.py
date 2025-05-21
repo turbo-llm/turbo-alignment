@@ -89,7 +89,7 @@ def gemma_model(model_path: str = GEMMA_MODEL_PATH):
     result = model(
         input_ids[:, start:end],
         attention_mask,
-        position_ids=position_ids,
+        position_ids=position_ids[:, start:end],
     ).logits
 
     result.mean().backward()

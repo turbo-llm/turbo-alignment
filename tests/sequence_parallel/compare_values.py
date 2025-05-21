@@ -46,17 +46,12 @@ def compare(root_dir, attention_mask=None):
                 # assert weight.shape == canon_shape, (weight.shape, canon_shape)
                 weights[rank] = weight
 
-            if 'rotary_emb' in param_name:
-                np.testing.assert_allclose(weights[0], weights[1])
-                combined_weights = weights[0]
-
+            if len(half_shape) in {3, 4}:
+                dim_to_merge = 1
             else:
-                if len(half_shape) in {3, 4}:
-                    dim_to_merge = 1
-                else:
-                    raise ValueError(f'Cannot merge: {half_shape}')
+                raise ValueError(f'Cannot merge: {half_shape}')
 
-                combined_weights = np.concatenate([weights[0], weights[1]], axis=dim_to_merge)
+            combined_weights = np.concatenate([weights[0], weights[1]], axis=dim_to_merge)
             try:
                 # if attention_mask is None or 'rotary_emb' in param_name:
                 if attention_mask is None:
@@ -80,8 +75,9 @@ def compare(root_dir, attention_mask=None):
                             )
 
                     else:
+                        # Rotary embeddeings are propogated along first dimension inside attention module
                         assert (
-                            combined_weights.shape[0] == 1
+                            weights[None].shape[0] == 1
                         ), f'Unexpected shape in rotary_emb: {combined_weights.shape}'
                         for i in range(combined_weights.shape[0]):
                             attention_row = attention_mask[i]
