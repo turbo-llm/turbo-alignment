@@ -39,9 +39,7 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
             end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
             input_ids = input_ids[:, start:end].clone()
 
-        all_rewards = model(
-            input_ids, attention_mask=attention_mask, return_dict=True
-        )[0]
+        all_rewards = model(input_ids, attention_mask=attention_mask, return_dict=True)[0]
 
         chosen_idxs = batch['inputs_w']['input_ids'].shape[0]
 
