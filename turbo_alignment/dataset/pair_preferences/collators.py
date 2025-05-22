@@ -22,6 +22,8 @@ class PairPreferenceDataCollator:
         no_labels_features = [
             {k: v for k, v in feature.items() if k not in ['labels', 'precomputed_margin']} for feature in features
         ]
+        
+        tokenizer.padding_side  = 'left'
 
         batch = tokenizer.pad(
             no_labels_features,
@@ -32,7 +34,7 @@ class PairPreferenceDataCollator:
         )
         if self.add_labels:
             batch['labels'] = torch.tensor(
-                [label + (max_length - len(label)) * [DISABLE_LOSS_LABEL] for label in labels]
+                [(max_length - len(label)) * [DISABLE_LOSS_LABEL] + label for label in labels]
             )
         return batch
 
