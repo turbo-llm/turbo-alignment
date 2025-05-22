@@ -10,3 +10,4 @@ class EngineSettings(ExtraFieldsNotAllowedBaseModel):
     max_logprobs: int | None = None
     enable_lora: bool = False
     max_lora_rank: int | None = 16
+    max_model_len: int  = 20000
