@@ -42,7 +42,7 @@ def patch_settings(
         pytest.param('dpo', DPO_SETTINGS_PATH, id='dpo'),
         pytest.param('sft', SFT_SETTINGS_PATH, id='sft'),
         pytest.param('sft', SFT_PEFT_SETTINGS_PATH, id='sft_lora', marks=pytest.mark.xfail),
-        pytest.param('rm', RM_SETTINGS_PATH, id='rm')
+        pytest.param('rm', RM_SETTINGS_PATH, id='rm'),
     ],
 )
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
