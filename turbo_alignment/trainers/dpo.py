@@ -735,7 +735,8 @@ class DPOTrainer(TrainerWithSeqP):
 
         if parallel_states.sequence_parallel_is_initialized():
             input_ids = pad_for_sequence_parallel(
-                input_ids, parallel_states.get_sequence_parallel_world_size(),
+                input_ids,
+                parallel_states.get_sequence_parallel_world_size(),
                 self.tokenizer.pad_token_id,
                 padding_side=self.tokenizer.padding_side,
             )
