@@ -27,11 +27,17 @@ class RMTrainer(MultiGPUCherryPicksTrainer):
         attention_mask = concatenated_batch['attention_mask']
 
         if parallel_states.sequence_parallel_is_initialized():
-            input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
+            input_ids = pad_for_sequence_parallel(
+                input_ids,
+                parallel_states.get_sequence_parallel_world_size(),
+                self.tokenizer.pad_token_id,
+                padding_side=self.tokenizer.padding_side,
+            )
             attention_mask = pad_for_sequence_parallel(
                 attention_mask,
                 parallel_states.get_sequence_parallel_world_size(),
                 0,
+                padding_side=self.tokenizer.padding_side,
             )
 
             chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
