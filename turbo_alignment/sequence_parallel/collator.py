@@ -73,6 +73,31 @@ class DataCollatorForSequenceParallism:
         self.pad_values_for_fields = pad_values_for_fields or DEFAULT_PAD_VALUES
         self.add_cache_positions = add_cache_positions
 
+    @staticmethod
+    def pad_values_from_tokenizer(tokenizer) -> dict[str, tp.Any]:
+        pad_values = DEFAULT_PAD_VALUES.copy()
+        pad_values['input_ids'] = tokenizer.pad_token_id
+        return pad_values
+
+    @classmethod
+    def create_with_tokenizer(
+        cls,
+        base_collate_fn,
+        seq_p_rank: int,
+        seq_p_world_size: int,
+        tokenizer,
+        fields_not_to_split: list[str] | None = None,
+        add_cache_positions: bool = True,
+    ):
+        return cls(
+            base_collate_fn,
+            seq_p_rank,
+            seq_p_world_size,
+            fields_not_to_split=fields_not_to_split,
+            pad_values_for_fields=cls.pad_values_from_tokenizer(tokenizer),
+            add_cache_positions=add_cache_positions,
+        )
+
     def _get_cache_position(self, input_ids: torch.Tensor) -> torch.Tensor:
         return torch.arange(0, input_ids.shape[1], device=input_ids.device)
 

@@ -734,12 +734,17 @@ class DPOTrainer(TrainerWithSeqP):
         labels = concatenated_batch['labels']
 
         if parallel_states.sequence_parallel_is_initialized():
-            input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
+            input_ids = pad_for_sequence_parallel(
+                input_ids, parallel_states.get_sequence_parallel_world_size(),
+                self.tokenizer.pad_token_id,
+                padding_side=self.tokenizer.padding_side,
+            )
             labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
             attention_mask = pad_for_sequence_parallel(
                 attention_mask,
                 parallel_states.get_sequence_parallel_world_size(),
                 0,
+                padding_side=self.tokenizer.padding_side,
             )
             assert input_ids.size(-1) == labels.size(-1), (input_ids.size(), labels.size())
             chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
