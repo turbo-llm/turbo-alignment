@@ -49,3 +49,6 @@ class TrainerSettings(ExtraFieldsNotAllowedBaseModel):
     gradient_checkpointing_kwargs: dict[str, Any] = {}
     neftune_noise_alpha: float | None = None
     report_to: list[str] = []
+    include_tokens_per_second: bool = False
+    include_num_input_tokens_seen: bool = False
+    sequence_parallel: int = 1

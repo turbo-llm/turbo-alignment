@@ -7,6 +7,8 @@ from transformers import DataCollatorWithPadding, PreTrainedTokenizerBase
 from turbo_alignment.dataset.pair_preferences import PairPreferenceRecord
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
+from turbo_alignment.modeling import parallel_states
+from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
 from turbo_alignment.settings.generators.outputs.rm import (
     RMPairInferenceOutput,
     RMSamplingInferenceOutput,
@@ -26,6 +28,19 @@ class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]
         batch = self._collator(merged_inputs)
         input_ids = batch['input_ids'].to(self.device)
         attn_mask = batch['attention_mask'].to(self.device)
+
+        if parallel_states.sequence_parallel_is_initialized():
+            input_ids = pad_for_sequence_parallel(input_ids, parallel_states.get_sequence_parallel_world_size(), 0)
+            attn_mask = pad_for_sequence_parallel(
+                attn_mask,
+                parallel_states.get_sequence_parallel_world_size(),
+                0,
+            )
+
+            chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
+            start = chunk_size * parallel_states.get_sequence_parallel_rank()
+            end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
+            input_ids = input_ids[:, start:end].clone()
 
         with torch.no_grad():
             rewards = self._model(input_ids=input_ids, attention_mask=attn_mask).logits.cpu()
