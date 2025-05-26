@@ -38,9 +38,7 @@ class PairPreferenceDataCollator:
             return_tensors='pt',
         )
         if self.add_labels:
-            batch['labels'] = torch.tensor(
-                [add_disable_loss_label(label) for label in labels]
-            )
+            batch['labels'] = torch.tensor([add_disable_loss_label(label) for label in labels])
         return batch
 
     def __call__(self, examples: list[dict[str, dict[str, Any]]]) -> dict[str, Any]:  # type: ignore[override]
