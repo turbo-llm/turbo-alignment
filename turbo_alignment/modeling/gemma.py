@@ -2,36 +2,49 @@
 # flake8: noqa
 # mypy: ignore-errors
 
-from typing import Optional, Tuple, Union, Callable
+from functools import partial
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from torch import nn
 from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
+    SequenceClassifierOutputWithPast,
 )
 from transformers.models.gemma2.modeling_gemma2 import (
-    apply_rotary_pos_emb,
-    eager_attention_forward,
-    logger,
     ALL_ATTENTION_FUNCTIONS,
+    GEMMA2_INPUTS_DOCSTRING,
+    GEMMA2_START_DOCSTRING,
     Cache,
     FlashAttentionKwargs,
     Gemma2Config,
     Gemma2DecoderLayer as Gemma2DecoderLayerBase,
     Gemma2ForCausalLM,
-    Gemma2Model,
     Gemma2MLP,
+    Gemma2Model,
     Gemma2RMSNorm,
     Gemma2RotaryEmbedding,
     HybridCache,
     Unpack,
+    apply_rotary_pos_emb,
+    eager_attention_forward,
+    logger,
 )
+from transformers.utils.doc import (
+    add_start_docstrings,
+    add_start_docstrings_to_model_forward,
+)
+from transformers.utils.generic import can_return_tuple
+
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
-from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
-from turbo_alignment.sequence_parallel.vocab_parallel_cross_entropy import vocab_sequence_parallel_cross_entropy_loss
 from turbo_alignment.modeling.ulysses_attn import _SeqAllToAll
+from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
+from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
+from turbo_alignment.sequence_parallel.vocab_parallel_cross_entropy import (
+    vocab_sequence_parallel_cross_entropy_loss,
+)
 
 
 class Gemma2Attention(nn.Module):
@@ -197,6 +210,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         # Initialize weights and apply final processing
         self.post_init()
 
+    @torch.no_grad()
     def _update_causal_mask(
         self,
         attention_mask: torch.Tensor,
@@ -237,6 +251,7 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
         )
         return causal_mask
 
+    @can_return_tuple
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -263,18 +278,121 @@ class Gemma2ModelWithMPU(Gemma2PreTrainedModel, Gemma2Model):
             else:
                 raise RuntimeError('Attention mask must be set')
 
-        return super().forward(
-            input_ids,
-            attention_mask,
-            position_ids,
-            past_key_values,
-            inputs_embeds,
-            use_cache,
-            output_attentions,
-            output_hidden_states,
-            cache_position,
-            last_cache_position,
-            **flash_attn_kwargs,
+        use_cache = False
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        if (input_ids is None) ^ (inputs_embeds is not None):
+            raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+
+        if self.gradient_checkpointing and self.training and use_cache:
+            logger.warning_once(
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`."
+            )
+            use_cache = False
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        if use_cache and past_key_values is None and not self.training:
+            batch_size, seq_len, _ = inputs_embeds.shape
+            # NOTE: ideally, `HybridCache` should be initialized outside the model with `layer_device_map`
+            past_key_values = HybridCache(
+                self.config,
+                max_batch_size=batch_size,
+                max_cache_len=seq_len,
+                dtype=inputs_embeds.dtype,
+                device=self.device,
+            )
+
+        if cache_position is None:
+            past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
+            # HACK
+            sequence_length = inputs_embeds.size(1) * parallel_states.get_sequence_parallel_world_size_or_one()
+            cache_position = torch.arange(0, sequence_length, device=inputs_embeds.device)
+
+        if position_ids is None:
+            position_ids = cache_position.unsqueeze(0)
+
+        # This is needed to correctly slice the mask without data-dependent slicing later on if using dynamo tracing
+        # (retrieving the same value from `cache_position` later on would crash dynamo)
+        if last_cache_position is None:
+            last_cache_position = 0
+            if attention_mask is not None:
+                # In case a 4d mask is passed directly without using `generate`, we have to rely on cache_position
+                # It will break dynamo tracing but there are no way around it (and it should never happen in practice)
+                last_cache_position = (
+                    attention_mask.shape[-1] if attention_mask.dim() == 2 else cache_position[-1].item()
+                )
+        causal_mask = self._update_causal_mask(
+            attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
+        )
+
+        # embed positions
+        hidden_states = inputs_embeds
+
+        # create position embeddings to be shared across the decoder layers
+        position_embeddings = self.rotary_emb(hidden_states, position_ids)
+
+        # normalized
+        # Gemma2 downcasts the below to float16, causing sqrt(3072)=55.4256 to become 55.5
+        # See https://github.com/huggingface/transformers/pull/29402
+        normalizer = torch.tensor(self.config.hidden_size**0.5, dtype=hidden_states.dtype)
+        hidden_states = hidden_states * normalizer
+
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+
+        for decoder_layer in self.layers[: self.config.num_hidden_layers]:
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+
+            if self.gradient_checkpointing and self.training:
+                layer_outputs = self._gradient_checkpointing_func(
+                    partial(decoder_layer.__call__, **flash_attn_kwargs),
+                    hidden_states,
+                    position_embeddings,
+                    causal_mask,
+                    position_ids,
+                    past_key_values,
+                    output_attentions,
+                    use_cache,
+                    cache_position,
+                    last_cache_position,
+                )
+            else:
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    position_embeddings=position_embeddings,
+                    attention_mask=causal_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_values,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    last_cache_position=last_cache_position,
+                    **flash_attn_kwargs,
+                )
+
+            hidden_states = layer_outputs[0]
+
+            if output_attentions:
+                all_self_attns += (layer_outputs[1],)
+
+        hidden_states = self.norm(hidden_states)
+
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        return BaseModelOutputWithPast(
+            last_hidden_state=hidden_states,
+            past_key_values=past_key_values,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
         )
 
 
@@ -288,6 +406,7 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
         # Initialize weights and apply final processing
         self.post_init()
 
+    @can_return_tuple
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -383,4 +502,111 @@ class Gemma2ForCausalLMWithMPU(GenerationMixinWithSeqP, PreTrainedModelWithMPU, 
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+        )
+
+
+@add_start_docstrings(
+    """
+    The Gemma2 Model transformer with a sequence classification head on top (linear layer).
+
+    [`Gemma2ForSequenceClassification`] uses the last token in order to do the classification, as other causal models
+    (e.g. GPT-2) do.
+
+    Since it does classification on the last token, it requires to know the position of the last token. If a
+    `pad_token_id` is defined in the configuration, it finds the last token that is not a padding token in each row. If
+    no `pad_token_id` is defined, it simply takes the last value in each row of the batch. Since it cannot guess the
+    padding tokens when `inputs_embeds` are passed instead of `input_ids`, it does the same (take the last value in
+    each row of the batch).
+    """,
+    GEMMA2_START_DOCSTRING,
+)
+class Gemma2ForSequenceClassificationWithMPU(Gemma2PreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.model = Gemma2ModelWithMPU(config)
+        self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def get_input_embeddings(self):
+        return self.model.embed_tokens
+
+    def set_input_embeddings(self, value):
+        self.model.embed_tokens = value
+
+    @can_return_tuple
+    @add_start_docstrings_to_model_forward(GEMMA2_INPUTS_DOCSTRING)
+    def forward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[Cache] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+    ) -> SequenceClassifierOutputWithPast:
+        r"""
+        labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
+            Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
+            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
+            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+        """
+
+        transformer_outputs: BaseModelOutputWithPast = self.model(
+            input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+        hidden_states = transformer_outputs.last_hidden_state
+        logits = self.score(hidden_states)
+
+        logits = GatherAllLogits.apply(logits, parallel_states.get_sequence_parallel_group())
+        if input_ids is not None:
+            input_ids = GatherAllLogits.apply(input_ids, parallel_states.get_sequence_parallel_group())
+        else:
+            inputs_embeds = GatherAllLogits.apply(inputs_embeds, parallel_states.get_sequence_parallel_group())
+
+        if input_ids is not None:
+            batch_size = input_ids.shape[0]
+        else:
+            batch_size = inputs_embeds.shape[0]
+
+        if self.config.pad_token_id is None and batch_size != 1:
+            raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
+        if self.config.pad_token_id is None:
+            last_non_pad_token = -1
+        elif input_ids is not None:
+            # To handle both left- and right- padding, we take the rightmost token that is not equal to pad_token_id
+            non_pad_mask = (input_ids != self.config.pad_token_id).to(logits.device, torch.int32)
+            token_indices = torch.arange(input_ids.shape[-1], device=logits.device, dtype=torch.int32)
+            last_non_pad_token = (token_indices * non_pad_mask).argmax(-1)
+        else:
+            last_non_pad_token = -1
+            logger.warning_once(
+                f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
+                "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
+            )
+
+        pooled_logits = logits[torch.arange(batch_size, device=logits.device), last_non_pad_token]
+
+        loss = None
+        if labels is not None:
+            loss = self.loss_function(logits=logits, labels=labels, pooled_logits=pooled_logits, config=self.config)
+
+        return SequenceClassifierOutputWithPast(
+            loss=loss,
+            logits=pooled_logits,
+            past_key_values=transformer_outputs.past_key_values,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
         )

@@ -13,8 +13,8 @@ from transformers import (
 
 from turbo_alignment.common.registry import Registrable
 from turbo_alignment.settings.model import ModelType
-from turbo_alignment.modeling.gemma import Gemma2ForCausalLMWithMPU
-from turbo_alignment.modeling.qwen import Qwen2ForCausalLMWithMPU
+from turbo_alignment.modeling.gemma import Gemma2ForCausalLMWithMPU, Gemma2ForSequenceClassificationWithMPU
+from turbo_alignment.modeling.qwen import Qwen2ForCausalLMWithMPU, Qwen2ForSequenceClassificationWithMPU
 from turbo_alignment.modeling.qwen3 import Qwen3ForCausalLMWithMPU, Qwen3ForSequenceClassificationWithMPU
 
 
@@ -33,6 +33,8 @@ TransformersAutoModelRegistry.register(ModelType.GEMMA_WITH_ULYSSES)(Gemma2ForCa
 TransformersAutoModelRegistry.register(ModelType.QWEN_WITH_ULYSSES)(Qwen2ForCausalLMWithMPU)
 TransformersAutoModelRegistry.register(ModelType.QWEN3_WITH_ULYSSES)(Qwen3ForCausalLMWithMPU)
 TransformersAutoModelRegistry.register(ModelType.SEQ_CLS_QWEN3_WITH_ULYSSES)(Qwen3ForSequenceClassificationWithMPU)
+TransformersAutoModelRegistry.register(ModelType.SEQ_CLS_QWEN_WITH_ULYSSES)(Qwen2ForSequenceClassificationWithMPU)
+TransformersAutoModelRegistry.register(ModelType.SEQ_CLS_GEMMA_WITH_ULYSSES)(Gemma2ForSequenceClassificationWithMPU)
 
 PeftConfigRegistry.register(PeftType.LORA)(LoraConfig)
 PeftConfigRegistry.register(PeftType.PREFIX_TUNING)(PrefixTuningConfig)

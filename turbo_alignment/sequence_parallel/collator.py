@@ -5,6 +5,9 @@ import torch
 
 from turbo_alignment.common.logging import get_project_logger
 
+if tp.TYPE_CHECKING:
+    from transformers import PreTrainedTokenizerBase
+
 
 logger = get_project_logger()
 
@@ -65,16 +68,18 @@ class DataCollatorForSequenceParallism:
         fields_not_to_split: list[str] | None = None,
         pad_values_for_fields: dict[str, tp.Any] | None = None,
         add_cache_positions: bool = True,
+        padding_side: str = 'left',
     ):
         self.base_collate_fn = base_collate_fn
         self.seq_p_rank = seq_p_rank
         self.seq_p_world_size = seq_p_world_size
-        self.fields_not_to_split = fields_not_to_split or ['attention_mask', 'position_ids']
+        self.fields_not_to_split = fields_not_to_split or ['attention_mask']
         self.pad_values_for_fields = pad_values_for_fields or DEFAULT_PAD_VALUES
         self.add_cache_positions = add_cache_positions
+        self.padding_side = padding_side
 
     @staticmethod
-    def pad_values_from_tokenizer(tokenizer) -> dict[str, tp.Any]:
+    def pad_values_from_tokenizer(tokenizer: 'PreTrainedTokenizerBase') -> dict[str, tp.Any]:
         pad_values = DEFAULT_PAD_VALUES.copy()
         pad_values['input_ids'] = tokenizer.pad_token_id
         return pad_values
@@ -85,7 +90,7 @@ class DataCollatorForSequenceParallism:
         base_collate_fn,
         seq_p_rank: int,
         seq_p_world_size: int,
-        tokenizer,
+        tokenizer: 'PreTrainedTokenizerBase',
         fields_not_to_split: list[str] | None = None,
         add_cache_positions: bool = True,
     ):
@@ -96,6 +101,7 @@ class DataCollatorForSequenceParallism:
             fields_not_to_split=fields_not_to_split,
             pad_values_for_fields=cls.pad_values_from_tokenizer(tokenizer),
             add_cache_positions=add_cache_positions,
+            padding_side=tokenizer.padding_side,
         )
 
     def _get_cache_position(self, input_ids: torch.Tensor) -> torch.Tensor:
@@ -127,7 +133,7 @@ class DataCollatorForSequenceParallism:
             self.seq_p_world_size,
             pad_value if pad_value is not None else self.pad_values_for_fields.get(key, 0),
             dim=-1,
-            padding_side='left',
+            padding_side=self.padding_side,
         )
         if self.should_be_splitted(key):
             if not isinstance(padded, torch.Tensor):
