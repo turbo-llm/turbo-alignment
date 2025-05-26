@@ -82,8 +82,8 @@ def test_model_output(
     launch_mode: str,
     tmp_path_factory: pytest.TempPathFactory,
 ):
-    if task_type == 'rm' and 'qwen3' not in model_type:
-        pytest.skip(reason='Only Qwen3 supported for rm')
+    if task_type == 'rm' and 'gemma' in model_path:
+        pytest.xfail('Gemma As sequence classifier is unstable')
 
     if task_type == 'rm':
         model_type = 'seq_cls_' + model_type

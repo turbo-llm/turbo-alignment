@@ -42,6 +42,7 @@ from transformers.utils.generic import can_return_tuple
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.modeling.ulysses_attn import _SeqAllToAll
 from turbo_alignment.modeling.pretrained_model import PreTrainedModelWithMPU
+from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 from turbo_alignment.sequence_parallel.generation import GenerationMixinWithSeqP
 from turbo_alignment.sequence_parallel.vocab_parallel_cross_entropy import (
     vocab_sequence_parallel_cross_entropy_loss,
@@ -588,8 +589,6 @@ class Qwen3ForSequenceClassificationWithMPU(Qwen3PreTrainedModel):
         )
         hidden_states = transformer_outputs.last_hidden_state  # (bs, sequence_length // seq_p_degree, hidden_size)
         logits = self.score(hidden_states)  # (bs, sequence_length // seq_p_degree, self.num_labels)
-
-        from turbo_alignment.sequence_parallel.gather_logits import GatherAllLogits
 
         logits = GatherAllLogits.apply(logits, parallel_states.get_sequence_parallel_group())
         if input_ids is not None:
