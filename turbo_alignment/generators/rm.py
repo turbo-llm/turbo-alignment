@@ -65,11 +65,13 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
                 [item['input_ids'] for item in merged_inputs],
                 padding_value=self._tokenizer.pad_token_id,
                 batch_first=True,
+                padding_side='left'
             )
             attn_mask = nn.utils.rnn.pad_sequence(
                 [item['attention_mask'] for item in merged_inputs],
                 padding_value=0,
                 batch_first=True,
+                padding_side='left'
             )
             for i in range(0, len(input_ids), self._micro_batch):
                 input_ids_batch = input_ids[i : i + self._micro_batch].to(self.device)
