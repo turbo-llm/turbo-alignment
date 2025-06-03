@@ -42,8 +42,7 @@ class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
         records: list[dict[str, Any]],
         original_records: list[DatasetRecordT],
         dataset_name: str,
-    ) -> list[InferenceOutputT]:
-        ...
+    ) -> list[InferenceOutputT]: ...
 
     @property
     def device(self):
@@ -115,8 +114,7 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         record: dict[str, torch.Tensor],
         original_record: DatasetRecordT,
         dataset_name: str,
-    ) -> InferenceOutputT:
-        ...
+    ) -> InferenceOutputT: ...
 
     @abstractmethod
     def _generate_from_batch_records(
@@ -124,8 +122,7 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         records: list[dict[str, torch.Tensor]],
         original_records: list[DatasetRecordT],
         dataset_name: str,
-    ) -> list[InferenceOutputT]:
-        ...
+    ) -> list[InferenceOutputT]: ...
 
     def _generate_from_batch(
         self, records: list[dict[str, Any]], original_records: list[DatasetRecordT], dataset_name: str
@@ -134,14 +131,14 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
             if self._transformers_generator_parameters.num_beams != 1:
                 raise ValueError('You can not use batch generation with num_beams != 1')
 
-            if self._tokenizer.padding_side == 'right':  
+            if self._tokenizer.padding_side == 'right':
                 logger.warning(
                     'Changing tokenizer.padding side from "right" to "left".'
                     'This may affect model performance.'
                     'Please verify that `padding_side="left"` is correct for your use case.'
                 )
 
-            self._tokenizer.padding_side = 'left'  
+            self._tokenizer.padding_side = 'left'
             self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 
             return self._generate_from_batch_records(records, original_records, dataset_name)
