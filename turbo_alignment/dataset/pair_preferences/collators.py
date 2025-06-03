@@ -23,6 +23,13 @@ class PairPreferenceDataCollator:
             {k: v for k, v in feature.items() if k not in ['labels', 'precomputed_margin']} for feature in features
         ]
 
+        def add_disable_loss_label(label):
+            disable_loss_labels = (max_length - len(label)) * [DISABLE_LOSS_LABEL]
+            if tokenizer.padding_side == 'right':
+                return label + disable_loss_labels
+
+            return disable_loss_labels + label
+
         batch = tokenizer.pad(
             no_labels_features,
             padding='max_length',
@@ -31,9 +38,7 @@ class PairPreferenceDataCollator:
             return_tensors='pt',
         )
         if self.add_labels:
-            batch['labels'] = torch.tensor(
-                [label + (max_length - len(label)) * [DISABLE_LOSS_LABEL] for label in labels]
-            )
+            batch['labels'] = torch.tensor([add_disable_loss_label(label) for label in labels])
         return batch
 
     def __call__(self, examples: list[dict[str, dict[str, Any]]]) -> dict[str, Any]:  # type: ignore[override]
