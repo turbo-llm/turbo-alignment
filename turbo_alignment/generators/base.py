@@ -131,7 +131,7 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
         if self._custom_generation_settings.batch > 1:
             if self._transformers_generator_parameters.num_beams != 1:
                 raise ValueError('You can not use batch generation with num_beams != 1')
-
+            # ?
             self._tokenizer.padding_side = 'left'
             self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 
