@@ -46,7 +46,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
         eos_token_id: list[int] = self._tokenizer.encode(generator_settings.stop_strings, add_special_tokens=False)
 
         beam_search_params: dict[str, Any] = {
-            'best_of': generator_settings.best_of if generator_settings.use_beam_search else generator_settings.n,
+            'best_of': generator_settings.best_of if generator_settings.best_of else generator_settings.n,
         }
 
         sampling_params = generator_settings.dict(
