@@ -49,9 +49,7 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
             'best_of': generator_settings.best_of if generator_settings.best_of else generator_settings.n,
         }
 
-        sampling_params = generator_settings.dict(
-            exclude={'best_of', 'stop_strings', 'filter_token_ids'}
-        )
+        sampling_params = generator_settings.dict(exclude={'best_of', 'stop_strings', 'filter_token_ids'})
         if generator_settings.filter_token_ids:
             sampling_params['logits_processors'] = [
                 TokenSuppressionLogitsProcessor(generator_settings.filter_token_ids)
