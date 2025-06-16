@@ -11,9 +11,12 @@ from turbo_alignment.dataset.base.models import DatasetRecord
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
 from turbo_alignment.settings.generators.outputs.base import BaseInferenceOutput
 from turbo_alignment.settings.tf.generation import GeneratorTransformersSettings
+from turbo_alignment.common.logging import get_project_logger
 
 InferenceOutputT = TypeVar('InferenceOutputT', bound=BaseInferenceOutput)
 DatasetRecordT = TypeVar('DatasetRecordT', bound=DatasetRecord)
+
+logger = get_project_logger()
 
 
 class BaseGenerator(Generic[DatasetRecordT, InferenceOutputT]):
@@ -131,6 +134,12 @@ class ChatGeneratorBase(BaseGenerator, Generic[DatasetRecordT, InferenceOutputT]
             if self._transformers_generator_parameters.num_beams != 1:
                 raise ValueError('You can not use batch generation with num_beams != 1')
 
+            if self._tokenizer.padding_side == 'right':
+                logger.warning(
+                    'Changing tokenizer.padding side from "right" to "left".'
+                    'This may affect model performance.'
+                    'Please verify that `padding_side="left"` is correct for your use case.'
+                )
             self._tokenizer.padding_side = 'left'
             self._tokenizer.pad_token_id = self._tokenizer.pad_token_id
 

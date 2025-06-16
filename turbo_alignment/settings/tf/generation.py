@@ -21,5 +21,4 @@ class VLLMGeneratorSettings(BaseGeneratorSettings):
     max_tokens: int = 15
     logprobs: int | None = None
     best_of: int = 1
-    use_beam_search: bool = False
     filter_token_ids: list[int] | None = None
