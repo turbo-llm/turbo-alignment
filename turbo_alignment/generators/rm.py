@@ -2,7 +2,7 @@ from typing import Any
 
 import torch
 from torch import nn
-from transformers import DataCollatorWithPadding, PreTrainedTokenizerBase
+from transformers import BatchEncoding, DataCollatorWithPadding, PreTrainedTokenizerBase
 
 from turbo_alignment.dataset.pair_preferences import PairPreferenceRecord
 from turbo_alignment.dataset.sampling.models import SamplingDatasetRecord
@@ -14,7 +14,7 @@ from turbo_alignment.settings.generators.outputs.rm import (
 
 
 class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, **kwargs):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, **kwargs) -> None:
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
         super().__init__(tokenizer=tokenizer, **kwargs)
@@ -46,7 +46,7 @@ class RMPairGenerator(BaseGenerator[PairPreferenceRecord, RMPairInferenceOutput]
 
 
 class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int, **kwargs):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, micro_batch: int, **kwargs) -> None:
         self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
         self._micro_batch = micro_batch
         super().__init__(tokenizer=tokenizer, **kwargs)
@@ -99,3 +99,50 @@ class RMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferen
             )
             for record, rewards in zip(original_records, record_rewards)
         ]
+
+    def generate_from_records(  # FIXME
+        self,
+        _records: dict[str, torch.Tensor] | BatchEncoding,
+    ) -> torch.Tensor:
+        return torch.zeros(2)
+
+
+class RayRMSamplingGenerator(BaseGenerator[SamplingDatasetRecord, RMSamplingInferenceOutput]):
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, micro_batch: int = 1, model_replicas: int = 1, **kwargs
+    ) -> None:
+        self._collator = DataCollatorWithPadding(tokenizer=tokenizer)
+        self._micro_batch = micro_batch
+        self.model_replicas = model_replicas
+        super().__init__(tokenizer=tokenizer, **kwargs)
+
+    def _generate_from_batch(
+        self,
+        records: list[dict[str, torch.Tensor]],
+        original_records: list[SamplingDatasetRecord],
+        dataset_name: str,
+    ) -> list[RMSamplingInferenceOutput]:
+        return [  # FIMXE
+            RMSamplingInferenceOutput(
+                id='0',
+                rewards=None,
+                messages=[],
+                dataset_name='',
+                answers=[],
+            )
+        ]
+
+    def generate_from_records(
+        self,
+        records: dict[str, torch.Tensor] | BatchEncoding,
+    ) -> torch.Tensor:
+        with torch.no_grad():
+            records = {k: v.cuda() for k, v in records.items()}
+
+            import ray
+
+            rewards = ray.get(
+                self._model.reward_forward(records=records, index=torch.distributed.get_rank() % self.model_replicas)
+            )  # FIXME different routing strategies
+
+        return rewards
