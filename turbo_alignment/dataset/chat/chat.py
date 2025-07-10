@@ -44,7 +44,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
         self.cut_generator = random.Random(self.seed)
-        self.show_tokenization = False
+        self.show_tokenization = True
+        self.dummy_tokens = self.tokenizer(
+            '<think>\n\n</think>\n\n',
+            truncation=False,
+            padding=False,
+            add_special_tokens=False
+        )['input_ids']
 
         if read:
             self._read()
@@ -259,6 +265,17 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
 
+    def mask_dummy_think_fn(self, chat_tokens, enable_loss):
+        dummy_tokens = self.dummy_tokens
+        n = len(dummy_tokens)
+        for i in range(len(chat_tokens) - n + 1):
+            # check for a match of the entire dummy_tokens slice
+            if chat_tokens[i: i + n] == dummy_tokens:
+                # zero-out that span in enable_loss
+                for j in range(n):
+                    enable_loss[i + j] = 0
+        return enable_loss
+    
     def _encode_trl(
             self,
             records: list[ChatDatasetRecord],
@@ -322,11 +339,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     logger.warning(f"Sample dropped: exceeds max length {max_length}")
                     continue
 
-                # Create labels tensor - initially all DISABLE_LOSS_LABEL
-                labels = np.full_like(tokenized_chat["input_ids"], DISABLE_LOSS_LABEL)
-
                 # Now we identify and enable loss for assistant responses
                 if not inference:
+                    loss_mask = np.zeros_like(tokenized_chat["input_ids"], dtype=np.int8)
                     # Process each message to find assistant responses
                     assistant_indices = []
                     for i, message in enumerate(record.messages):
@@ -380,18 +395,28 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
                         start_idx = len(prev_tokens)
                         end_idx = len(partial_tokens)
-
-                        # Set labels to the actual token IDs for the assistant's response
-                        if start_idx < end_idx and start_idx < len(labels):
-                            labels[start_idx:min(end_idx, len(labels))] = tokenized_chat["input_ids"][
-                                                                          start_idx:min(end_idx, len(labels))]
+                        loss_mask[start_idx:end_idx] = 1
 
                 input_ids_tensor = torch.LongTensor(tokenized_chat["input_ids"])
                 attention_mask_tensor = torch.ones(input_ids_tensor.shape, dtype=torch.int64)
-                labels_tensor = torch.LongTensor(labels)
 
-                if self.show_tokenization and tools is not None:
-                    logger.info(f"Tokenization: {formatted_chat}")
+                # Optionally mask dummy think tokens
+
+                should_mask = self.settings.mask_dummy_think
+                for msg in chat_messages:
+                    if msg['role'] in ('user', 'system') and \
+                        ('/no_think' in msg['content'] or '/nothink' in msg['content']):
+                        should_mask = False
+                        break
+                
+                if should_mask:
+                    loss_mask = self.mask_dummy_think_fn(chat_tokens=tokenized_chat["input_ids"],
+                                                            enable_loss=loss_mask)
+
+                # Assign labels where mask is 1
+                labels = np.where(loss_mask == 1, input_ids_tensor, DISABLE_LOSS_LABEL)
+
+                if self.show_tokenization:
                     filtered_ids = tokenized_chat[labels != DISABLE_LOSS_LABEL]
                     text = self.tokenizer.decode(filtered_ids, skip_special_tokens=False)
                     logger.info(f"Filtered text: {text}")
@@ -400,7 +425,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 encoded_record = {
                     "input_ids": input_ids_tensor,
                     "attention_mask": attention_mask_tensor,
-                    "labels": labels_tensor,
+                    "labels": torch.LongTensor(labels),
                 }
 
                 if inference:
@@ -427,6 +452,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
     ) -> list[dict[str, Any] | None]:
         # Use TRL tokenization if enabled
         if getattr(self.settings, "use_trl_tokenization", False):
+            logger.info(f"USING TRL TOKENIZATION")
             return self._encode_trl(records, inference)
 
         # Original tokenization logic
