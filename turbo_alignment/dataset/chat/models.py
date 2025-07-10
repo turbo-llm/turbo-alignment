@@ -10,11 +10,14 @@ class ChatMessageRole(str, Enum):
     SYSTEM = 'system'
     USER = 'user'
     BOT = 'bot'
+    TOOL = 'tool'
+    DOCUMENTS = 'documents'
 
 
 class ChatMessage(BaseModel):
     role: ChatMessageRole
     content: str
+    tool_calls: list[dict[str, Any]] | None = None
     disable_loss: bool = False
 
     @field_validator('role', mode='before')
@@ -28,3 +31,4 @@ class ChatDatasetRecord(DatasetRecord):
     messages: list[ChatMessage]
     label: str | None = None
     meta: dict[str, Any] | None = None
+    tools: list[dict[str, Any]] | None  = None

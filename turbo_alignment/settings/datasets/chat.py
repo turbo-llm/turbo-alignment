@@ -20,6 +20,7 @@ class ChatDatasetSettings(BaseDatasetSettings):
     # FIXME: this settings are strange for inference dataset
     only_last_replica_loss: bool = False
     only_answer_loss: bool = True
+    use_trl_tokenization: bool = False
     random_cut: bool = False  # TODO: not common property for train/inference
     random_cut_seed: int = 42
 
