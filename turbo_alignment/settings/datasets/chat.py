@@ -21,7 +21,7 @@ class ChatDatasetSettings(BaseDatasetSettings):
     only_last_replica_loss: bool = False
     only_answer_loss: bool = True
     use_trl_tokenization: bool = False
-    mask_dummy_think: bool = True
+    dummy_tokens: str | None = None
     random_cut: bool = False  # TODO: not common property for train/inference
     random_cut_seed: int = 42
 

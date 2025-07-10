@@ -44,13 +44,15 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
         self.cut_generator = random.Random(self.seed)
-        self.show_tokenization = True
-        self.dummy_tokens = self.tokenizer(
-            '<think>\n\n</think>\n\n',
-            truncation=False,
-            padding=False,
-            add_special_tokens=False
-        )['input_ids']
+        self.show_tokenization = False
+
+        if self.settings.dummy_tokens:
+            self.dummy_tokens = self.tokenizer(
+                self.settings.dummy_tokens,
+                truncation=False,
+                padding=False,
+                add_special_tokens=False
+            )['input_ids']
 
         if read:
             self._read()
@@ -402,7 +404,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
                 # Optionally mask dummy think tokens
 
-                should_mask = self.settings.mask_dummy_think
+                should_mask = True if self.settings.dummy_tokens else False
                 for msg in chat_messages:
                     if msg['role'] in ('user', 'system') and \
                         ('/no_think' in msg['content'] or '/nothink' in msg['content']):
@@ -452,7 +454,6 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
     ) -> list[dict[str, Any] | None]:
         # Use TRL tokenization if enabled
         if getattr(self.settings, "use_trl_tokenization", False):
-            logger.info(f"USING TRL TOKENIZATION")
             return self._encode_trl(records, inference)
 
         # Original tokenization logic
