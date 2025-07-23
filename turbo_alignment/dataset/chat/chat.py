@@ -51,12 +51,10 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             self._read()
 
     @overload
-    def __tokenize(self, inputs: str) -> npt.NDArray[np.int64]:
-        ...
+    def __tokenize(self, inputs: str) -> npt.NDArray[np.int64]: ...
 
     @overload
-    def __tokenize(self, inputs: list[str]) -> np.ndarray:
-        ...
+    def __tokenize(self, inputs: list[str]) -> np.ndarray: ...
 
     def __tokenize(self, inputs):
         return self.tokenizer(
@@ -247,13 +245,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         start_replica_token_id = role_prefix_tokens[ChatMessageRole.BOT][0].item()
 
         # -1 for bos token
-        input_ids = input_ids[-(self.settings.max_tokens_count - 1):]  # type: ignore[operator]
+        input_ids = input_ids[-(self.settings.max_tokens_count - 1) :]  # type: ignore[operator]
         replica_start_token_inds = np.where(input_ids == start_replica_token_id)[0]
         if len(replica_start_token_inds) != 0:
             cut_index = replica_start_token_inds[0]
             input_ids = input_ids[cut_index:]
 
-        labels = labels[-len(input_ids):]
+        labels = labels[-len(input_ids) :]
         if self.tokenizer.bos_token_id is not None:
             input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
             labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
@@ -280,19 +278,19 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 self.settings.prompt_template.prefix_template.format(
                     role=self.settings.prompt_template.role_tag_mapping[role]
                 )
-            )[0].astype(np.int32)  # int32 saves RAM
+            )[0].astype(
+                np.int32
+            )  # int32 saves RAM
             for role in ChatMessageRole
         }
-        suffix_tokens: np.ndarray = self.__tokenize(
-            self.settings.prompt_template.suffix_template
-        )[0].astype(np.int32)
+        suffix_tokens: np.ndarray = self.__tokenize(self.settings.prompt_template.suffix_template)[0].astype(np.int32)
 
         batch_size: int = getattr(self.settings, "tokenizer_batch_size", 1024)
         out: list[dict[str, Any] | None] = []
 
         # ──────────────────────────────────────  process in batches  ──────────────────────────────────────
         for batch_start in range(0, len(records), batch_size):
-            batch_records = records[batch_start: batch_start + batch_size]
+            batch_records = records[batch_start : batch_start + batch_size]
 
             # 1) build Conversation objects (they are lightweight)
             conversations = [
@@ -316,7 +314,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             offset = 0
             for rec, conv in zip(batch_records, conversations):
                 num_msgs = len(conv.messages)
-                tok_replicas = tokenized_flat[offset: offset + num_msgs]
+                tok_replicas = tokenized_flat[offset : offset + num_msgs]
                 offset += num_msgs
 
                 try:
@@ -336,9 +334,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 encoded: dict[str, Any] = {
                     "input_ids": torch.tensor(input_ids_np, dtype=torch.int32),
                     "labels": torch.tensor(labels_np, dtype=torch.int32),
-                    "attention_mask": torch.ones(
-                        len(input_ids_np), dtype=torch.int32
-                    ),
+                    "attention_mask": torch.ones(len(input_ids_np), dtype=torch.int32),
                 }
                 if inference:
                     encoded.update(
@@ -359,13 +355,11 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
     @staticmethod
     @overload
-    def _read_records(records: Path) -> list[ChatDatasetRecord]:
-        ...
+    def _read_records(records: Path) -> list[ChatDatasetRecord]: ...
 
     @staticmethod
     @overload
-    def _read_records(records: list[dict]) -> list[ChatDatasetRecord]:
-        ...
+    def _read_records(records: list[dict]) -> list[ChatDatasetRecord]: ...
 
     @staticmethod
     def _read_records(records) -> list[ChatDatasetRecord]:
@@ -417,3 +411,4 @@ class InferenceChatDataset(ChatDataset):
         }
 
         return new_instance
+        
