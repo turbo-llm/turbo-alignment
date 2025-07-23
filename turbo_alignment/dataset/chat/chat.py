@@ -1,3 +1,4 @@
+import gc
 import random
 from abc import ABC
 from itertools import accumulate
@@ -20,15 +21,9 @@ from turbo_alignment.dataset.chat.models import (
     ChatMessageRole,
 )
 from turbo_alignment.dataset.registry import ChatDatasetTypeRegistry
-from turbo_alignment.settings.datasets.base import (
-    DatasetSourceSettings,
-    DatasetStrategy,
-)
+from turbo_alignment.settings.datasets.base import DatasetSourceSettings, DatasetStrategy
 from turbo_alignment.settings.datasets.chat import ChatDatasetSettings
-
 from .conversation import Conversation
-
-import gc
 
 logger = get_project_logger()
 
