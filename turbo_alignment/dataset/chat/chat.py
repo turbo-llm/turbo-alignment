@@ -51,10 +51,12 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             self._read()
 
     @overload
-    def __tokenize(self, inputs: str) -> npt.NDArray[np.int64]: ...
+    def __tokenize(self, inputs: str) -> npt.NDArray[np.int64]:
+        ...
 
     @overload
-    def __tokenize(self, inputs: list[str]) -> np.ndarray: ...
+    def __tokenize(self, inputs: list[str]) -> np.ndarray:
+        ...
 
     def __tokenize(self, inputs):
         return self.tokenizer(
@@ -355,11 +357,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
     @staticmethod
     @overload
-    def _read_records(records: Path) -> list[ChatDatasetRecord]: ...
+    def _read_records(records: Path) -> list[ChatDatasetRecord]:
+        ...
 
     @staticmethod
     @overload
-    def _read_records(records: list[dict]) -> list[ChatDatasetRecord]: ...
+    def _read_records(records: list[dict]) -> list[ChatDatasetRecord]:
+        ...
 
     @staticmethod
     def _read_records(records) -> list[ChatDatasetRecord]:
@@ -411,4 +415,3 @@ class InferenceChatDataset(ChatDataset):
         }
 
         return new_instance
-        
