@@ -29,7 +29,6 @@ from turbo_alignment.settings.datasets.chat import ChatDatasetSettings
 from .conversation import Conversation
 
 import gc
-from itertools import islice
 
 logger = get_project_logger()
 
