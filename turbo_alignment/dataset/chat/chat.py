@@ -1,3 +1,4 @@
+import gc
 import random
 from abc import ABC
 from itertools import accumulate
@@ -20,12 +21,8 @@ from turbo_alignment.dataset.chat.models import (
     ChatMessageRole,
 )
 from turbo_alignment.dataset.registry import ChatDatasetTypeRegistry
-from turbo_alignment.settings.datasets.base import (
-    DatasetSourceSettings,
-    DatasetStrategy,
-)
+from turbo_alignment.settings.datasets.base import DatasetSourceSettings, DatasetStrategy
 from turbo_alignment.settings.datasets.chat import ChatDatasetSettings
-
 from .conversation import Conversation
 
 logger = get_project_logger()
@@ -89,7 +86,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             if remaining_length <= max_tokens:
                 return left_bound, right_bound
 
-        raise ValueError('Can\'t trim dialogue to fit all requirements')
+        raise ValueError("Can't trim dialogue to fit all requirements")
 
     def __keep_start(
         self,
@@ -108,7 +105,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             if max_tokens is None or end_index < max_tokens:
                 return 0, len(replicas_cum_len) - i
 
-        raise ValueError('Can\'t trim dialogue to fit all requirements')
+        raise ValueError("Can't trim dialogue to fit all requirements")
 
     def __truncate(
         self,
@@ -117,15 +114,15 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         inference: bool,
         max_tokens: int | None,
     ) -> tuple[int, int]:
-        '''
-        truncate dialogue to fit all requirements:
-        - cumulative tokens num is less than max_tokens
-        - keep dialogue end or start according to settings
-        - remove bot's messages from dialog end at inference
-        - remove user's messages from dialog end at non inference (training)
+        """
+        Truncate the dialogue to satisfy all constraints:
+        - cumulative number of tokens is less than max_tokens;
+        - keep the end or the start of the dialogue according to settings;
+        - remove bot messages from the dialogue end during inference;
+        - remove user messages from the dialogue end during training.
 
-        returns [first_message_index, last_message_index]
-        '''
+        Returns (first_message_index, last_message_index).
+        """
         if self.settings.keep_end:
             return self.__keep_end(
                 conversation=conversation,
@@ -155,7 +152,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         inference: bool,
         random_cut: bool,
     ) -> tuple[np.ndarray, np.ndarray, str]:
-        # random_cut используется только когда inference=true
+        # random_cut is used only when inference=True
         assert inference or not random_cut
 
         bot_prefix_tokens = role_prefix_tokens[ChatMessageRole.BOT]
@@ -182,7 +179,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         if (
             inference
             and left_bound == 0
-            and right_bound == 1  # если при инференсе остался только системный промпт
+            and right_bound == 1  # if only the system prompt remains after inference
             and conversation.messages[0].role == ChatMessageRole.SYSTEM
         ):
             raise ValueError('Less than two messages left after truncation')
@@ -257,73 +254,100 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
 
-    def _encode(
+    # logger.info(f'Tokenizing dataset in BATCH-WAY {self.source.name}')
+    def _encode(  # type: ignore[override]
         self,
         records: list[ChatDatasetRecord],
         inference: bool,
         random_cut: bool,
     ) -> list[dict[str, Any] | None]:
-        conversations = [
-            Conversation(
-                system_prompt=self.source.system_prompt,
-                messages=r.messages,
-                ignore_system_prompt=self.settings.ignore_system_prompt,
-            )
-            for r in records
-        ]
-
-        logger.info(f'Tokenizing dataset {self.source.name}')
-        tokenized_replicas = self.__tokenize([m.content for c in conversations for m in c.messages])
-
-        tokenized_conversations = []
-        offset = 0
-        for c in conversations:
-            tokenized_conversations.append([tokenized_replicas[offset + i] for i in range(len(c.messages))])
-            offset += len(c.messages)
-
-        role_prefix_tokens = {
+        """
+        Batch tokenization without padding:
+        • memory grows proportionally to batch_size, not to the entire dataset;
+        • the lengths of replicas are calculated exactly as in the original, which means
+          the filters in _truncate_and_merge behave identically,
+          so the number of discarded examples matches the "pre‑war" count.
+        """
+        # ─────────────────────────────────  pre-compute prefixes/suffixes  ─────────────────────────────────
+        role_prefix_tokens: dict[ChatMessageRole, np.ndarray] = {
             role: self.__tokenize(
                 self.settings.prompt_template.prefix_template.format(
                     role=self.settings.prompt_template.role_tag_mapping[role]
                 )
-            )[0]
+            )[0].astype(
+                np.int32
+            )  # int32 saves RAM
             for role in ChatMessageRole
         }
-        # TODO: what if suffix is empty?
-        suffix_tokens = self.__tokenize(self.settings.prompt_template.suffix_template)[0]
+        suffix_tokens: np.ndarray = self.__tokenize(self.settings.prompt_template.suffix_template)[0].astype(np.int32)
 
-        logger.info(f'Postprocessing tokenized data in {self.source.name}')
-        output: list[dict[str, Any] | None] = []
-        for record, conversation, tokenized_replicas in zip(records, conversations, tokenized_conversations):
-            try:
-                input_ids, labels, prompt = self._truncate_and_merge(
-                    conversation=conversation,
-                    tokenized_replicas=tokenized_replicas,
-                    role_prefix_tokens=role_prefix_tokens,
-                    suffix_tokens=suffix_tokens,
-                    inference=inference,
-                    random_cut=random_cut,
+        batch_size: int = getattr(self.settings, "tokenizer_batch_size", 1024)
+        out: list[dict[str, Any] | None] = []
+
+        # ──────────────────────────────────────  process in batches  ──────────────────────────────────────
+        for batch_start in range(0, len(records), batch_size):
+            batch_records = records[batch_start : batch_start + batch_size]
+
+            # 1) build Conversation objects (they are lightweight)
+            conversations = [
+                Conversation(
+                    system_prompt=self.source.system_prompt,
+                    messages=rec.messages,
+                    ignore_system_prompt=self.settings.ignore_system_prompt,
                 )
+                for rec in batch_records
+            ]
 
-            except ValueError as ex:
-                output.append(None)
-                logger.warning(f'Sample dropped: {ex}')
-                continue
+            # 2) collect all texts of replica in the batch into one list
+            texts = [msg.content for conv in conversations for msg in conv.messages]
 
-            encoded_record: dict[str, Any] = {
-                # 'id': record.id, FIXME: dont work with collators
-                'input_ids': torch.LongTensor(input_ids.astype(np.float32)),
-                'labels': torch.LongTensor(labels),
-                'attention_mask': torch.ones(input_ids.shape, dtype=torch.int64),
-            }
-            if inference:
-                encoded_record.update(
-                    {'prompt': prompt, 'id': record.id, 'messages': record.messages, 'meta': record.meta}
-                )
+            # 3) tokenize WITHOUT padding ⇒ returns a "ragged" object‑dtype array
+            raw_tokens = self.__tokenize(texts)  # object array
+            # 3.1 cast each replica to np.int32
+            tokenized_flat = [np.asarray(toks, dtype=np.int32) for toks in raw_tokens]
 
-            output.append(encoded_record)
+            # 4) split the flat list back into dialogues
+            offset = 0
+            for rec, conv in zip(batch_records, conversations):
+                num_msgs = len(conv.messages)
+                tok_replicas = tokenized_flat[offset : offset + num_msgs]
+                offset += num_msgs
 
-        return output
+                try:
+                    input_ids_np, labels_np, prompt = self._truncate_and_merge(
+                        conversation=conv,
+                        tokenized_replicas=tok_replicas,
+                        role_prefix_tokens=role_prefix_tokens,
+                        suffix_tokens=suffix_tokens,
+                        inference=inference,
+                        random_cut=random_cut,
+                    )
+                except ValueError:  # logic for discarded examples—same as in the original
+                    out.append(None)
+                    continue
+
+                # 5) form the output dictionary
+                encoded: dict[str, Any] = {
+                    "input_ids": torch.tensor(input_ids_np, dtype=torch.int32),
+                    "labels": torch.tensor(labels_np, dtype=torch.int32),
+                    "attention_mask": torch.ones(len(input_ids_np), dtype=torch.int32),
+                }
+                if inference:
+                    encoded.update(
+                        {
+                            "prompt": prompt,
+                            "id": rec.id,
+                            "messages": rec.messages,
+                            "meta": rec.meta,
+                        }
+                    )
+                out.append(encoded)
+
+            # 6) free memory and proceed to the next batch
+            del tokenized_flat, raw_tokens, texts, conversations
+            gc.collect()
+
+        return out
 
     @staticmethod
     @overload
