@@ -1,5 +1,6 @@
 # pylint: disable=line-too-long,superfluous-parens,abstract-method,raise-missing-from,no-else-raise,protected-access,unnecessary-pass,unbalanced-tuple-unpacking,unexpected-keyword-arg,attribute-defined-outside-init
 # flake8: noqa
+# mypy: ignore-errors
 import collections
 import copy
 import gc
