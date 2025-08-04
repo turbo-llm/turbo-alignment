@@ -1,0 +1,40 @@
+# Ulysses attention
+
+This directory contains code for implementing Ulysses Attention, as described in the [paper](https://arxiv.org/abs/2309.14509).
+See also the DeepSpeed team's [blogpost](https://www.deepspeed.ai/tutorials/ds-sequence/).
+
+## Using
+Just set `sequence_parallel` in trainer settings and choose an adapted model.
+Currently, we support the following models:
+* Gemma2, adpated version has name `gemma_with_ulysses`;
+* Qwen2, adpated version has name `qwen_with_ulysses`.
+
+
+An example of the settings file can be found in [tests](../../tests/fixtures/configs/train/dpo/dpo_with_seq_p.json).
+
+
+## Implementation
+1. We split all the workers into groups. Every worker in the group will process the same examples.
+This is achieved by patching dataset sharding.
+1. Each worker in the group process its own subsequence of example for all layers, except Attention.
+1. In the attention layers, communication occurs as described in the paper.
+1. We have to patch model graphs. We have to patch:
+    1. Attention implementation class. Eager and Flash attention variants are implemented.
+    1. Lengths arithmetic. Some code relies on input length, but since input_ids are now sharded across workers, adjustments are required.
+    1. Positional embedding implementation: Updates are made to support sharded inputs.
+1. Loss functions are adapted to account for the changes.
+1. Parameters dependent on the number of workers (e.g., total batch size, number of steps) are adjusted accordingly.
+1. We have to be sure, that all random generators of all workers inside group are perfectly synchronized.
+1. Each example should be padded, so all workers inside group have the sub-example of the same length.
+
+## Generation.
+Generation process should be ajusted as well. Since only last worker inside group has newly generated tokens, all the generation control happens on the last worker. To achive this, we store all the sequence on it, and apply stopping criterias on it. Note, that we do not infer model on the whole sequence on the last node, we compute only stopping criterais and next token selection.
+After the generation process finished, we send sequnces from last worker to all workers inside group.
+
+Because of padding, we have to rearrange inputs on each generation step.
+
+Currently, only sampling and Beam search generation methods are supported.
+
+## Tests
+Tests for this code can be found in directory `tests/sequence_parallel`.
+Most tests require two GPUs and Gemma model.

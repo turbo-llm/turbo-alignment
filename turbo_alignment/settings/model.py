@@ -13,6 +13,13 @@ class ModelType(str, Enum):
     SEQ2SEQ = 'seq2seq'
     SEQ_CLS = 'seq_cls'
     ENC = 'encoder'
+    GEMMA_WITH_ULYSSES = 'gemma_with_ulysses'
+    QWEN_WITH_ULYSSES = 'qwen_with_ulysses'
+    QWEN3_WITH_ULYSSES = 'qwen3_with_ulysses'
+
+    SEQ_CLS_QWEN3_WITH_ULYSSES = 'seq_cls_qwen3_with_ulysses'
+    SEQ_CLS_QWEN_WITH_ULYSSES = 'seq_cls_qwen_with_ulysses'
+    SEQ_CLS_GEMMA_WITH_ULYSSES = 'seq_cls_gemma_with_ulysses'
 
 
 class LigerKernelSettings(ExtraFieldsNotAllowedBaseModel):

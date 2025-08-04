@@ -10,6 +10,7 @@ from torch import nn
 from transformers import PreTrainedModel
 
 from turbo_alignment.common.registry import Registrable
+from turbo_alignment.modeling import parallel_states
 
 
 def concatenated_inputs(
@@ -83,7 +84,11 @@ def prepare_model_for_deepspeed(
         config_kwargs['zero_optimization']['stage'] = 0
     config_kwargs['optimizer'] = {'type': None}
 
-    model, *_ = deepspeed.initialize(model=model, config=config_kwargs)
+    model, *_ = deepspeed.initialize(
+        model=model,
+        config=config_kwargs,
+        mpu=parallel_states if parallel_states.sequence_parallel_is_initialized() else None,
+    )
     model.eval()
     return model
 
