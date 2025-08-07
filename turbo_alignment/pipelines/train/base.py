@@ -54,8 +54,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
         experiment_settings: ExperimentSettingsT,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> CherryPickCallbackBase | None:
-        ...
+    ) -> CherryPickCallbackBase | None: ...
 
     @staticmethod
     def _save_experiment_config(
@@ -73,8 +72,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
     @abstractmethod
     def _get_data_collator(
         experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase, **kwargs
-    ) -> DataCollator:
-        ...
+    ) -> DataCollator: ...
 
     @staticmethod
     @abstractmethod
@@ -86,8 +84,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
         train_dataset: Dataset,
         val_dataset: Dataset,
         data_collator: DataCollator,
-    ) -> Trainer:
-        ...
+    ) -> Trainer: ...
 
     @staticmethod
     def _load_model(
@@ -97,16 +94,14 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
 
     @staticmethod
     @abstractmethod
-    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArgumentsT:
-        ...
+    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArgumentsT: ...
 
     @staticmethod
     def _load_tokenizer(experiment_settings: ExperimentSettingsT) -> PreTrainedTokenizerBase:
         return load_tokenizer(experiment_settings.tokenizer_settings, experiment_settings.model_settings)
 
     @abstractmethod
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
-        ...
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None: ...
 
     @staticmethod
     def _get_additional_special_tokens(
@@ -129,10 +124,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             self.trainer.add_callback(cherry_pick_callback)
 
         if experiment_settings.checkpoint_uploader_callback_parameters is not None:
-            # if self.trainer.is_deepspeed_enabled and self.trainer.args.deepspeed_plugin.zero_stage == 3:
-            #     raise NotImplementedError(
-            #         'You should not use checkpoint uploader callback when DeepSpeed ZeRO stage 3 enabled'
-            #     )
             s3_handler = self._get_s3_handler(S3HandlerParameters())
 
             self.trainer.add_callback(
@@ -231,7 +222,9 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             resume_ckpt = None
 
             if os.path.isdir(ckpt_dir):
-                ckpt_list = [f for f in os.listdir(ckpt_dir) if f.startswith('checkpoint-') and f.split('-')[1].isdigit()]
+                ckpt_list = [
+                    f for f in os.listdir(ckpt_dir) if f.startswith('checkpoint-') and f.split('-')[1].isdigit()
+                ]
                 if ckpt_list:
                     max_ckpt = max(ckpt_list, key=lambda x: int(x.split('-')[1]))
                     resume_ckpt = os.path.join(ckpt_dir, max_ckpt)
@@ -240,13 +233,13 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             set_random_seed(training_args.seed)
 
             if resume_ckpt:
-                self._patch_trainer_rng_state() 
+                self._patch_trainer_rng_state()
                 self.trainer.train(resume_from_checkpoint=resume_ckpt)
             else:
                 self.trainer.train()
 
             self.trainer.save_model()
-            
+
     @staticmethod
     def _patch_trainer_rng_state() -> None:
         """
@@ -263,7 +256,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             real_load = torch.load
 
             def patched_load(*args, **kwargs):
-                # ВСЕГДА принудительно
                 kwargs["weights_only"] = False
                 return real_load(*args, **kwargs)
 
