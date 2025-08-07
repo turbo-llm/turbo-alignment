@@ -18,7 +18,5 @@ class S3Mixin:
         checkpoint_uploader_callback = CheckpointUploaderCallback(
             parameters=checkpoint_uploader_callback_parameters, s3_handler=s3_handler
         )
-        if s3_handler.directory_exists(directory_path=checkpoint_uploader_callback_parameters.directory):
-            raise ValueError(f'🍅 Directory {checkpoint_uploader_callback_parameters.directory} exists in bucket')
 
         return checkpoint_uploader_callback
