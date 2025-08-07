@@ -1,7 +1,9 @@
 import os
 from abc import abstractmethod
+import contextlib
 from pathlib import Path
 from typing import Generic, TypeVar
+
 
 import torch
 from torch.utils.data import ConcatDataset, Dataset
@@ -127,10 +129,10 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             self.trainer.add_callback(cherry_pick_callback)
 
         if experiment_settings.checkpoint_uploader_callback_parameters is not None:
-            if self.trainer.is_deepspeed_enabled and self.trainer.args.deepspeed_plugin.zero_stage == 3:
-                raise NotImplementedError(
-                    'You should not use checkpoint uploader callback when DeepSpeed ZeRO stage 3 enabled'
-                )
+            # if self.trainer.is_deepspeed_enabled and self.trainer.args.deepspeed_plugin.zero_stage == 3:
+            #     raise NotImplementedError(
+            #         'You should not use checkpoint uploader callback when DeepSpeed ZeRO stage 3 enabled'
+            #     )
             s3_handler = self._get_s3_handler(S3HandlerParameters())
 
             self.trainer.add_callback(
@@ -225,7 +227,57 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
                 experiment_metadata, Path(self.trainer.args.output_dir) / 'experiment_metadata.json'
             )
 
+            ckpt_dir = '/checkpoints/'
+            resume_ckpt = None
+
+            if os.path.isdir(ckpt_dir):
+                ckpt_list = [f for f in os.listdir(ckpt_dir) if f.startswith('checkpoint-') and f.split('-')[1].isdigit()]
+                if ckpt_list:
+                    max_ckpt = max(ckpt_list, key=lambda x: int(x.split('-')[1]))
+                    resume_ckpt = os.path.join(ckpt_dir, max_ckpt)
+                    print('Возьмем чекпоинт:', resume_ckpt)
+
             set_random_seed(training_args.seed)
-            self.trainer.train()
+
+            if resume_ckpt:
+                self._patch_trainer_rng_state() 
+                self.trainer.train(resume_from_checkpoint=resume_ckpt)
+            else:
+                self.trainer.train()
 
             self.trainer.save_model()
+            
+    @staticmethod
+    def _patch_trainer_rng_state() -> None:
+        """
+        Исправляет Trainer._load_rng_state для PyTorch ≥ 2.6, чтобы
+        torch.load(..., weights_only=False).  Накладывается однократно.
+        """
+        if getattr(Trainer, "_rng_patch_applied", False):
+            return
+
+        _orig = Trainer._load_rng_state
+
+        @contextlib.contextmanager
+        def _force_weights_only_false():
+            real_load = torch.load
+
+            def patched_load(*args, **kwargs):
+                # ВСЕГДА принудительно
+                kwargs["weights_only"] = False
+                return real_load(*args, **kwargs)
+
+            torch.load = patched_load
+            try:
+                yield
+            finally:
+                torch.load = real_load
+
+        def _patched(self, checkpoint):
+            if checkpoint is None:
+                return _orig(self, checkpoint)
+            with _force_weights_only_false():
+                return _orig(self, checkpoint)
+
+        Trainer._load_rng_state = _patched
+        Trainer._rng_patch_applied = True
