@@ -246,10 +246,10 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
 
     @staticmethod
     def _patch_trainer_rng_state() -> None:
-        if getattr(Trainer, "_rng_patch_applied", False):
+        if getattr(Trainer, "_rng_patch_applied", False):  # pylint: disable=protected-access
             return
 
-        _orig = Trainer._load_rng_state
+        _orig = Trainer._load_rng_state  # pylint: disable=protected-access
 
         @contextlib.contextmanager
         def _force_weights_only_false():
@@ -271,5 +271,5 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
             with _force_weights_only_false():
                 return _orig(self, checkpoint)
 
-        Trainer._load_rng_state = _patched
-        Trainer._rng_patch_applied = True
+        Trainer._load_rng_state = _patched  # pylint: disable=protected-access
+        Trainer._rng_patch_applied = True   # pylint: disable=protected-access
