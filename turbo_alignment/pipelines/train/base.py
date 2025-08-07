@@ -242,10 +242,6 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
 
     @staticmethod
     def _patch_trainer_rng_state() -> None:
-        """
-        Исправляет Trainer._load_rng_state для PyTorch ≥ 2.6, чтобы
-        torch.load(..., weights_only=False).  Накладывается однократно.
-        """
         if getattr(Trainer, "_rng_patch_applied", False):
             return
 
