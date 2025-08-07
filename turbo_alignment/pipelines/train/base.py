@@ -272,4 +272,4 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
                 return _orig(self, checkpoint)
 
         Trainer._load_rng_state = _patched  # pylint: disable=protected-access
-        Trainer._rng_patch_applied = True   # pylint: disable=protected-access
+        Trainer._rng_patch_applied = True  # pylint: disable=protected-access
