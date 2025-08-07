@@ -53,7 +53,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
         experiment_settings: ExperimentSettingsT,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> CherryPickCallbackBase | None: 
+    ) -> CherryPickCallbackBase | None:
         ...
 
     @staticmethod
@@ -72,7 +72,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
     @abstractmethod
     def _get_data_collator(
         experiment_settings: ExperimentSettingsT, tokenizer: PreTrainedTokenizerBase, **kwargs
-    ) -> DataCollator: 
+    ) -> DataCollator:
         ...
 
     @staticmethod
@@ -85,7 +85,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
         train_dataset: Dataset,
         val_dataset: Dataset,
         data_collator: DataCollator,
-    ) -> Trainer: 
+    ) -> Trainer:
         ...
 
     @staticmethod
@@ -96,7 +96,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
 
     @staticmethod
     @abstractmethod
-    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArgumentsT: 
+    def _get_training_args(experiment_settings: ExperimentSettingsT) -> TrainingArgumentsT:
         ...
 
     @staticmethod
@@ -104,7 +104,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
         return load_tokenizer(experiment_settings.tokenizer_settings, experiment_settings.model_settings)
 
     @abstractmethod
-    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None: 
+    def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
         ...
 
     @staticmethod
