@@ -66,7 +66,7 @@ def prepare_model_for_deepspeed(
     if model is not None:
         if hasattr(model, 'config'):
             hidden_size: int | None = (
-                max(model.config.hidden_sizes)
+                max(model.config.hidden_sizes)  # type: ignore[union-attr,arg-type]
                 if getattr(model.config, 'hidden_sizes', None)
                 else getattr(model.config, 'hidden_size', None)
             )

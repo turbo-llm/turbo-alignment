@@ -13,7 +13,7 @@ class SelfBleuMetric(Metric):
         self._settings: SelfBleuSettings = settings
 
     def compute(self, **kwargs) -> list[MetricResults]:
-        predictions: list[list[str]] = kwargs.get('predictions', None)
+        predictions: list[list[str]] = kwargs.get('predictions', None)  # type: ignore[assignment]
         dataset_name: str = kwargs.get('dataset_name', '')
 
         if predictions is None:

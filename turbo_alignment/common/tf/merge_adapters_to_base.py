@@ -11,7 +11,7 @@ def peft_to_base_model(settings: MergeAdaptersToBaseModelSettings) -> None:
     tokenizer = load_tokenizer(settings.tokenizer_settings, settings.model_settings)
     base_model = load_model(settings.model_settings, tokenizer)
 
-    first_weight = base_model.model.layers[0].self_attn.q_proj.weight
+    first_weight = base_model.model.layers[0].self_attn.q_proj.weight  # type: ignore[union-attr, index]
     first_weight_old = first_weight.clone()
 
     lora_model = PeftModel.from_pretrained(

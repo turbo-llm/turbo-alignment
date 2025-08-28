@@ -682,7 +682,7 @@ class TrainerWithSeqP(Trainer):
                     self._save(output_dir, state_dict={})
                 # remove the dummy state_dict
                 remove_dummy_checkpoint(self.args.should_save, output_dir, [WEIGHTS_NAME, SAFE_WEIGHTS_NAME])
-                self.model_wrapped.save_checkpoint(output_dir)
+                self.model_wrapped.save_checkpoint(output_dir)  # type: ignore[operator]
 
         elif self.args.should_save:
             self._save(output_dir)
