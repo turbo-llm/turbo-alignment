@@ -234,8 +234,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             input_ids = np.concatenate((input_ids, bot_prefix_tokens))
             labels = np.concatenate((labels, np.full(bot_prefix_tokens.shape, DISABLE_LOSS_LABEL)))
         else:
-            input_ids = np.append(input_ids, self.tokenizer.eos_token_id)
-            labels = np.append(labels, DISABLE_LOSS_LABEL)
+            if not self.settings.single_eos:
+                input_ids = np.append(input_ids, self.tokenizer.eos_token_id)
+                labels = np.append(labels, DISABLE_LOSS_LABEL)
 
         # FIXME
         start_replica_token_id = role_prefix_tokens[ChatMessageRole.BOT][0].item()
