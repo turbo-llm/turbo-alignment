@@ -8,8 +8,8 @@ from turbo_alignment.settings.metric import ElementWiseScores, MetricResults, Me
 @Metric.register(MetricType.LENGTH)
 class LengthMetric(Metric):
     def compute(self, **kwargs) -> list[MetricResults]:
-        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
-        answer_tokens_ids: list[torch.Tensor] = kwargs.get('answer_tokens_ids', None)
+        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)  # type: ignore[assignment]
+        answer_tokens_ids: list[torch.Tensor] = kwargs.get('answer_tokens_ids', None)  # type: ignore[assignment]
         dataset_name: str = kwargs.get('dataset_name', '')
 
         if answer_tokens_ids is None:

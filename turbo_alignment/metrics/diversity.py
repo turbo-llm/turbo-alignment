@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 from scipy.stats import entropy
@@ -17,8 +17,8 @@ class DiversityMetric(Metric):
         self._settings: DiversitySettings = settings
 
     def compute(self, **kwargs) -> list[MetricResults]:
-        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
-        predictions: list[list[str]] = kwargs.get('predictions', None)
+        tokenizer: Optional[PreTrainedTokenizerBase] = kwargs.get('tokenizer', None)  # type: ignore[assignment]
+        predictions: Optional[list[list[str]]] = kwargs.get('predictions', None)  # type: ignore[assignment]
         dataset_name: str = kwargs.get('dataset_name', '')
 
         if predictions is None:

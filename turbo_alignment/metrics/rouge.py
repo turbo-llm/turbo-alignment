@@ -30,8 +30,8 @@ class RougeMetric(Metric):
         self._rouge_scorer = rouge_scorer.RougeScorer(rouge_types=rouge_types, tokenizer=CustomTokenizer())
 
     def compute(self, **kwargs) -> list[MetricResults]:
-        references: list[str] = kwargs.get('references', None)
-        predictions: list[str] = kwargs.get('predictions', None)
+        references: list[str] = kwargs.get('references', None)  # type: ignore[assignment]
+        predictions: list[str] = kwargs.get('predictions', None)  # type: ignore[assignment]
 
         element_wise_scores = self._compute_element_wise(references=references, predictions=predictions)
 
