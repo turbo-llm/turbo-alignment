@@ -5,6 +5,7 @@ from transformers import PreTrainedTokenizerBase
 from vllm import LLM, SamplingParams
 from vllm.lora.request import LoRARequest
 
+from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.dataset.chat import ChatDatasetRecord
 from turbo_alignment.generators.base import BaseGenerator
 from turbo_alignment.settings.generators.chat import CustomChatGenerationSettings
@@ -13,6 +14,9 @@ from turbo_alignment.settings.generators.outputs.chat import (
     ChatInferenceOutput,
 )
 from turbo_alignment.settings.tf.generation import VLLMGeneratorSettings
+
+
+logger = get_project_logger()
 
 
 class TokenSuppressionLogitsProcessor:
@@ -45,8 +49,16 @@ class VLLMChatGenerator(BaseGenerator[ChatDatasetRecord, ChatInferenceOutput]):
 
         eos_token_id: list[int] = self._tokenizer.encode(generator_settings.stop_strings, add_special_tokens=False)
 
+        best_of = generator_settings.best_of
+        if not best_of:
+            best_of = generator_settings.n
+
+        elif best_of < generator_settings.n:
+            logger.warning('best_of is less than n, set best_of to n')
+            best_of = generator_settings.n
+
         beam_search_params: dict[str, Any] = {
-            'best_of': generator_settings.best_of if generator_settings.best_of else generator_settings.n,
+            'best_of': best_of,
         }
 
         sampling_params = generator_settings.dict(exclude={'best_of', 'stop_strings', 'filter_token_ids'})

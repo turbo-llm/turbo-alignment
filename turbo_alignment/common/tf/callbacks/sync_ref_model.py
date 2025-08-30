@@ -51,4 +51,6 @@ class SyncRefModelCallback(TrainerCallback):
                     is_zero3_enabled=is_zero3_enabled,
                 )
             else:
-                self.sync_target_model(model=model, target_model=ref_model, alpha=self._sync_ref_settings.alpha)
+                self.sync_target_model(
+                    model=model, target_model=ref_model, alpha=self._sync_ref_settings.alpha  # type: ignore[arg-type]
+                )

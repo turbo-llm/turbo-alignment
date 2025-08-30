@@ -9,9 +9,9 @@ from turbo_alignment.settings.metric import ElementWiseScores, MetricResults, Me
 @Metric.register(MetricType.PERPLEXITY)
 class PerplexityMetric(Metric):
     def compute(self, **kwargs) -> list[MetricResults]:
-        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
-        logits: torch.Tensor = kwargs.get('logits', None)
-        labels: torch.Tensor = kwargs.get('answer_tokens_ids', None)
+        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)  # type: ignore[assignment]
+        logits: torch.Tensor = kwargs.get('logits', None)  # type: ignore[assignment]
+        labels: torch.Tensor = kwargs.get('answer_tokens_ids', None)  # type: ignore[assignment]
         dataset_name: str = kwargs.get('dataset_name', '')
 
         if logits is None:
