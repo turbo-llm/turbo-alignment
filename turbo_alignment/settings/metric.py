@@ -8,6 +8,8 @@ from turbo_alignment.settings.base import ExtraFieldsNotAllowedBaseModel
 
 class MetricType(str, Enum):
     ACCURACY = 'accuracy'
+    STR_ACCURACY = 'str_accuracy'
+    COVERAGE = 'coverage'
     ROUGE = 'rouge'
     METEOR = 'meteor'
     REWARD = 'reward'

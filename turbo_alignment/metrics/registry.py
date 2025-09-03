@@ -47,6 +47,16 @@ class LengthSettings(MetricSettings):
     ...
 
 
+@MetricSettingsRegistry.register(MetricType.STR_ACCURACY)
+class StringAccuracySettings(MetricSettings):
+    ...
+
+
+@MetricSettingsRegistry.register(MetricType.COVERAGE)
+class CoverageSettings(MetricSettings):
+    target_string: str
+
+
 @MetricSettingsRegistry.register(MetricType.KL)
 class KLSettings(MetricSettings):
     ref_logits_type: KLType
