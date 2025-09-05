@@ -22,6 +22,7 @@ def create_and_broadcast(
         object_list,
         src=src,
         group=group,
+        device=device,
     )
 
     if rank == src:

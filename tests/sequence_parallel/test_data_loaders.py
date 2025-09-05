@@ -76,6 +76,7 @@ def main():
     return app()
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
 @pytest.mark.parametrize(
     'cmd_name',

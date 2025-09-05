@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 from accelerate import Accelerator
 
@@ -25,9 +27,9 @@ class RewardMetric(Metric):
         self.model.eval()
 
     def compute(self, **kwargs) -> list[MetricResults]:
-        dataset: SamplingRMDataset = kwargs.get('dataset', None)
-        predictions: list[list[str]] = kwargs.get('predictions', None)
-        accelerator: Accelerator = kwargs.get('accelerator', None)
+        dataset: Optional[SamplingRMDataset] = kwargs.get('dataset', None)  # type: ignore[assignment]
+        predictions: Optional[list[list[str]]] = kwargs.get('predictions', None)  # type: ignore[assignment]
+        accelerator: Optional[Accelerator] = kwargs.get('accelerator', None)  # type: ignore[assignment]
         dataset_name: str = kwargs.get('dataset_name', '')
 
         if dataset is None:
@@ -35,6 +37,9 @@ class RewardMetric(Metric):
 
         if predictions is None:
             raise ValueError('predictions should not be None')
+
+        if accelerator is None:
+            raise ValueError('accelerator should not be None')
 
         self.model = accelerator.prepare_model(self.model, device_placement=True, evaluation_mode=True)
         self.model.to(accelerator.device)

@@ -200,6 +200,7 @@ def _test_genaration(test_case: int = 0, model_path: str = GEMMA_MODEL_PATH):
             assert torch.equal(generated, vanilla_result), (generated, vanilla_result)
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
 @pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
 @pytest.mark.parametrize(
@@ -211,6 +212,7 @@ def test_generation(test_case):
     return launch_with_name(__file__, 'test-generation', 2, cmd_args=cmd_args)
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(not has_two_gpus(), reason='At least two gpu are required')
 @pytest.mark.skipif(not has_gemma_model(), reason='Gemma model not found')
 def test_gemma_model():

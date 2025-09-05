@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 import torch
@@ -66,6 +67,7 @@ def do_test_all_gather_variable(n_ranks: int = 4, group_size: int = 2):
     assert result.tolist() == sum((inputs_per_rank[r].tolist() for r in dist.get_process_group_ranks(group)), [])
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(
     not torch.cuda.is_available() or torch.cuda.device_count() < 4,
     reason='at least four gpus required',
@@ -86,6 +88,7 @@ def do_test_gather_and_split(test_case):
     assert result == output, (result, output)
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
 @pytest.mark.parametrize(
     'test_case',
@@ -103,10 +106,13 @@ CREATE_AND_BROADCAST_INPUTS = [
 
 @register_function('create_and_broadcast')
 def do_test_create_and_broadcast(test_case: int):
-    dist.init_process_group()
+    env_rank = os.getenv('RANK')
+    device = torch.device(f'cuda:{env_rank}')
+
+    dist.init_process_group(device_id=device)
     rank = dist.get_rank()
     input_ = CREATE_AND_BROADCAST_INPUTS[test_case]
-    device = torch.device(f'cuda:{rank}')
+
     if rank == 1:
         input_tensor = torch.tensor(input_, device=device)
     else:
@@ -122,6 +128,7 @@ def do_test_create_and_broadcast(test_case: int):
     assert result.tolist() == input_
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
 @pytest.mark.parametrize(
     'test_case',
