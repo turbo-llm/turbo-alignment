@@ -1,6 +1,8 @@
+import subprocess
 from pathlib import Path
 
 import pytest
+import torch
 from typer.testing import CliRunner
 
 from tests.constants import FIXTURES_PATH
@@ -50,6 +52,46 @@ def test_inference_classification(config_path: Path):
     )
     assert result.exit_code == 0
     inference_settings = InferenceExperimentSettings.parse_file(config_path)
+    info_save_file = inference_settings.save_path / Path('info.json')
+    assert info_save_file.is_file()
+    info_file = read_json(info_save_file)
+    assert len(info_file) != 0
+    for filename in info_file:
+        filepath = inference_settings.save_path / filename
+        assert filepath.is_file()
+        assert len(read_jsonl(filepath)) != 0
+
+
+def has_gpu() -> bool:
+    return torch.cuda.is_available()
+
+
+@pytest.mark.gpu
+@pytest.mark.skipif(not has_gpu(), reason='gpu is required')
+@pytest.mark.parametrize(
+    'config_path',
+    [
+        pytest.param(
+            FIXTURES_PATH / 'configs' / 'inference' / 'sft' / 'vllm_base.json',
+            id='vllm-sft-inference',
+        )
+    ],
+)
+def test_inference_chat_vllm(config_path: Path):
+    # for some obscure reason, VLLM throws an error, if it is invoked via CliTestRunner,
+    # so we run it manually
+    subprocess.check_call(
+        [
+            'python',
+            '-m',
+            'turbo_alignment',
+            'inference_chat',
+            '--inference_settings_path',
+            str(config_path),
+        ]
+    )
+
+    inference_settings = ChatInferenceExperimentSettings.parse_file(config_path)
     info_save_file = inference_settings.save_path / Path('info.json')
     assert info_save_file.is_file()
     info_file = read_json(info_save_file)

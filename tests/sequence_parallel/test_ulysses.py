@@ -152,6 +152,7 @@ def without_flash():
     run_with_seq_p()
 
 
+@pytest.mark.gpu
 @pytest.mark.skipif(not has_two_gpus(), reason='at least two gpus are required')
 @pytest.mark.parametrize(
     'cmd_name',

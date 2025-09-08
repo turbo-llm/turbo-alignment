@@ -40,8 +40,8 @@ class ChatCherryPickCallback(CherryPickCallbackBase[InferenceChatDataset]):
     ) -> list[MetricResults]:
         accelerator: Accelerator = kwargs.get('accelerator', None)
         metrics_kwargs: dict = kwargs.get('metrics_kwargs', {})
-        ref_model: PreTrainedModel = kwargs.get('ref_model', None)
-        sft_model: PreTrainedModel = kwargs.get('sft_model', None)
+        ref_model: PreTrainedModel = kwargs.get('ref_model', None)  # type: ignore[assignment]
+        sft_model: PreTrainedModel = kwargs.get('sft_model', None)  # type: ignore[assignment]
 
         generator = ChatGenerator(
             model=model,

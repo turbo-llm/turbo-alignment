@@ -117,11 +117,11 @@ def load_model(
 
         # deepspeed stage3 is currently doens't work with seq_cls head and peft
         if model_settings.model_type == ModelType.SEQ_CLS and is_deepspeed_zero3_enabled():
-            model.base_model.model.score = torch.nn.Linear(
-                in_features=model.base_model.model.score.original_module.in_features,
-                out_features=model.base_model.model.score.original_module.out_features,
-                bias=model.base_model.model.score.original_module.bias,
+            model.base_model.model.score = torch.nn.Linear(  # type: ignore[attr-defined]
+                in_features=model.base_model.model.score.original_module.in_features,  # type: ignore[attr-defined]
+                out_features=model.base_model.model.score.original_module.out_features,  # type: ignore[attr-defined]
+                bias=model.base_model.model.score.original_module.bias,  # type: ignore[attr-defined]
             )
-            model.base_model.model.score.weight.requires_grad = True
+            model.base_model.model.score.weight.requires_grad = True  # type: ignore[attr-defined]
 
     return model

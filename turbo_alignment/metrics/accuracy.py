@@ -1,3 +1,5 @@
+from typing import Optional
+
 from transformers import PreTrainedTokenizerBase
 
 from turbo_alignment.metrics.metric import Metric
@@ -7,9 +9,9 @@ from turbo_alignment.settings.metric import ElementWiseScores, MetricResults, Me
 @Metric.register(MetricType.ACCURACY)
 class AccuracyMetric(Metric):
     def compute(self, **kwargs) -> list[MetricResults]:
-        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
-        references: list[list[str]] = kwargs.get('references', None)
-        predictions: list[list[str]] = kwargs.get('predictions', None)
+        tokenizer: Optional[PreTrainedTokenizerBase] = kwargs.get('tokenizer', None)  # type: ignore[assignment]
+        references: Optional[list[list[str]]] = kwargs.get('references', None)  # type: ignore[assignment]
+        predictions: Optional[list[list[str]]] = kwargs.get('predictions', None)  # type: ignore[assignment]
         dataset_name: str = kwargs.get('dataset_name', '')
 
         if references is None:
