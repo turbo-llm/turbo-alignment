@@ -31,12 +31,12 @@ logger = get_project_logger()
 
 class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
     def __init__(
-            self,
-            source: DatasetSourceSettings,
-            settings: ChatDatasetSettings,
-            tokenizer: PreTrainedTokenizerBase,
-            seed: int,
-            read: bool = True,
+        self,
+        source: DatasetSourceSettings,
+        settings: ChatDatasetSettings,
+        tokenizer: PreTrainedTokenizerBase,
+        seed: int,
+        read: bool = True,
     ) -> None:
         super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
@@ -45,10 +45,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         if self.settings.dummy_tokens:
             self.dummy_tokens = self.tokenizer(
-                self.settings.dummy_tokens,
-                truncation=False,
-                padding=False,
-                add_special_tokens=False
+                self.settings.dummy_tokens, truncation=False, padding=False, add_special_tokens=False
             )['input_ids']
 
         if read:
@@ -72,11 +69,11 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         )['input_ids']
 
     def __keep_end(
-            self,
-            conversation: Conversation,
-            replicas_cum_len: list[int],
-            inference: bool,
-            max_tokens: int | None,
+        self,
+        conversation: Conversation,
+        replicas_cum_len: list[int],
+        inference: bool,
+        max_tokens: int | None,
     ) -> tuple[int, int]:
         if max_tokens is None:
             return 0, len(replicas_cum_len)
@@ -99,11 +96,11 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         raise ValueError("Can't trim dialogue to fit all requirements")
 
     def __keep_start(
-            self,
-            conversation: Conversation,
-            replicas_cum_len: list[int],
-            inference: bool,
-            max_tokens: int | None = None,
+        self,
+        conversation: Conversation,
+        replicas_cum_len: list[int],
+        inference: bool,
+        max_tokens: int | None = None,
     ) -> tuple[int, int]:
         for i, (message, end_index) in enumerate(zip(conversation.messages[::-1], replicas_cum_len[::-1])):
             if self.settings.only_answer_loss:
@@ -118,11 +115,11 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         raise ValueError("Can't trim dialogue to fit all requirements")
 
     def __truncate(
-            self,
-            conversation: Conversation,
-            replicas_cum_len: list[int],
-            inference: bool,
-            max_tokens: int | None,
+        self,
+        conversation: Conversation,
+        replicas_cum_len: list[int],
+        inference: bool,
+        max_tokens: int | None,
     ) -> tuple[int, int]:
         """
         Truncate the dialogue to satisfy all constraints:
@@ -154,13 +151,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         return sum(loss_flags) == len(leftover_messages)
 
     def _truncate_and_merge(
-            self,
-            conversation: Conversation,
-            tokenized_replicas: list[np.ndarray],
-            role_prefix_tokens: dict[ChatMessageRole, np.ndarray],
-            suffix_tokens: np.ndarray,
-            inference: bool,
-            random_cut: bool,
+        self,
+        conversation: Conversation,
+        tokenized_replicas: list[np.ndarray],
+        role_prefix_tokens: dict[ChatMessageRole, np.ndarray],
+        suffix_tokens: np.ndarray,
+        inference: bool,
+        random_cut: bool,
     ) -> tuple[np.ndarray, np.ndarray, str]:
         # random_cut is used only when inference=True
         assert inference or not random_cut
@@ -187,10 +184,10 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         if not inference and right_bound - left_bound < 2:
             raise ValueError('Less than two messages left after truncation')
         if (
-                inference
-                and left_bound == 0
-                and right_bound == 1  # if only the system prompt remains after inference
-                and conversation.messages[0].role == ChatMessageRole.SYSTEM
+            inference
+            and left_bound == 0
+            and right_bound == 1  # if only the system prompt remains after inference
+            and conversation.messages[0].role == ChatMessageRole.SYSTEM
         ):
             raise ValueError('Less than two messages left after truncation')
         if not inference and self._all_loss_disabled(conversation.messages[left_bound:right_bound]):
@@ -215,19 +212,19 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             truncated_tokenized_replicas = [truncated_tokenized_replicas[0]] + truncated_tokenized_replicas
 
         for ind, (message, tokenized_replica) in enumerate(
-                zip(
-                    truncated_conversation_messages,
-                    truncated_tokenized_replicas,
-                )
+            zip(
+                truncated_conversation_messages,
+                truncated_tokenized_replicas,
+            )
         ):
             prefix_tokens = role_prefix_tokens[message.role]
             merged_replica = np.concatenate((prefix_tokens, tokenized_replica, suffix_tokens))
             input_ids = np.concatenate((input_ids, merged_replica))
 
             if (
-                    (self.settings.only_last_replica_loss and ind != right_bound - left_bound - 1)
-                    or (self.settings.only_answer_loss and message.role != ChatMessageRole.BOT)
-                    or message.disable_loss
+                (self.settings.only_last_replica_loss and ind != right_bound - left_bound - 1)
+                or (self.settings.only_answer_loss and message.role != ChatMessageRole.BOT)
+                or message.disable_loss
             ):
                 replica_labels = np.full(merged_replica.shape, DISABLE_LOSS_LABEL)
             else:
@@ -252,13 +249,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         start_replica_token_id = role_prefix_tokens[ChatMessageRole.BOT][0].item()
 
         # -1 for bos token
-        input_ids = input_ids[-(self.settings.max_tokens_count - 1):]  # type: ignore[operator]
+        input_ids = input_ids[-(self.settings.max_tokens_count - 1) :]  # type: ignore[operator]
         replica_start_token_inds = np.where(input_ids == start_replica_token_id)[0]
         if len(replica_start_token_inds) != 0:
             cut_index = replica_start_token_inds[0]
             input_ids = input_ids[cut_index:]
 
-        labels = labels[-len(input_ids):]
+        labels = labels[-len(input_ids) :]
         if self.tokenizer.bos_token_id is not None:
             input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
             labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
@@ -270,16 +267,16 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         n = len(dummy_tokens)
         for i in range(len(chat_tokens) - n + 1):
             # check for a match of the entire dummy_tokens slice
-            if chat_tokens[i: i + n] == dummy_tokens:
+            if chat_tokens[i : i + n] == dummy_tokens:
                 # zero-out that span in enable_loss
                 for j in range(n):
                     enable_loss[i + j] = 0
         return enable_loss
-    
+
     def _encode_trl(
-            self,
-            records: list[ChatDatasetRecord],
-            inference: bool,
+        self,
+        records: list[ChatDatasetRecord],
+        inference: bool,
     ) -> list[dict[str, Any] | None]:
         """
         TRL-style tokenization using HF chat templates.
@@ -290,24 +287,35 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         for record in records:
             tools = record.tools
-            if tools is not None and type(tools) == str:
+            if tools is not None and isinstance(tools, str):
                 tools = json.loads(tools)
             if tools is not None:
-                tools = [json.loads(tool) if type(tool) == str else tool for tool in tools]
+                tools = [json.loads(tool) if isinstance(tool, str) else tool for tool in tools]
+
             try:
                 # Convert our messages to the format expected by apply_chat_template
                 chat_messages = []
                 for message in record.messages:
                     # Map our role names to HF expected format
 
-                    role = "system" if message.role == ChatMessageRole.SYSTEM else (
-                        "assistant" if message.role == ChatMessageRole.BOT else (
-                        "tool" if message.role == ChatMessageRole.TOOL else
-                        "documents" if message.role == ChatMessageRole.DOCUMENTS else
-                        "user" if  message.role == ChatMessageRole.USER else "unknown"
-                    ))
-                    chat_messages.append({"role": role, "content": message.content,
-                                          "tool_calls": message.tool_calls})
+                    role = (
+                        "system"
+                        if message.role == ChatMessageRole.SYSTEM
+                        else (
+                            "assistant"
+                            if message.role == ChatMessageRole.BOT
+                            else (
+                                "tool"
+                                if message.role == ChatMessageRole.TOOL
+                                else "documents"
+                                if message.role == ChatMessageRole.DOCUMENTS
+                                else "user"
+                                if message.role == ChatMessageRole.USER
+                                else "unknown"
+                            )
+                        )
+                    )
+                    chat_messages.append({"role": role, "content": message.content, "tool_calls": message.tool_calls})
 
                 # For inference, we don't include the last assistant message in the tokenization
                 inference_messages = chat_messages
@@ -321,7 +329,6 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     tokenize=False,
                     add_generation_prompt=inference,
                 )
-
 
                 # Tokenize the chat
                 tokenized_chat = self.tokenizer(
@@ -345,9 +352,11 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     # Process each message to find assistant responses
                     assistant_indices = []
                     for i, message in enumerate(record.messages):
-                        if (message.role == ChatMessageRole.BOT and
-                                not message.disable_loss and
-                                (not self.settings.only_last_replica_loss or i == len(record.messages) - 1)):
+                        if (
+                            message.role == ChatMessageRole.BOT
+                            and not message.disable_loss
+                            and (not self.settings.only_last_replica_loss or i == len(record.messages) - 1)
+                        ):
                             assistant_indices.append(i)
 
                     # If no eligible assistant messages, drop this sample
@@ -360,12 +369,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     # and enable loss for those tokens
                     for idx in assistant_indices:
                         # Apply the template only up to this message to find the start position
-                        partial_messages = chat_messages[:idx + 1]
+                        partial_messages = chat_messages[: idx + 1]
                         partial_format = self.tokenizer.apply_chat_template(
-                            partial_messages,
-                            tools=tools,
-                            tokenize=False,
-                            add_generation_prompt=False
+                            partial_messages, tools=tools, tokenize=False, add_generation_prompt=False
                         )
 
                         # Find the position where this message starts
@@ -380,10 +386,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                         # Exclude the prompt and include only the assistant's response
                         prev_messages = chat_messages[:idx]
                         prev_format = self.tokenizer.apply_chat_template(
-                            prev_messages,
-                            tools=tools,
-                            tokenize=False,
-                            add_generation_prompt=True
+                            prev_messages, tools=tools, tokenize=False, add_generation_prompt=True
                         )
                         prev_tokens = self.tokenizer(
                             prev_format,
@@ -402,16 +405,18 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
                 # Optionally mask dummy think tokens
 
-                should_mask = True if self.settings.dummy_tokens else False
+                should_mask = bool(self.settings.dummy_tokens)
                 for msg in chat_messages:
-                    if msg['role'] in ('user', 'system') and \
-                        ('/no_think' in msg['content'] or '/nothink' in msg['content']):
+                    if msg['role'] in ('user', 'system') and (
+                        '/no_think' in msg['content'] or '/nothink' in msg['content']
+                    ):
                         should_mask = False
                         break
-                
+
                 if should_mask:
-                    loss_mask = self.mask_dummy_think_fn(chat_tokens=tokenized_chat["input_ids"],
-                                                            enable_loss=loss_mask)
+                    loss_mask = self.mask_dummy_think_fn(
+                        chat_tokens=tokenized_chat["input_ids"], enable_loss=loss_mask
+                    )
 
                 # Assign labels where mask is 1
                 labels = np.where(loss_mask == 1, input_ids_tensor, DISABLE_LOSS_LABEL)
@@ -429,12 +434,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 }
 
                 if inference:
-                    encoded_record.update({
-                        "prompt": formatted_chat,
-                        "id": record.id,
-                        "messages": record.messages,
-                        "meta": record.meta
-                    })
+                    encoded_record.update(
+                        {"prompt": formatted_chat, "id": record.id, "messages": record.messages, "meta": record.meta}
+                    )
 
                 result.append(encoded_record)
 
@@ -445,10 +447,10 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         return result
 
     def _encode(
-            self,
-            records: list[ChatDatasetRecord],
-            inference: bool,
-            random_cut: bool,
+        self,
+        records: list[ChatDatasetRecord],
+        inference: bool,
+        random_cut: bool,
     ) -> list[dict[str, Any] | None]:
         # Use TRL tokenization if enabled
         if getattr(self.settings, "use_trl_tokenization", False):
@@ -581,13 +583,13 @@ class TrainChatDataset(ChatDataset):
 @ChatDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)
 class InferenceChatDataset(ChatDataset):
     def __init__(
-            self,
-            source: DatasetSourceSettings,
-            settings: ChatDatasetSettings,
-            tokenizer: PreTrainedTokenizerBase,
-            seed: int,
-            read: bool = True,
-            random_cut: bool = False,
+        self,
+        source: DatasetSourceSettings,
+        settings: ChatDatasetSettings,
+        tokenizer: PreTrainedTokenizerBase,
+        seed: int,
+        read: bool = True,
+        random_cut: bool = False,
     ) -> None:
         self._random_cut = random_cut
 

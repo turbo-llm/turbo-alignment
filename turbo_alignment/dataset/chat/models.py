@@ -31,4 +31,4 @@ class ChatDatasetRecord(DatasetRecord):
     messages: list[ChatMessage]
     label: str | None = None
     meta: dict[str, Any] | None = None
-    tools: list[dict[str, Any]] | None  = None
+    tools: list[dict[str, Any]] | None = None
