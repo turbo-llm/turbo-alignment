@@ -1,9 +1,10 @@
+import json
 import gc
 import random
 from abc import ABC
 from itertools import accumulate
 from pathlib import Path
-from typing import Any, overload
+from typing import Any, overload, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -40,6 +41,12 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         super().__init__(source=source, settings=settings, tokenizer=tokenizer, seed=seed)
         self.settings: ChatDatasetSettings = settings
         self.cut_generator = random.Random(self.seed)
+        self.show_tokenization = False
+
+        if self.settings.dummy_tokens:
+            self.dummy_tokens = self.tokenizer(
+                self.settings.dummy_tokens, truncation=False, padding=False, add_special_tokens=False
+            )['input_ids']
 
         if read:
             self._read()
@@ -255,22 +262,225 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
 
-    # logger.info(f'Tokenizing dataset in BATCH-WAY {self.source.name}')
+    def mask_dummy_think_fn(self, chat_tokens, enable_loss):
+        dummy_tokens = self.dummy_tokens
+        n = len(dummy_tokens)
+        for i in range(len(chat_tokens) - n + 1):
+            # check for a match of the entire dummy_tokens slice
+            if chat_tokens[i : i + n] == dummy_tokens:
+                # zero-out that span in enable_loss
+                for j in range(n):
+                    enable_loss[i + j] = 0
+        return enable_loss
+
+    def _encode_trl(
+        self,
+        records: list[ChatDatasetRecord],
+        inference: bool,
+    ) -> list[dict[str, Any] | None]:
+        """
+        TRL-style tokenization using HF chat templates.
+        This handles whole messages as units rather than token-level truncation.
+        """
+        result: list[dict | None] = []
+        max_length = self.settings.max_tokens_count
+
+        for record in records:
+            tools = record.tools
+            if tools is not None and isinstance(tools, str):
+                tools = json.loads(tools)
+            if tools is not None:
+                tools = [json.loads(tool) if isinstance(tool, str) else tool for tool in tools]
+
+            try:
+                # Convert our messages to the format expected by apply_chat_template
+                chat_messages = []
+                for message in record.messages:
+                    # Map our role names to HF expected format
+
+                    role = (
+                        "system"
+                        if message.role == ChatMessageRole.SYSTEM
+                        else (
+                            "assistant"
+                            if message.role == ChatMessageRole.BOT
+                            else (
+                                "tool"
+                                if message.role == ChatMessageRole.TOOL
+                                else "documents"
+                                if message.role == ChatMessageRole.DOCUMENTS
+                                else "user"
+                                if message.role == ChatMessageRole.USER
+                                else "unknown"
+                            )
+                        )
+                    )
+                    chat_messages.append({"role": role, "content": message.content, "tool_calls": message.tool_calls})
+
+                # For inference, we don't include the last assistant message in the tokenization
+                inference_messages = chat_messages
+                if inference and chat_messages[-1]["role"] == "assistant":
+                    inference_messages = chat_messages[:-1]
+
+                # Apply chat template to the entire conversation
+                formatted_chat = self.tokenizer.apply_chat_template(
+                    cast(list[dict[str, str]], inference_messages),  # type: ignore[arg-type]
+                    tools=cast(list[dict[str, Any]] | None, tools),  # type: ignore[arg-type]
+                    tokenize=False,
+                    add_generation_prompt=inference,
+                )
+
+                # Tokenize the chat
+                tokenized_chat = self.tokenizer(
+                    formatted_chat,
+                    truncation=True,
+                    max_length=max_length,
+                    padding=False,
+                    return_tensors=None,
+                    add_special_tokens=False,
+                )
+
+                # If the tokenized input is too long, skip this sample
+                if max_length is not None and len(tokenized_chat["input_ids"]) > max_length:
+                    result.append(None)
+                    logger.warning(f"Sample dropped: exceeds max length {max_length}")
+                    continue
+
+                # Now we identify and enable loss for assistant responses
+                if not inference:
+                    loss_mask = np.zeros_like(tokenized_chat["input_ids"], dtype=np.int8)
+                    # Process each message to find assistant responses
+                    assistant_indices = []
+                    for i, message in enumerate(record.messages):
+                        if (
+                            message.role == ChatMessageRole.BOT
+                            and not message.disable_loss
+                            and (not self.settings.only_last_replica_loss or i == len(record.messages) - 1)
+                        ):
+                            assistant_indices.append(i)
+
+                    # If no eligible assistant messages, drop this sample
+                    if not assistant_indices and self.settings.only_answer_loss:
+                        result.append(None)
+                        logger.warning("Sample dropped: No assistant messages with enabled loss")
+                        continue
+
+                    # For each eligible assistant message, find its tokens in the input_ids
+                    # and enable loss for those tokens
+                    for idx in assistant_indices:
+                        # Apply the template only up to this message to find the start position
+                        partial_messages = chat_messages[: idx + 1]
+                        partial_format = self.tokenizer.apply_chat_template(
+                            cast(list[dict[str, str]], partial_messages),  # type: ignore[arg-type]
+                            tools=cast(list[dict[str, Any]] | None, tools),  # type: ignore[arg-type]
+                            tokenize=False,
+                            add_generation_prompt=False,
+                        )
+
+                        # Find the position where this message starts
+                        partial_tokens = self.tokenizer(
+                            partial_format,
+                            truncation=False,
+                            padding=False,
+                            return_tensors=None,
+                            add_special_tokens=False,
+                        )["input_ids"]
+
+                        # Exclude the prompt and include only the assistant's response
+                        prev_messages = chat_messages[:idx]
+                        prev_format = self.tokenizer.apply_chat_template(
+                            cast(list[dict[str, str]], prev_messages),  # type: ignore[arg-type]
+                            tools=cast(list[dict[str, Any]] | None, tools),  # type: ignore[arg-type]
+                            tokenize=False,
+                            add_generation_prompt=True,
+                        )
+                        prev_tokens = self.tokenizer(
+                            prev_format,
+                            truncation=False,
+                            padding=False,
+                            return_tensors=None,
+                            add_special_tokens=False,
+                        )["input_ids"]
+
+                        start_idx = len(prev_tokens)
+                        end_idx = len(partial_tokens)
+                        loss_mask[start_idx:end_idx] = 1
+
+                input_ids_tensor = torch.LongTensor(tokenized_chat["input_ids"])
+                attention_mask_tensor = torch.ones(input_ids_tensor.shape, dtype=torch.int64)
+
+                # Optionally mask dummy think tokens
+
+                should_mask = bool(self.settings.dummy_tokens)
+                for msg in chat_messages:
+                    content = msg.get('content')
+                    if isinstance(content, str) and ('/no_think' in content or '/nothink' in content):
+                        should_mask = False
+                        break
+
+                if should_mask:
+                    loss_mask = self.mask_dummy_think_fn(
+                        chat_tokens=tokenized_chat["input_ids"], enable_loss=loss_mask
+                    )
+
+                # Assign labels where mask is 1
+                labels = np.where(loss_mask == 1, input_ids_tensor, DISABLE_LOSS_LABEL)
+
+                if self.show_tokenization:
+                    filtered_ids = tokenized_chat[labels != DISABLE_LOSS_LABEL]
+                    text = self.tokenizer.decode(filtered_ids, skip_special_tokens=False)
+                    logger.info(f"Filtered text: {text}")
+                    self.show_tokenization = False
+
+                encoded_record: dict[str, Any] = {
+                    "input_ids": input_ids_tensor,
+                    "attention_mask": attention_mask_tensor,
+                    "labels": torch.LongTensor(labels),
+                }
+
+                if inference:
+                    encoded_record.update(
+                        {"prompt": formatted_chat, "id": record.id, "messages": record.messages, "meta": record.meta}
+                    )
+
+                result.append(encoded_record)
+
+            except Exception as ex:
+                result.append(None)
+                logger.warning(f"Sample dropped: {ex}")
+
+        return result
+
     def _encode(  # type: ignore[override]
         self,
         records: list[ChatDatasetRecord],
         inference: bool,
         random_cut: bool,
     ) -> list[dict[str, Any] | None]:
-        """
-        Batch tokenization without padding:
-        • memory grows proportionally to batch_size, not to the entire dataset;
-        • the lengths of replicas are calculated exactly as in the original, which means
-          the filters in _truncate_and_merge behave identically,
-          so the number of discarded examples matches the "pre‑war" count.
-        """
-        # ─────────────────────────────────  pre-compute prefixes/suffixes  ─────────────────────────────────
-        role_prefix_tokens: dict[ChatMessageRole, np.ndarray] = {
+        # Use TRL tokenization if enabled
+        if getattr(self.settings, "use_trl_tokenization", False):
+            return self._encode_trl(records, inference)
+
+        # Original tokenization logic
+        conversations = [
+            Conversation(
+                system_prompt=self.source.system_prompt,
+                messages=r.messages,
+                ignore_system_prompt=self.settings.ignore_system_prompt,
+            )
+            for r in records
+        ]
+
+        logger.info(f'Tokenizing dataset {self.source.name}')
+        tokenized_replicas = self.__tokenize([m.content for c in conversations for m in c.messages])
+
+        tokenized_conversations = []
+        offset = 0
+        for c in conversations:
+            tokenized_conversations.append([tokenized_replicas[offset + i] for i in range(len(c.messages))])
+            offset += len(c.messages)
+
+        role_prefix_tokens = {
             role: self.__tokenize(
                 self.settings.prompt_template.prefix_template.format(
                     role=self.settings.prompt_template.role_tag_mapping[role]
@@ -279,6 +489,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 np.int32
             )  # int32 saves RAM
             for role in ChatMessageRole
+            if role in self.settings.prompt_template.role_tag_mapping
         }
         suffix_tokens: np.ndarray = self.__tokenize(self.settings.prompt_template.suffix_template)[0].astype(np.int32)
 
