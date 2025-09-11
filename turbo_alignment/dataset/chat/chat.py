@@ -4,7 +4,7 @@ import random
 from abc import ABC
 from itertools import accumulate
 from pathlib import Path
-from typing import Any, overload
+from typing import Any, overload, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -282,7 +282,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         TRL-style tokenization using HF chat templates.
         This handles whole messages as units rather than token-level truncation.
         """
-        result = []
+        result: list[dict | None] = []
         max_length = self.settings.max_tokens_count
 
         for record in records:
@@ -324,8 +324,8 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
                 # Apply chat template to the entire conversation
                 formatted_chat = self.tokenizer.apply_chat_template(
-                    inference_messages,
-                    tools=tools,
+                    cast(list[dict[str, str]], inference_messages),  # type: ignore[arg-type]
+                    tools=cast(list[dict[str, Any]] | None, tools),  # type: ignore[arg-type]
                     tokenize=False,
                     add_generation_prompt=inference,
                 )
@@ -371,7 +371,10 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                         # Apply the template only up to this message to find the start position
                         partial_messages = chat_messages[: idx + 1]
                         partial_format = self.tokenizer.apply_chat_template(
-                            partial_messages, tools=tools, tokenize=False, add_generation_prompt=False
+                            cast(list[dict[str, str]], partial_messages),  # type: ignore[arg-type]
+                            tools=cast(list[dict[str, Any]] | None, tools),  # type: ignore[arg-type]
+                            tokenize=False,
+                            add_generation_prompt=False,
                         )
 
                         # Find the position where this message starts
@@ -386,7 +389,10 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                         # Exclude the prompt and include only the assistant's response
                         prev_messages = chat_messages[:idx]
                         prev_format = self.tokenizer.apply_chat_template(
-                            prev_messages, tools=tools, tokenize=False, add_generation_prompt=True
+                            cast(list[dict[str, str]], prev_messages),  # type: ignore[arg-type]
+                            tools=cast(list[dict[str, Any]] | None, tools),  # type: ignore[arg-type]
+                            tokenize=False,
+                            add_generation_prompt=True,
                         )
                         prev_tokens = self.tokenizer(
                             prev_format,
@@ -407,9 +413,8 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
                 should_mask = bool(self.settings.dummy_tokens)
                 for msg in chat_messages:
-                    if msg['role'] in ('user', 'system') and (
-                        '/no_think' in msg['content'] or '/nothink' in msg['content']
-                    ):
+                    content = msg.get('content')
+                    if isinstance(content, str) and ('/no_think' in content or '/nothink' in content):
                         should_mask = False
                         break
 
@@ -427,7 +432,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     logger.info(f"Filtered text: {text}")
                     self.show_tokenization = False
 
-                encoded_record = {
+                encoded_record: dict[str, Any] = {
                     "input_ids": input_ids_tensor,
                     "attention_mask": attention_mask_tensor,
                     "labels": torch.LongTensor(labels),
@@ -446,7 +451,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         return result
 
-    def _encode(
+    def _encode(  # type: ignore[override]
         self,
         records: list[ChatDatasetRecord],
         inference: bool,
@@ -484,6 +489,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 np.int32
             )  # int32 saves RAM
             for role in ChatMessageRole
+            if role in self.settings.prompt_template.role_tag_mapping
         }
         suffix_tokens: np.ndarray = self.__tokenize(self.settings.prompt_template.suffix_template)[0].astype(np.int32)
 
