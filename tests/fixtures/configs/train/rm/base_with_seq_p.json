@@ -1,0 +1,163 @@
+{
+    "train_dataset_settings": {
+        "sources": [
+            {
+                "name": "rm_preferences_test",
+                "records_path": "tests/fixtures/datasets/rm/train_preferences.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "max_tokens_count": 120
+        },
+        "add_labels": false,
+        "dataset_type": "pair_preferences"
+    },
+    "val_dataset_settings": {
+        "sources": [
+            {
+                "name": "rm_preferences_test",
+                "records_path": "tests/fixtures/datasets/rm/val_preferences.jsonl",
+                "sample_rate": 1
+            }
+        ],
+        "chat_settings":{
+            "prompt_template": {
+                "role_tag_mapping": {
+                    "bot": "<bot>",
+                    "user": "<user>",
+                    "system": "<system>"
+                },
+                "prefix_template": "<RS>{role}",
+                "suffix_template": "</RS>"
+            },
+            "max_tokens_count": 120
+        },
+        "add_labels": false,
+        "dataset_type": "pair_preferences"
+    },
+    "cherry_pick_settings": {
+        "dataset_settings":{
+            "sources": [
+                {
+                    "name": "rm_preferences_test",
+                    "records_path": "tests/fixtures/datasets/rm/val_preferences.jsonl",
+                    "sample_rate": 1
+                }
+            ],
+            "chat_settings":{
+                "prompt_template": {
+                    "role_tag_mapping": {
+                        "bot": "<bot>",
+                        "user": "<user>",
+                        "system": "<system>"
+                    },
+                    "prefix_template": "<RS>{role}",
+                    "suffix_template": "</RS>"
+                },
+                "max_tokens_count": 120
+            },
+            "add_labels": false,
+            "dataset_type": "pair_preferences"
+        },
+        "metric_settings": []
+    },
+    "model_settings": {
+        "model_path": "tests/fixtures/models/llama2_tiny",
+        "model_type": "seq_cls",
+        "transformers_settings": {
+        },
+        "model_kwargs": {
+            "num_labels": 1,
+            "return_dict": true
+        }
+    },
+    "tokenizer_settings": {},
+    "special_tokens_settings": {
+        "bos_token": "<s>",
+        "eos_token": "</s>",
+        "pad_token": "<pad>"
+    },
+    "trainer_settings": {
+        "evaluation_strategy": "steps",
+        "per_device_train_batch_size": 1,
+        "per_device_eval_batch_size": 1,
+        "gradient_accumulation_steps": 1,
+        "eval_steps": 1,
+        "save_steps": 1,
+        "logging_steps": 1,
+        "learning_rate": 0.0003,
+        "num_train_epochs": 1,
+        "lr_scheduler_type": "cosine",
+        "warmup_steps": 2,
+        "fp16": false,
+        "bf16": false,
+        "optim": "adamw_torch",
+        "save_total_limit": 1,
+        "no_cuda": false,
+        "max_steps": 1,
+        "sequence_parallel": 2,
+        "deepspeed": {
+            "fp16": {
+                "enabled": "auto"
+            },
+            "bf16": {
+                "enabled": "auto"
+            },
+            "optimizer": {
+                "type": "AdamW",
+               "params": {
+                   "lr": "auto",
+                     "betas": "auto",
+                     "eps": "auto",
+                     "weight_decay": "auto"
+                 }
+            },
+            "scheduler": {
+                "type": "WarmupDecayLR",
+                "params": {
+                    "warmup_min_lr": "auto",
+                    "warmup_max_lr": "auto",
+                    "warmup_num_steps": "auto",
+                    "total_num_steps": "auto"
+                }
+            },
+            "zero_optimization": {
+                "stage": 3,
+                "allgather_partitions": true,
+                "allgather_bucket_size": 1e5,
+                "overlap_comm": false,
+                "reduce_scatter": true,
+                "reduce_bucket_size": "auto",
+                "contiguous_gradients": true,
+                "sub_group_size": 1e5,
+                "stage3_param_persistence_threshold": "auto",
+                "stage3_prefetch_bucket_size": 0,
+                "stage3_max_live_parameters": 0,
+                "stage3_max_reuse_distance": 0,
+                "stage3_gather_16bit_weights_on_model_save": true
+            },
+            "gradient_accumulation_steps": "auto",
+            "gradient_clipping": "auto",
+            "steps_per_print": 2,
+            "train_batch_size": "auto",
+            "train_micro_batch_size_per_gpu": 1,
+            "wall_clock_breakdown": false
+        }
+    },
+    "logging_settings": {
+        "project_name": "alignment",
+        "run_name": "rm",
+        "entity": "turbo-alignment"
+      },
+    "log_path": "test_rm_train_output"
+}

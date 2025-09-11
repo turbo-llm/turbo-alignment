@@ -14,9 +14,9 @@ class DistinctnessMetric(Metric):
         self._settings: DistinctnessSettings = settings
 
     def compute(self, **kwargs) -> list[MetricResults]:
-        predictions: list[list[str]] = kwargs.get('predictions', None)
-        dataset_name: str = kwargs.get('dataset_name', '')
-        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)
+        predictions: list[list[str]] = kwargs.get('predictions', None)  # type: ignore[assignment]
+        dataset_name: str = kwargs.get('dataset_name', '')  # type: ignore[assignment]
+        tokenizer: PreTrainedTokenizerBase = kwargs.get('tokenizer', None)  # type: ignore[assignment]
         if tokenizer is None:
             raise ValueError('tokenizer should not be None')
         vocab_size: int = tokenizer.vocab_size

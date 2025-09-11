@@ -1,8 +1,11 @@
+import inspect
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 import torch
+import torch.distributed as dist
+import torch.distributed.nn.functional as dist_functional
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import Dataset
@@ -16,11 +19,9 @@ from transformers import (
     ProgressCallback,
     TrainerCallback,
     TrainerControl,
-    TrainingArguments,
 )
-from transformers.integrations import get_reporting_integration_callbacks
+from transformers.integrations import get_reporting_integration_callbacks, is_deepspeed_available
 from transformers.modeling_utils import PreTrainedModel
-from transformers.trainer import Trainer
 
 from turbo_alignment.common.logging import get_project_logger
 from turbo_alignment.common.tf.callbacks.common import MetricsCallbackHandler
@@ -45,13 +46,33 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SlicHfLossSettings,
     SyncRefModelSettings,
 )
+from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
     concatenated_inputs,
     prepare_model,
 )
+from turbo_alignment.modeling import parallel_states
+from turbo_alignment.sequence_parallel.trainer import TrainerWithSeqP
+from .base_args import TrainingArgumentsWithSeqP
+
+if is_deepspeed_available():
+    from deepspeed.runtime.engine import DeepSpeedEngine
+else:
+    DeepSpeedEngine = None
 
 logger = get_project_logger()
+
+
+def get_actual_forward(model: nn.Module):
+    if DeepSpeedEngine is not None and isinstance(model, DeepSpeedEngine):
+        model = model.module
+
+    return model.forward
+
+
+def require_position_ids(model: nn.Module):
+    return 'position_ids' in inspect.signature(get_actual_forward(model)).parameters
 
 
 @DPOLossRegistry.register(DPOLossesType.SIGMOID)
@@ -525,7 +546,7 @@ class CALDPOLoss(DPOLossRegistry):
 
 
 @dataclass
-class DPOTrainingArguments(TrainingArguments):
+class DPOTrainingArguments(TrainingArgumentsWithSeqP):
     loss_settings: (
         SigmoidLossSettings
         | HingeLossSettings
@@ -554,7 +575,7 @@ class DPOTrainingArguments(TrainingArguments):
     average_log_prob: bool = False
 
 
-class DPOTrainer(Trainer):
+class DPOTrainer(TrainerWithSeqP):
     """
     Inspired by https://github.com/huggingface/trl/blob/main/trl/trainer/dpo_trainer.py
 
@@ -668,11 +689,17 @@ class DPOTrainer(Trainer):
         labels: torch.Tensor,
         average_log_prob: bool = False,
     ) -> torch.Tensor:
+        if parallel_states.sequence_parallel_is_initialized():
+            if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
+                logits = logits[:, :-1]
+
+        else:
+            logits = logits[:, :-1, :]
+            labels = labels[:, 1:].clone()
+
         if logits.shape[:-1] != labels.shape:
             raise ValueError('Logits (batch and sequence length dim) and labels must have the same shape.')
 
-        labels = labels[:, 1:].clone()
-        logits = logits[:, :-1, :]
         loss_mask = labels != DISABLE_LOSS_LABEL
 
         labels[labels == DISABLE_LOSS_LABEL] = 0
@@ -680,8 +707,20 @@ class DPOTrainer(Trainer):
         per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
 
         if average_log_prob:
-            return (per_token_logps * loss_mask).sum(-1) / loss_mask.sum(-1)
-        return (per_token_logps * loss_mask).sum(-1)
+            n_tokens = loss_mask.sum(-1)
+            local_loss = (per_token_logps * loss_mask).sum(-1)
+
+            if parallel_states.sequence_parallel_is_initialized():
+                n_tokens = dist_functional.all_reduce(n_tokens, op=dist.ReduceOp.SUM)
+                local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
+
+            return local_loss / n_tokens
+
+        local_loss = (per_token_logps * loss_mask).sum(-1)
+        if parallel_states.sequence_parallel_is_initialized():
+            local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
+
+        return local_loss
 
     def concatenated_forward(
         self, model: nn.Module, batch: dict[str, Any]
@@ -690,13 +729,40 @@ class DPOTrainer(Trainer):
 
         precomputed_margins: torch.Tensor | None = concatenated_batch.pop('margin', None)
 
+        input_ids = concatenated_batch['input_ids']
+        attention_mask = concatenated_batch['attention_mask']
+        labels = concatenated_batch['labels']
+
+        if parallel_states.sequence_parallel_is_initialized():
+            input_ids = pad_for_sequence_parallel(
+                input_ids,
+                parallel_states.get_sequence_parallel_world_size(),
+                self.tokenizer.pad_token_id,  # type: ignore[union-attr]
+                padding_side=self.tokenizer.padding_side,  # type: ignore[union-attr]
+            )
+            labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
+            attention_mask = pad_for_sequence_parallel(
+                attention_mask,
+                parallel_states.get_sequence_parallel_world_size(),
+                0,
+                padding_side=self.tokenizer.padding_side,  # type: ignore[union-attr]
+            )
+            assert input_ids.size(-1) == labels.size(-1), (input_ids.size(), labels.size())
+            chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
+            start = chunk_size * parallel_states.get_sequence_parallel_rank()
+            end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
+            input_ids = input_ids[:, start:end].clone()
+
+            labels = labels[:, start + 1 : end + 1]
+
         all_logits = model(
-            concatenated_batch['input_ids'],
-            attention_mask=concatenated_batch['attention_mask'],
+            input_ids,
+            attention_mask,
         ).logits.to(torch.float32)
+
         all_logps = self._get_batch_logps(
             all_logits,
-            concatenated_batch['labels'],
+            labels,
             average_log_prob=self.average_log_prob,
         )
         chosen_idxs = batch['inputs_w']['input_ids'].shape[0]
@@ -707,6 +773,7 @@ class DPOTrainer(Trainer):
 
         chosen_logits = all_logits[:chosen_idxs]
         rejected_logits = all_logits[chosen_idxs:]
+
         return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
 
     def _get_logps(
@@ -739,7 +806,9 @@ class DPOTrainer(Trainer):
             policy_chosen_logits,
             policy_rejected_logits,
             precomputed_margins,
-        ) = self.concatenated_forward(model, batch)
+        ) = self.concatenated_forward(
+            model, batch
+        )  # pylit: disable=unbalanced-tuple-unpacking
 
         reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
 
@@ -846,7 +915,7 @@ class DPOTrainer(Trainer):
             sft_prefix_name = prefix + 'rewards/sft_'
             metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
 
-        return losses.mean(), metrics
+        return losses.mean() / parallel_states.get_sequence_parallel_world_size_or_one(), metrics
 
     def _compute_metrics(
         self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor

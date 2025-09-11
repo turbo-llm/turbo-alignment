@@ -18,6 +18,7 @@ class ChatDatasetSettings(BaseDatasetSettings):
     dataset_type: Literal[DatasetType.CHAT] = DatasetType.CHAT
 
     # FIXME: this settings are strange for inference dataset
+    single_eos: bool = True
     only_last_replica_loss: bool = False
     only_answer_loss: bool = True
     use_trl_tokenization: bool = False

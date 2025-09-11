@@ -13,13 +13,14 @@
       },
       "use_vllm": true,
       "vllm_engine_settings": {
-        "max_lora_rank": 32,
+        "enable_lora": true,
         "tensor_parallel_size": 1
       },
       "generation_settings": [
         {
           "vllm_settings": {
-            "n": 1,
+            "best_of": 32,
+            "n": 32,
             "repetition_penalty": 1.02,
             "max_tokens": 16,
             "top_k": -1,
@@ -27,8 +28,7 @@
           },
           "transformers_settings": {
             "num_beams": 3,
-            "max_new_tokens": 8,
-            "logprobs": 100
+            "max_new_tokens": 8
           },
           "custom_settings": {}
         }

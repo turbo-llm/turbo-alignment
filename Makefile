@@ -13,7 +13,7 @@ tests-%:
 	mv .coverage .coverage.$(subst tests-,,$@)
 
 
-tests: tests-unit tests-integration tests-cli
+tests: tests-unit tests-integration tests-cli tests-sequence_parallel
 	coverage combine
 	[ -n $$CI ] && coverage xml -i || true # always success
 	coverage report -i
@@ -21,7 +21,7 @@ tests: tests-unit tests-integration tests-cli
 lint: black flake pylint mypy
 
 black:
-	black --target-version py310 --check --skip-string-normalization --line-length $(MAX_LINE_LENGTH) $(CODE)
+	black --target-version py310 --check --skip-string-normalization --diff --line-length $(MAX_LINE_LENGTH) $(CODE)
 
 flake:
 	flake8 --max-line-length 119 --jobs $(JOBS) --statistics $${CI:+--format=gl-codeclimate --output=codeclimate-flake8.json} $(CODE)
@@ -46,4 +46,3 @@ lock:
 clear:
 	rm -f test_*_answers.jsonl
 	rm -rf test_*_output
-	

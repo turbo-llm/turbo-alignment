@@ -1,3 +1,4 @@
+import torch
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase, TrainingArguments
 from transformers.data.data_collator import (
@@ -16,9 +17,21 @@ from turbo_alignment.metrics.registry import MetricSettingsRegistry
 from turbo_alignment.pipelines.train.base import BaseTrainStrategy
 from turbo_alignment.settings.datasets import DatasetStrategy
 from turbo_alignment.settings.pipelines.train.sft import SftTrainExperimentSettings
+from turbo_alignment.trainers.base_args import TrainingArgumentsWithSeqP
 from turbo_alignment.trainers.multigpu import MultiGPUCherryPicksTrainer
 
 logger = get_project_logger()
+
+
+class DataCollatorForTokenClassificationWithShiftedLabels(DataCollatorForTokenClassification):
+    def torch_call(self, features):
+        result = super().torch_call(features)
+        label_name = 'label' if 'label' in features[0].keys() else 'labels'
+        labels = result[label_name]
+        last_column = -100 * torch.ones(labels.size(0), 1, dtype=labels.dtype, device=labels.device)
+        shifted_labels = torch.cat([labels[:, 1:], last_column], dim=1)
+        result[label_name] = shifted_labels
+        return result
 
 
 class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings, TrainingArguments]):
@@ -27,8 +40,11 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings, TrainingArg
         experiment_settings: SftTrainExperimentSettings,
         tokenizer: PreTrainedTokenizerBase,
         **kwargs,
-    ) -> DataCollatorForTokenClassification:
-        return DataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8)
+    ) -> DataCollatorForTokenClassification | DataCollatorForTokenClassificationWithShiftedLabels:
+        if experiment_settings.trainer_settings.sequence_parallel == 1:
+            return DataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8)
+
+        return DataCollatorForTokenClassificationWithShiftedLabels(tokenizer, pad_to_multiple_of=8)
 
     @staticmethod
     def _get_cherry_pick_callback(
@@ -60,7 +76,7 @@ class TrainSFTStrategy(BaseTrainStrategy[SftTrainExperimentSettings, TrainingArg
 
     @staticmethod
     def _get_training_args(experiment_settings: SftTrainExperimentSettings) -> TrainingArguments:
-        return TrainingArguments(
+        return TrainingArgumentsWithSeqP(
             output_dir=str(experiment_settings.log_path / TRAINER_LOGS_FOLDER),
             **experiment_settings.trainer_settings.dict(),
         )

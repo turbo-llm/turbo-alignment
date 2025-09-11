@@ -13,8 +13,8 @@ class KLMetric(Metric):
         self._settings: KLSettings = settings
 
     def compute(self, **kwargs) -> list[MetricResults]:
-        answer_tokens_ids: list[torch.Tensor] = kwargs.get('answer_tokens_ids', None)
-        logits: list[torch.Tensor] = kwargs.get('logits', None)
+        answer_tokens_ids: list[torch.Tensor] = kwargs.get('answer_tokens_ids', None)  # type: ignore[assignment]
+        logits: list[torch.Tensor] = kwargs.get('logits', None)  # type: ignore[assignment]
         metrics_kwargs = kwargs.get('metrics_kwargs', {})
         ref_logits: list[torch.Tensor] = metrics_kwargs.get(self._settings.ref_logits_type, None)
         dataset_name: str = kwargs.get('dataset_name', '')
