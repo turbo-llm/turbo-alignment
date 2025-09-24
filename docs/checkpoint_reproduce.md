@@ -6,13 +6,15 @@ if they already exist). Setting `save_only_model` to **false** guarantees
 that the *entire* training state—model, optimizer, scheduler, RNG seeds—is
 written to disk.
 
-```jsonc
+```json
 {
-  // … other trainer settings
-  "checkpoint_uploader_callback_parameters": {
-    "directory": "test/reproduce-ckpt-dir-test"
+  {
+    // … other trainer settings
+    "save_only_model": false
   },
-  "save_only_model": false
+  "checkpoint_uploader_callback_parameters": {
+      "directory": "test/reproduce-ckpt-dir-test"
+  },
 }
 ```
 
