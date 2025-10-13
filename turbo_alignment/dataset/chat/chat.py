@@ -329,9 +329,9 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
                 # 5) form the output dictionary
                 encoded: dict[str, Any] = {
-                    "input_ids": torch.tensor(input_ids_np, dtype=torch.int32),
-                    "labels": torch.tensor(labels_np, dtype=torch.int32),
-                    "attention_mask": torch.ones(len(input_ids_np), dtype=torch.int32),
+                    "input_ids": torch.tensor(input_ids_np, dtype=torch.long),
+                    "labels": torch.tensor(labels_np, dtype=torch.long),
+                    "attention_mask": torch.ones(len(input_ids_np), dtype=torch.long),
                 }
                 if inference:
                     encoded.update(
