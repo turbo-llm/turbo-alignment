@@ -49,8 +49,10 @@ def test_pair_preferences(tokenizer_llama2, chat_dataset_settings, pair_preferen
     for data_dict, sample in zip(data_dicts, dataset):
         record = PairPreferenceRecord.model_validate(data_dict)
         context: list[str] = [c.content for c in record.context]
+        chosen_input_ids = sample['inputs_context'].tolist() + sample['inputs_chosen'].tolist()
         contents_w = [*context, record.answer_w.content]
-        assert is_sample_build_from_content(sample['inputs_w']['input_ids'], contents_w, tokenizer_llama2)
+        assert is_sample_build_from_content(chosen_input_ids, contents_w, tokenizer_llama2)
 
+        rejected_input_ids = sample['inputs_context'].tolist() + sample['inputs_rejected'].tolist()
         contents_l = [*context, record.answer_l.content]
-        assert is_sample_build_from_content(sample['inputs_l']['input_ids'], contents_l, tokenizer_llama2)
+        assert is_sample_build_from_content(rejected_input_ids, contents_l, tokenizer_llama2)

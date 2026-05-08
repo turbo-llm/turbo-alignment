@@ -59,6 +59,11 @@ def log_once_unused_keys(keys: tuple[str, ...]):
     logger.info(f'Cannot split values, got keys: {" ".join(keys)}')
 
 
+@lru_cache
+def log_once_none_value(key: str):
+    logger.warning(f"Found None value for key '{key}' in batch. Skipping sequence parallel processing for this key.")
+
+
 class DataCollatorForSequenceParallism:
     def __init__(
         self,
@@ -110,16 +115,17 @@ class DataCollatorForSequenceParallism:
     def __call__(self, *args, **kwargs):
         collated = self.base_collate_fn(*args, **kwargs)
         if isinstance(collated, tp.Mapping):
-            if 'input_ids' not in collated:
-                log_once_unused_keys(tuple(collated.keys()))
-                return collated
-
-            input_ids = collated['input_ids']
-            cache_position = None
+            # Optionally add 'cache_position'. This is often needed for specific sequence parallel
+            # implementations or models like Qwen/Llama with RoPE.
             if self.add_cache_positions:
-                cache_position = self._get_cache_position(input_ids)
+                cache_position = self._get_cache_position(collated['input_ids'])
                 collated['cache_position'] = cache_position
 
+            # The 'prepare_value' method is responsible for:
+            # 1. Padding the tensor along the sequence dimension to be divisible by the world size.
+            # 2. Splitting (chunking) the tensor along the sequence dimension.
+            # 3. Returning ONLY the chunk corresponding to the current GPU rank.
+            # This ensures that each GPU processes a unique, non-overlapping segment of the sequence.
             return {key: self.prepare_value(key, value) for key, value in collated.items()}
 
         return self._split_value(collated)
@@ -128,6 +134,12 @@ class DataCollatorForSequenceParallism:
         return key not in self.fields_not_to_split
 
     def prepare_value(self, key: str, value: torch.Tensor, pad_value=None):
+        if value is None:
+            return None
+
+        if not self.should_be_splitted(key) and value.dim() == 1:
+            return value
+
         padded = pad_for_sequence_parallel(
             value,
             self.seq_p_world_size,
@@ -135,6 +147,16 @@ class DataCollatorForSequenceParallism:
             dim=-1,
             padding_side=self.padding_side,
         )
+
+        if key == 'attention_mask' and padded.dim() == 4:
+            padded = pad_for_sequence_parallel(
+                padded,
+                self.seq_p_world_size,
+                pad_value if pad_value is not None else self.pad_values_for_fields.get(key, 0),
+                dim=-2,
+                padding_side=self.padding_side,
+            )
+
         if self.should_be_splitted(key):
             if not isinstance(padded, torch.Tensor):
                 raise ValueError(f'{key=} {value=} {padded=}')

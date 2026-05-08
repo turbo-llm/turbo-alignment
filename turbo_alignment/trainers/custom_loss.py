@@ -26,11 +26,9 @@ class CustomLossTrainer(MultiGPUCherryPicksTrainer):
         eval_dataset: Dataset,
         custom_loss: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         data_collator: DataCollator,
-        processing_class: PreTrainedTokenizerBase
-        | BaseImageProcessor
-        | FeatureExtractionMixin
-        | ProcessorMixin
-        | None = None,
+        processing_class: (
+            PreTrainedTokenizerBase | BaseImageProcessor | FeatureExtractionMixin | ProcessorMixin | None
+        ) = None,
         callbacks: list[TrainerCallback] | None = None,
         model_init: Callable[[], PreTrainedModel] | None = None,
         **kwargs,

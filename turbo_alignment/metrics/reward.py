@@ -86,7 +86,8 @@ class RewardMetric(Metric):
 
 def compute_metrics(eval_preds) -> dict[str, float]:
     logits, labels = eval_preds
-    rewards_w, rewards_l = logits[:, 0], logits[:1]
+    # rewards_w, rewards_l = logits[:, 0], logits[:1]
+    rewards_w, rewards_l = logits[:, 0], logits[:, 1]
 
     return {
         'pair_accuracy': labels.mean(),

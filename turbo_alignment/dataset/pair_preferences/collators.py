@@ -1,60 +1,152 @@
-from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 import torch
-import transformers
-from transformers import PreTrainedTokenizerBase
+from transformers import DataCollatorForSeq2Seq, PreTrainedTokenizerBase
 
 from turbo_alignment.constants import DISABLE_LOSS_LABEL
 
 
-@dataclass
-class PairPreferenceDataCollator:
-    tokenizer: PreTrainedTokenizerBase
-    add_labels: bool = True
-    pad_to_multiple_of: int | None = None
+class PairPreferenceDataCollator(DataCollatorForSeq2Seq):
+    """
+    Data collator using sequential packing: [context | chosen | rejected].
 
-    def _get_batch(
-        self, examples: list[dict[str, dict[str, Any]]], tokenizer: PreTrainedTokenizerBase, key: str, max_length: int
-    ) -> transformers.BatchEncoding:
-        features = [ex[key] for ex in examples]
-        labels = [v.tolist() for feature in features for k, v in feature.items() if k == 'labels']
-        no_labels_features = [
-            {k: v for k, v in feature.items() if k not in ['labels', 'precomputed_margin']} for feature in features
-        ]
+    Packs all segments into a single sequence for efficient processing. Attention masks
+    enforce isolation between chosen/rejected segments. Position IDs are symmetric
+    (rejected mirrors chosen) for fair comparison.
 
-        def add_disable_loss_label(label):
-            disable_loss_labels = (max_length - len(label)) * [DISABLE_LOSS_LABEL]
-            if tokenizer.padding_side == 'right':
-                return label + disable_loss_labels
+    Args:
+        tokenizer: Tokenizer for padding operations
+        add_labels: Whether to add labels (kept for API compatibility)
+        pad_to_multiple_of: Pad sequences to multiple of this value
+    """
 
-            return disable_loss_labels + label
-
-        batch = tokenizer.pad(
-            no_labels_features,
-            padding='max_length',
-            max_length=max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizerBase,
+        add_labels: bool = True,
+        pad_to_multiple_of: int | None = None,
+    ):
+        super().__init__(
+            tokenizer=tokenizer,
+            pad_to_multiple_of=pad_to_multiple_of,
             return_tensors='pt',
+            label_pad_token_id=DISABLE_LOSS_LABEL,
         )
-        if self.add_labels:
-            batch['labels'] = torch.tensor([add_disable_loss_label(label) for label in labels])
-        return batch
+        self.add_labels = add_labels
 
-    def __call__(self, examples: list[dict[str, dict[str, Any]]]) -> dict[str, Any]:  # type: ignore[override]
-        max_length = 0
-        for ex in examples:
-            for t in ex:
-                if isinstance(ex[t], Iterable):
-                    if 'input_ids' in ex[t]:
-                        max_length = max(max_length, len(ex[t]['input_ids']))
+    def _process_example(self, ex: dict) -> tuple[torch.Tensor, tuple[int, int, int], float | None]:
+        """
+        Pack example into sequential format: [context | chosen | rejected].
 
-        batch: dict[str, Any] = {
-            'inputs_w': dict(self._get_batch(examples, self.tokenizer, 'inputs_w', max_length)),
-            'inputs_l': dict(self._get_batch(examples, self.tokenizer, 'inputs_l', max_length)),
-        }
+        Returns:
+            - input_ids: Concatenated tensor
+            - boundaries: Tuple (context_end, chosen_end, rejected_end)
+            - precomputed_margin: Optional margin value
+        """
+        context, chosen, rejected = ex['inputs_context'], ex['inputs_chosen'], ex['inputs_rejected']
 
-        if 'precomputed_margin' in examples[0] and examples[0]['precomputed_margin'] is not None:
-            batch['precomputed_margin'] = torch.tensor([ex['precomputed_margin'] for ex in examples])
+        input_ids = torch.cat([context, chosen, rejected])
+
+        boundaries = (
+            len(context),  # context_end
+            len(context) + len(chosen),  # chosen_end
+            len(context) + len(chosen) + len(rejected),  # rejected_end
+        )
+
+        return input_ids, boundaries, ex.get('precomputed_margin')
+
+    def _get_attn_mask(self, boundaries_tensor: torch.Tensor, max_seq_len: int, device: torch.device) -> torch.Tensor:
+        """
+        Create 4D attention mask enforcing chosen/rejected isolation.
+
+        Uses causal mask with rectangle exclusion.
+
+        Returns:
+            Tensor[batch_size, 1, max_seq_len, max_seq_len] where 1 = attend, 0 = mask
+        """
+        batch_size = boundaries_tensor.shape[0]
+
+        mask = torch.tril(torch.ones(max_seq_len, max_seq_len, dtype=torch.bool, device=device))
+        mask = mask[None, None].expand(batch_size, 1, -1, -1).clone()
+
+        positions = torch.arange(max_seq_len, device=device)
+        row_idx = positions.view(1, 1, -1, 1)
+        col_idx = positions.view(1, 1, 1, -1)
+
+        context_grid = boundaries_tensor[:, 0].view(-1, 1, 1, 1)
+        chosen_grid = boundaries_tensor[:, 1].view(-1, 1, 1, 1)
+        rejected_grid = boundaries_tensor[:, 2].view(-1, 1, 1, 1)
+
+        # Exclude positions where rejected segment (rows) attends to chosen segment (cols)
+        rejected_mask = (
+            (row_idx >= chosen_grid) & (row_idx < rejected_grid) & (col_idx >= context_grid) & (col_idx < chosen_grid)
+        )
+
+        # Apply exclusion in-place for memory efficiency
+        mask &= ~rejected_mask
+
+        return mask
+
+    def _get_position_ids(self, boundaries_tensor: torch.Tensor, max_seq_len: int) -> torch.Tensor:
+        """
+        Compute symmetric position IDs: rejected segment mirrors chosen positions.
+
+        Position scheme: context [0..N-1], chosen [N..N+M-1], rejected [N..N+K-1].
+
+        Returns:
+            Tensor[batch_size, max_seq_len] position IDs
+        """
+        batch_size = boundaries_tensor.shape[0]
+        ctx_ends, chosen_ends, rejected_ends = (
+            boundaries_tensor[:, 0],
+            boundaries_tensor[:, 1],
+            boundaries_tensor[:, 2],
+        )
+
+        base_positions = torch.arange(max_seq_len, dtype=torch.long)
+        position_ids = base_positions.unsqueeze(0).expand(batch_size, max_seq_len).clone()
+
+        positions_grid = base_positions.unsqueeze(0).expand(batch_size, -1)  # [batch_size, max_seq_len]
+
+        rejected_mask = (positions_grid >= chosen_ends.unsqueeze(1)) & (positions_grid < rejected_ends.unsqueeze(1))
+
+        # For each position in rejected segment, compute: ctx_end + (pos - chosen_end)
+        offset_positions = ctx_ends.unsqueeze(1) + (positions_grid - chosen_ends.unsqueeze(1))
+
+        # Apply offset positions only to rejected segments
+        position_ids = torch.where(rejected_mask, offset_positions, position_ids)
+
+        return position_ids
+
+    def __call__(
+        self, examples: list[dict[str, Any]], return_tensors=None
+    ) -> dict[str, Any]:  # type: ignore[override]
+        """
+        Collate batch using sequential packing: [context | chosen | rejected].
+
+        Returns:
+            - 'input_ids': Padded sequences
+            - 'attention_mask': 4D masks with chosen/rejected isolation
+            - 'position_ids': Symmetric positions.
+            - 'chosen_indices': Last token positions for chosen segments
+            - 'rejected_indices': Last token positions for rejected segments
+        """
+
+        processed = [self._process_example(ex) for ex in examples]
+        concat_input_ids, boundaries, _ = zip(*processed)
+
+        # Use parent class for padding
+        batch = super().__call__([{'input_ids': input_ids} for input_ids in concat_input_ids])
+        device = batch['input_ids'].device
+
+        _, max_seq_len = batch['input_ids'].shape[:2]
+        boundaries_tensor = torch.tensor(boundaries, dtype=torch.long, device=device)  # [batch_size, 3]
+
+        batch['attention_mask'] = self._get_attn_mask(boundaries_tensor, max_seq_len, device)
+        batch['position_ids'] = self._get_position_ids(boundaries_tensor, max_seq_len)
+
+        batch['context_end_indices'] = boundaries_tensor[:, 0] - 1  # Last token of context
+        batch['chosen_indices'] = boundaries_tensor[:, 1] - 1
+        batch['rejected_indices'] = boundaries_tensor[:, 2] - 1
 
         return batch

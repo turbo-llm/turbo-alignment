@@ -29,11 +29,9 @@ class MultiGPUCherryPicksTrainer(TrainerWithSeqP):
         args: TrainingArguments,
         train_dataset: Dataset,
         eval_dataset: Dataset,
-        processing_class: PreTrainedTokenizerBase
-        | BaseImageProcessor
-        | FeatureExtractionMixin
-        | ProcessorMixin
-        | None = None,
+        processing_class: (
+            PreTrainedTokenizerBase | BaseImageProcessor | FeatureExtractionMixin | ProcessorMixin | None
+        ) = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):

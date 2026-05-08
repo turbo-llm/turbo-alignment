@@ -1,11 +1,9 @@
-import inspect
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 import torch
 import torch.distributed as dist
-import torch.distributed.nn.functional as dist_functional
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import Dataset
@@ -20,7 +18,7 @@ from transformers import (
     TrainerCallback,
     TrainerControl,
 )
-from transformers.integrations import get_reporting_integration_callbacks, is_deepspeed_available
+from transformers.integrations import get_reporting_integration_callbacks
 from transformers.modeling_utils import PreTrainedModel
 
 from turbo_alignment.common.logging import get_project_logger
@@ -46,33 +44,15 @@ from turbo_alignment.settings.pipelines.train.dpo import (
     SlicHfLossSettings,
     SyncRefModelSettings,
 )
-from turbo_alignment.sequence_parallel.collator import pad_for_sequence_parallel
 from turbo_alignment.trainers.utils import (
     DPOLossRegistry,
-    concatenated_inputs,
     prepare_model,
 )
 from turbo_alignment.modeling import parallel_states
 from turbo_alignment.sequence_parallel.trainer import TrainerWithSeqP
 from .base_args import TrainingArgumentsWithSeqP
 
-if is_deepspeed_available():
-    from deepspeed.runtime.engine import DeepSpeedEngine
-else:
-    DeepSpeedEngine = None
-
 logger = get_project_logger()
-
-
-def get_actual_forward(model: nn.Module):
-    if DeepSpeedEngine is not None and isinstance(model, DeepSpeedEngine):
-        model = model.module
-
-    return model.forward
-
-
-def require_position_ids(model: nn.Module):
-    return 'position_ids' in inspect.signature(get_actual_forward(model)).parameters
 
 
 @DPOLossRegistry.register(DPOLossesType.SIGMOID)
@@ -577,8 +557,12 @@ class DPOTrainingArguments(TrainingArgumentsWithSeqP):
 
 class DPOTrainer(TrainerWithSeqP):
     """
-    Inspired by https://github.com/huggingface/trl/blob/main/trl/trainer/dpo_trainer.py
+    DPO trainer using sequential packing: [context | chosen | rejected].
 
+    Mirrors `RMTrainer` style: a single forward pass over packed inputs, exact
+    segment log-prob extraction at boundaries, and a configurable loss via
+    DPOLossRegistry. Supports ref_model, sft_model, sequence parallelism,
+    average_log_prob, precomputed_margins, and KTO/ORPO/ASFT specific metrics.
     """
 
     def __init__(
@@ -590,11 +574,9 @@ class DPOTrainer(TrainerWithSeqP):
         eval_dataset: Dataset,
         ref_model: PreTrainedModel | nn.Module | None = None,
         sft_model: PreTrainedModel | nn.Module | None = None,
-        processing_class: PreTrainedTokenizerBase
-        | BaseImageProcessor
-        | FeatureExtractionMixin
-        | ProcessorMixin
-        | None = None,
+        processing_class: (
+            PreTrainedTokenizerBase | BaseImageProcessor | FeatureExtractionMixin | ProcessorMixin | None
+        ) = None,
         callbacks: list[TrainerCallback] | None = None,
         **kwargs,
     ):
@@ -612,8 +594,12 @@ class DPOTrainer(TrainerWithSeqP):
             ):
                 raise ValueError(f'You should normalize logits by length when using {self.loss_type}')
 
-            loss_args = args.loss_settings
-            loss_args.pop('loss_type')  # type: ignore[union-attr]
+            loss_args = (
+                args.loss_settings.model_dump()
+                if hasattr(args.loss_settings, 'model_dump')
+                else dict(args.loss_settings)
+            )
+            loss_args.pop('loss_type', None)
             self.dpo_loss_registry = DPOLossRegistry.by_name(self.loss_type)(**loss_args)
 
         self._stored_metrics: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
@@ -667,6 +653,9 @@ class DPOTrainer(TrainerWithSeqP):
         if self.sync_ref_settings['sync_ref_model']:  # type: ignore[index]
             self.add_callback(SyncRefModelCallback(sync_ref_settings=self.sync_ref_settings))
 
+    # ------------------------------------------------------------------
+    # Loss dispatch (configurable via DPOLossRegistry)
+    # ------------------------------------------------------------------
     def dpo_loss(
         self,
         policy_chosen_logps: torch.Tensor,
@@ -683,142 +672,230 @@ class DPOTrainer(TrainerWithSeqP):
             precomputed_margins=precomputed_margins,
         )
 
-    def _get_batch_logps(
+    # ------------------------------------------------------------------
+    # Core helpers (RM-style, sequential packing)
+    # ------------------------------------------------------------------
+    def _forward_logits(
+        self,
+        model: nn.Module,
+        input_ids: torch.Tensor,
+        attention_mask_4d: torch.Tensor,
+        position_ids: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Run model forward over packed [context | chosen | rejected].
+
+        Follows RM-style behavior: sequence-parallel padding/splitting is handled
+        upstream by DataCollatorForSequenceParallism, so trainer does not pad/slice.
+        """
+        model_dtype = next(model.parameters()).dtype
+        attn_additive = torch.finfo(model_dtype).min * (attention_mask_4d == 0).to(model_dtype)
+        return model(
+            input_ids=input_ids,
+            attention_mask=attn_additive,
+            position_ids=position_ids,
+            use_cache=False,
+        ).logits.to(torch.float32)
+
+    def _extract_segment_logps(
         self,
         logits: torch.Tensor,
         labels: torch.Tensor,
+        segment_start_indices: torch.Tensor,
+        segment_end_indices: torch.Tensor,
         average_log_prob: bool = False,
     ) -> torch.Tensor:
+        """
+        Sum (or average) log-probabilities for tokens in
+        (segment_start_indices, segment_end_indices].
+
+        SP behavior mirrors RM: inputs are already rank-local (split in collator),
+        then per-rank segment sums are all-reduced across sequence-parallel group.
+        """
+        # Local next-token shift
+        local_logits = logits[:, :-1, :]
+        local_labels = labels[:, 1:].clone()
+
+        loss_mask = local_labels != DISABLE_LOSS_LABEL
+        labels_masked = local_labels.clone()
+        labels_masked[labels_masked == DISABLE_LOSS_LABEL] = 0
+
+        per_token_logps = (
+            torch.gather(
+                local_logits.log_softmax(-1),
+                dim=2,
+                index=labels_masked.unsqueeze(2),
+            ).squeeze(2)
+            * loss_mask.float()
+        )
+
+        bsz, local_len = per_token_logps.shape
+
         if parallel_states.sequence_parallel_is_initialized():
-            if parallel_states.get_sequence_parallel_rank() + 1 == parallel_states.get_sequence_parallel_world_size():
-                logits = logits[:, :-1]
+            rank = parallel_states.get_sequence_parallel_rank()
+            # logits length before local shift corresponds to local chunk size
+            seq_len_chunk = logits.size(1)
+            offset = rank * seq_len_chunk
+            positions = (
+                torch.arange(
+                    offset,
+                    offset + local_len,
+                    device=per_token_logps.device,
+                )
+                .unsqueeze(0)
+                .expand(bsz, -1)
+            )
 
-        else:
-            logits = logits[:, :-1, :]
-            labels = labels[:, 1:].clone()
+            seg_mask = (positions > segment_start_indices.unsqueeze(1)) & (
+                positions <= segment_end_indices.unsqueeze(1)
+            )
 
-        if logits.shape[:-1] != labels.shape:
-            raise ValueError('Logits (batch and sequence length dim) and labels must have the same shape.')
+            local_sum = (per_token_logps * seg_mask.float()).sum(dim=1)
+            dist.all_reduce(local_sum, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
 
-        loss_mask = labels != DISABLE_LOSS_LABEL
+            if average_log_prob:
+                local_n = seg_mask.sum(dim=1).float()
+                dist.all_reduce(local_n, op=dist.ReduceOp.SUM, group=parallel_states.get_sequence_parallel_group())
+                return torch.where(local_n > 0, local_sum / local_n, local_sum)
 
-        labels[labels == DISABLE_LOSS_LABEL] = 0
+            return local_sum
 
-        per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
+        positions = torch.arange(local_len, device=per_token_logps.device).unsqueeze(0).expand(bsz, -1)
+        seg_mask = (positions > segment_start_indices.unsqueeze(1)) & (positions <= segment_end_indices.unsqueeze(1))
 
+        seg_sum = (per_token_logps * seg_mask.float()).sum(dim=1)
         if average_log_prob:
-            n_tokens = loss_mask.sum(-1)
-            local_loss = (per_token_logps * loss_mask).sum(-1)
+            seg_n = seg_mask.sum(dim=1).float()
+            return torch.where(seg_n > 0, seg_sum / seg_n, seg_sum)
+        return seg_sum
 
-            if parallel_states.sequence_parallel_is_initialized():
-                n_tokens = dist_functional.all_reduce(n_tokens, op=dist.ReduceOp.SUM)
-                local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
-
-            return local_loss / n_tokens
-
-        local_loss = (per_token_logps * loss_mask).sum(-1)
-        if parallel_states.sequence_parallel_is_initialized():
-            local_loss = dist_functional.all_reduce(local_loss, op=dist.ReduceOp.SUM)
-
-        return local_loss
-
-    def concatenated_forward(
-        self, model: nn.Module, batch: dict[str, Any]
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
-        concatenated_batch = concatenated_inputs(batch, device=self.accelerator.device)
-
-        precomputed_margins: torch.Tensor | None = concatenated_batch.pop('margin', None)
-
-        input_ids = concatenated_batch['input_ids']
-        attention_mask = concatenated_batch['attention_mask']
-        labels = concatenated_batch['labels']
-
-        if parallel_states.sequence_parallel_is_initialized():
-            input_ids = pad_for_sequence_parallel(
-                input_ids,
-                parallel_states.get_sequence_parallel_world_size(),
-                self.tokenizer.pad_token_id,  # type: ignore[union-attr]
-                padding_side=self.tokenizer.padding_side,  # type: ignore[union-attr]
-            )
-            labels = pad_for_sequence_parallel(labels, parallel_states.get_sequence_parallel_world_size(), -100)
-            attention_mask = pad_for_sequence_parallel(
-                attention_mask,
-                parallel_states.get_sequence_parallel_world_size(),
-                0,
-                padding_side=self.tokenizer.padding_side,  # type: ignore[union-attr]
-            )
-            assert input_ids.size(-1) == labels.size(-1), (input_ids.size(), labels.size())
-            chunk_size = input_ids.size(-1) // parallel_states.get_sequence_parallel_world_size()
-            start = chunk_size * parallel_states.get_sequence_parallel_rank()
-            end = chunk_size * (parallel_states.get_sequence_parallel_rank() + 1)
-            input_ids = input_ids[:, start:end].clone()
-
-            labels = labels[:, start + 1 : end + 1]
-
-        all_logits = model(
-            input_ids,
-            attention_mask,
-        ).logits.to(torch.float32)
-
-        all_logps = self._get_batch_logps(
-            all_logits,
+    def _segment_logps_for_model(
+        self,
+        model: nn.Module,
+        input_ids: torch.Tensor,
+        attention_mask_4d: torch.Tensor,
+        position_ids: torch.Tensor,
+        labels: torch.Tensor,
+        context_end_indices: torch.Tensor,
+        chosen_indices: torch.Tensor,
+        rejected_indices: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self._forward_logits(model, input_ids, attention_mask_4d, position_ids)
+        chosen_logps = self._extract_segment_logps(
+            logits,
             labels,
+            context_end_indices,
+            chosen_indices,
             average_log_prob=self.average_log_prob,
         )
-        chosen_idxs = batch['inputs_w']['input_ids'].shape[0]
-        rejected_idx = batch['inputs_l']['input_ids'].shape[0]
+        rejected_logps = self._extract_segment_logps(
+            logits,
+            labels,
+            chosen_indices,
+            rejected_indices,
+            average_log_prob=self.average_log_prob,
+        )
+        return chosen_logps, rejected_logps, logits
 
-        chosen_logps = all_logps[:chosen_idxs]
-        rejected_logps = all_logps[chosen_idxs : chosen_idxs + rejected_idx]
-
-        chosen_logits = all_logits[:chosen_idxs]
-        rejected_logits = all_logits[chosen_idxs:]
-
-        return chosen_logps, rejected_logps, chosen_logits, rejected_logits, precomputed_margins
-
-    def _get_logps(
-        self, model: PreTrainedModel | nn.Module | None, batch: dict[str, Any]
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        with torch.no_grad():
-            if model is not None:
-                (chosen_logps, rejected_logps, *_) = self.concatenated_forward(model, batch)
-            else:
-                with self.accelerator.unwrap_model(self.model).disable_adapter():
-                    (
-                        chosen_logps,
-                        rejected_logps,
-                        *_,
-                    ) = self.concatenated_forward(self.model, batch)
-
-        return chosen_logps, rejected_logps
-
+    # ------------------------------------------------------------------
+    # Main loss / metrics
+    # ------------------------------------------------------------------
     def get_batch_metrics(
         self,
         model: nn.Module,
         batch: dict[str, Any],
         train_eval: Literal['train', 'eval'] = 'train',
     ) -> tuple[torch.Tensor, dict[str, float]]:
-        metrics: dict[str, float] = {}
+        device = self.accelerator.device
 
+        input_ids = batch['input_ids'].to(device)
+        attention_mask_4d = batch['attention_mask'].to(device)
+        position_ids = batch['position_ids'].to(device)
+        context_end_indices = batch['context_end_indices'].to(device)
+        chosen_indices = batch['chosen_indices'].to(device)
+        rejected_indices = batch['rejected_indices'].to(device)
+        labels = input_ids.clone()
+
+        precomputed_margins = batch.get('precomputed_margin')
+        if precomputed_margins is not None:
+            precomputed_margins = precomputed_margins.to(device)
+
+        # ---- Policy ----
         (
             policy_chosen_logps,
             policy_rejected_logps,
-            policy_chosen_logits,
-            policy_rejected_logits,
-            precomputed_margins,
-        ) = self.concatenated_forward(
-            model, batch
-        )  # pylit: disable=unbalanced-tuple-unpacking
+            policy_logits,
+        ) = self._segment_logps_for_model(
+            model,
+            input_ids,
+            attention_mask_4d,
+            position_ids,
+            labels,
+            context_end_indices,
+            chosen_indices,
+            rejected_indices,
+        )
 
-        reference_chosen_logps, reference_rejected_logps = torch.Tensor([float('inf')]), torch.Tensor([float('inf')])
+        policy_chosen_logits = policy_logits.mean()
+        policy_rejected_logits = policy_logits.mean()
 
-        if self.args.use_ref_model or self.loss_type not in (  # type: ignore[attr-defined]
+        # ---- Reference ----
+        needs_reference = self.args.use_ref_model or self.loss_type not in (  # type: ignore[attr-defined]
             DPOLossesType.SIMPO,
             DPOLossesType.ORPO,
             DPOLossesType.ASFT,
-        ):
-            reference_chosen_logps, reference_rejected_logps = self._get_logps(self.ref_model, batch)
+        )
 
+        if needs_reference:
+            if self.ref_model is not None:
+                with torch.no_grad():
+                    (
+                        reference_chosen_logps,
+                        reference_rejected_logps,
+                        _,
+                    ) = self._segment_logps_for_model(
+                        self.ref_model,
+                        input_ids,
+                        attention_mask_4d,
+                        position_ids,
+                        labels,
+                        context_end_indices,
+                        chosen_indices,
+                        rejected_indices,
+                    )
+            else:
+                # LoRA-style ref via adapter disable on the policy model
+                unwrapped_model = self.accelerator.unwrap_model(self.model)
+                if hasattr(unwrapped_model, 'disable_adapter'):
+                    disable_ctx = unwrapped_model.disable_adapter()
+                elif hasattr(unwrapped_model, 'disable_adapters'):
+                    disable_ctx = unwrapped_model.disable_adapters()
+                else:
+                    raise ValueError(
+                        f'Loss type {self.loss_type} requires a reference model, '
+                        f'but ref_model is None and the policy has no adapter to disable.'
+                    )
+                with torch.no_grad():
+                    with disable_ctx:
+                        (
+                            reference_chosen_logps,
+                            reference_rejected_logps,
+                            _,
+                        ) = self._segment_logps_for_model(
+                            self.model,
+                            input_ids,
+                            attention_mask_4d,
+                            position_ids,
+                            labels,
+                            context_end_indices,
+                            chosen_indices,
+                            rejected_indices,
+                        )
+        else:
+            reference_chosen_logps = torch.zeros_like(policy_chosen_logps)
+            reference_rejected_logps = torch.zeros_like(policy_rejected_logps)
+
+        # ---- Loss ----
         losses, chosen_rewards, rejected_rewards = self.dpo_loss(
             policy_chosen_logps=policy_chosen_logps,
             policy_rejected_logps=policy_rejected_logps,
@@ -827,30 +904,31 @@ class DPOTrainer(TrainerWithSeqP):
             precomputed_margins=precomputed_margins,
         )
 
+        # ---- Metrics ----
         prefix = 'eval_' if train_eval == 'eval' else ''
-
-        dpo_prefix_name = prefix + 'rewards/'
-
-        metrics = self._compute_metrics(metrics, dpo_prefix_name, chosen_rewards, rejected_rewards)
+        metrics: dict[str, float] = {}
+        metrics = self._compute_metrics(metrics, prefix + 'rewards/', chosen_rewards, rejected_rewards)
 
         logp_accuracies = (policy_chosen_logps > policy_rejected_logps).float()
-        metrics[f'{prefix}logps/accuracies'] = (logp_accuracies).detach().cpu().mean().item()
-        metrics[f'{prefix}logps/rejected'] = (policy_rejected_logps).detach().cpu().mean().item()
-        metrics[f'{prefix}logps/chosen'] = (policy_chosen_logps).detach().cpu().mean().item()
-
-        metrics[f'{prefix}logits/rejected'] = (policy_rejected_logits).detach().cpu().mean().item()
-        metrics[f'{prefix}logits/chosen'] = (policy_chosen_logits).detach().cpu().mean().item()
+        metrics[f'{prefix}logps/accuracies'] = logp_accuracies.detach().cpu().mean().item()
+        metrics[f'{prefix}logps/rejected'] = policy_rejected_logps.detach().cpu().mean().item()
+        metrics[f'{prefix}logps/chosen'] = policy_chosen_logps.detach().cpu().mean().item()
+        metrics[f'{prefix}logits/rejected'] = policy_rejected_logits.detach().cpu().mean().item()
+        metrics[f'{prefix}logits/chosen'] = policy_chosen_logits.detach().cpu().mean().item()
 
         if self.args.use_ref_model:  # type: ignore[attr-defined]
             ref_logp_accuracies = (reference_chosen_logps > reference_rejected_logps).float()
-            metrics[f'{prefix}logps/ref_accuracies'] = (ref_logp_accuracies).detach().cpu().mean().item()
-            metrics[f'{prefix}logps/ref_rejected'] = (reference_rejected_logps).detach().cpu().mean().item()
-            metrics[f'{prefix}logps/ref_chosen'] = (reference_chosen_logps).detach().cpu().mean().item()
-
+            metrics[f'{prefix}logps/ref_accuracies'] = ref_logp_accuracies.detach().cpu().mean().item()
+            metrics[f'{prefix}logps/ref_rejected'] = reference_rejected_logps.detach().cpu().mean().item()
+            metrics[f'{prefix}logps/ref_chosen'] = reference_chosen_logps.detach().cpu().mean().item()
             metrics = self._compute_flips(
-                metrics, prefix, logp_accuracies.detach().cpu(), ref_logp_accuracies.detach().cpu()
+                metrics,
+                prefix,
+                logp_accuracies.detach().cpu(),
+                ref_logp_accuracies.detach().cpu(),
             )
 
+        # Loss-specific extra metrics
         if self.loss_type == DPOLossesType.KTO:
             kto_chosen_KL = (
                 (policy_chosen_logps.detach().cpu() - reference_chosen_logps.detach().cpu()).mean().clamp(min=0)
@@ -879,8 +957,8 @@ class DPOTrainer(TrainerWithSeqP):
 
             metrics[f'{prefix}orpo/nll_loss'] = nll_loss.detach().cpu().mean().item()
             metrics[f'{prefix}orpo/or_loss'] = or_loss.detach().cpu().mean().item()
-            metrics[f'{prefix}orpo/ratio'] = (ratio).detach().cpu().mean().item()
-            metrics[f'{prefix}orpo/log_odds'] = (log_odds).detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/ratio'] = ratio.detach().cpu().mean().item()
+            metrics[f'{prefix}orpo/log_odds'] = log_odds.detach().cpu().mean().item()
 
         elif self.loss_type == DPOLossesType.ASFT:
             chosen_ratio = policy_chosen_logps - (
@@ -900,10 +978,24 @@ class DPOTrainer(TrainerWithSeqP):
             metrics[f'{prefix}asft/chosen_logsig'] = chosen_logsig.detach().cpu().mean().item()
             metrics[f'{prefix}asft/rejected_logsig'] = rejected_logsig.detach().cpu().mean().item()
 
+        # ---- SFT model branch ----
         if self.sft_model is not None:
-            sft_chosen_logps, sft_rejected_logps = self._get_logps(self.sft_model, batch)
-
             with torch.no_grad():
+                (
+                    sft_chosen_logps,
+                    sft_rejected_logps,
+                    _,
+                ) = self._segment_logps_for_model(
+                    self.sft_model,
+                    input_ids,
+                    attention_mask_4d,
+                    position_ids,
+                    labels,
+                    context_end_indices,
+                    chosen_indices,
+                    rejected_indices,
+                )
+
                 _, sft_chosen_rewards, sft_rejected_rewards = self.dpo_loss(
                     policy_chosen_logps=policy_chosen_logps,
                     policy_rejected_logps=policy_rejected_logps,
@@ -912,24 +1004,28 @@ class DPOTrainer(TrainerWithSeqP):
                     precomputed_margins=precomputed_margins,
                 )
 
-            sft_prefix_name = prefix + 'rewards/sft_'
-            metrics = self._compute_metrics(metrics, sft_prefix_name, sft_chosen_rewards, sft_rejected_rewards)
+            metrics = self._compute_metrics(metrics, prefix + 'rewards/sft_', sft_chosen_rewards, sft_rejected_rewards)
 
         return losses.mean() / parallel_states.get_sequence_parallel_world_size_or_one(), metrics
 
+    # ------------------------------------------------------------------
+    # Metric helpers
+    # ------------------------------------------------------------------
     def _compute_metrics(
-        self, metrics: dict[str, float], prefix_name: str, chosen_rewards: torch.Tensor, rejected_rewards: torch.Tensor
+        self,
+        metrics: dict[str, float],
+        prefix_name: str,
+        chosen_rewards: torch.Tensor,
+        rejected_rewards: torch.Tensor,
     ) -> dict[str, float]:
         accuracies = (chosen_rewards > rejected_rewards).float()
-        metrics[f'{prefix_name}chosen'] = (chosen_rewards).detach().cpu().mean().item()
-        metrics[f'{prefix_name}rejected'] = (rejected_rewards).detach().cpu().mean().item()
+        metrics[f'{prefix_name}chosen'] = chosen_rewards.detach().cpu().mean().item()
+        metrics[f'{prefix_name}rejected'] = rejected_rewards.detach().cpu().mean().item()
         metrics[f'{prefix_name}margins'] = (chosen_rewards - rejected_rewards).detach().cpu().mean().item()
         metrics[f'{prefix_name}accuracies'] = accuracies.detach().cpu().mean().item()
-
         metrics[f'{prefix_name}grad_term'] = (
             (self.dpo_loss_registry.beta * F.sigmoid(rejected_rewards - chosen_rewards)).detach().cpu().mean().item()
         )
-
         return metrics
 
     def _compute_flips(
@@ -944,25 +1040,16 @@ class DPOTrainer(TrainerWithSeqP):
         incorrect_correct = (ref_logp_accuracies == 0) & (logp_accuracies == 1)
         incorrect_incorrect = (ref_logp_accuracies == 0) & (logp_accuracies == 0)
 
-        correct_correct_count = correct_correct.sum().item()
-        correct_incorrect_count = correct_incorrect.sum().item()
-        incorrect_correct_count = incorrect_correct.sum().item()
-        incorrect_incorrect_count = incorrect_incorrect.sum().item()
-
-        total_count = len(logp_accuracies)
-
-        correct_correct_ratio = correct_correct_count / total_count
-        correct_incorrect_ratio = correct_incorrect_count / total_count
-        incorrect_correct_ratio = incorrect_correct_count / total_count
-        incorrect_incorrect_ratio = incorrect_incorrect_count / total_count
-
-        metrics[f'{prefix_name}flips/correct->correct'] = correct_correct_ratio
-        metrics[f'{prefix_name}flips/correct->incorrect'] = correct_incorrect_ratio
-        metrics[f'{prefix_name}flips/incorrect->correct'] = incorrect_correct_ratio
-        metrics[f'{prefix_name}flips/incorrect->incorrect'] = incorrect_incorrect_ratio
-
+        total_count = max(len(logp_accuracies), 1)
+        metrics[f'{prefix_name}flips/correct->correct'] = correct_correct.sum().item() / total_count
+        metrics[f'{prefix_name}flips/correct->incorrect'] = correct_incorrect.sum().item() / total_count
+        metrics[f'{prefix_name}flips/incorrect->correct'] = incorrect_correct.sum().item() / total_count
+        metrics[f'{prefix_name}flips/incorrect->incorrect'] = incorrect_incorrect.sum().item() / total_count
         return metrics
 
+    # ------------------------------------------------------------------
+    # HF Trainer hooks
+    # ------------------------------------------------------------------
     def compute_loss(
         self,
         model: PreTrainedModel | nn.Module,
@@ -1000,11 +1087,11 @@ class DPOTrainer(TrainerWithSeqP):
             return loss.detach(), None, None
 
         logits_dict = {
-            'logits_test/chosen': metrics['logits_test/chosen'],
-            'logits_test/rejected': metrics['logits_test/rejected'],
+            'logits_test/chosen': metrics.get('logits_test/chosen', metrics.get('eval_logits/chosen', 0.0)),
+            'logits_test/rejected': metrics.get('logits_test/rejected', metrics.get('eval_logits/rejected', 0.0)),
         }
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
-        logits = torch.stack(logits).mean(axis=1)  # type: ignore[call-overload, arg-type]
+        logits = torch.tensor(logits)
         labels = torch.zeros(logits.shape[0])
 
         return loss.detach(), logits, labels

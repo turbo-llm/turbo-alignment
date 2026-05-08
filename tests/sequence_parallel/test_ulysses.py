@@ -21,7 +21,6 @@ from tests.sequence_parallel.dataset import SimpleDataset
 from tests.sequence_parallel.launcher import app, launch_with_name
 from tests.sequence_parallel.marks import has_two_gpus
 
-
 CONFIG = Gemma2Config()
 
 

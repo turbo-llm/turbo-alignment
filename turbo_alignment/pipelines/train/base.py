@@ -189,6 +189,7 @@ class BaseTrainStrategy(S3Mixin, BaseStrategy, Generic[ExperimentSettingsT, Trai
                     seq_p_rank=get_sequence_parallel_rank(),
                     seq_p_world_size=get_sequence_parallel_world_size(),
                     tokenizer=self.tokenizer,
+                    fields_not_to_split=['attention_mask', 'chosen_indices', 'rejected_indices'],
                 )
 
             self.trainer = self._get_trainer(

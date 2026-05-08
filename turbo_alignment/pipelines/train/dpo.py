@@ -111,19 +111,18 @@ class TrainDPOStrategy(BaseTrainStrategy[DPOTrainExperimentSettings, DPOTraining
     def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
         logger.info(f'Train sample example:\n{dataset[0]}')
 
-        logger.info(
-            'Input-w check: {input_ids}'.format(
-                input_ids=collator([dataset[0], dataset[1]])['inputs_w']['input_ids'][0]
-            )
-        )
-        logger.info(
-            'Mask-w check: {mask}'.format(mask=collator([dataset[0], dataset[1]])['inputs_w']['attention_mask'][0])
-        )
-        logger.info(
-            'Input-l check: {input_ids}'.format(
-                input_ids=collator([dataset[0], dataset[1]])['inputs_l']['input_ids'][0]
-            )
-        )
-        logger.info(
-            'Mask-l check: {mask}'.format(mask=collator([dataset[0], dataset[1]])['inputs_l']['attention_mask'][0])
-        )
+        # Collate a batch to check the format
+        batch = collator([dataset[0], dataset[1]])
+
+        # Sequential packing format: [context | chosen | rejected]
+        logger.info('Using sequential packing format')
+        logger.info(f'Batch keys: {list(batch.keys())}')
+        logger.info(f'Input IDs shape: {batch["input_ids"].shape}')
+        logger.info(f'Attention mask shape: {batch["attention_mask"].shape}')
+
+        if 'position_ids' in batch:
+            logger.info(f'Position IDs shape: {batch["position_ids"].shape}')
+
+        logger.info(f'Chosen indices: {batch["chosen_indices"]}')
+        logger.info(f'Rejected indices: {batch["rejected_indices"]}')
+        logger.info(f'First example input_ids (first 50 tokens): {batch["input_ids"][0][:50]}...')

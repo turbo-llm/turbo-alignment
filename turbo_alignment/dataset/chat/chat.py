@@ -151,7 +151,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         suffix_tokens: np.ndarray,
         inference: bool,
         random_cut: bool,
-    ) -> tuple[np.ndarray, np.ndarray, str]:
+    ) -> tuple[np.ndarray, np.ndarray, str, list[int]]:
         # random_cut is used only when inference=True
         assert inference or not random_cut
 
@@ -196,6 +196,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 
         input_ids = np.array([])
         labels = np.array([])
+        bot_message_starts = []
 
         truncated_conversation_messages = conversation.messages[left_bound:right_bound]
         truncated_tokenized_replicas = tokenized_replicas[left_bound:right_bound]
@@ -211,6 +212,10 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             )
         ):
             prefix_tokens = role_prefix_tokens[message.role]
+            # Track where BOT messages start (after adding prefix, so prefix is in context)
+            if message.role == ChatMessageRole.BOT:
+                bot_message_starts.append(len(input_ids) + len(prefix_tokens))
+
             merged_replica = np.concatenate((prefix_tokens, tokenized_replica, suffix_tokens))
             input_ids = np.concatenate((input_ids, merged_replica))
 
@@ -253,7 +258,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
             input_ids = np.concatenate((np.array([self.tokenizer.bos_token_id]), input_ids))
             labels = np.concatenate((np.array([DISABLE_LOSS_LABEL]), labels))
 
-        return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound)
+        return input_ids, labels, conversation.get_prompt_repr(left_bound, right_bound), bot_message_starts
 
     # logger.info(f'Tokenizing dataset in BATCH-WAY {self.source.name}')
     def _encode(  # type: ignore[override]
@@ -261,6 +266,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
         records: list[ChatDatasetRecord],
         inference: bool,
         random_cut: bool,
+        split_context_answer: bool = False,
     ) -> list[dict[str, Any] | None]:
         """
         Batch tokenization without padding:
@@ -315,7 +321,7 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                 offset += num_msgs
 
                 try:
-                    input_ids_np, labels_np, prompt = self._truncate_and_merge(
+                    input_ids_np, labels_np, prompt, bot_message_starts = self._truncate_and_merge(
                         conversation=conv,
                         tokenized_replicas=tok_replicas,
                         role_prefix_tokens=role_prefix_tokens,
@@ -333,6 +339,23 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
                     "labels": torch.tensor(labels_np, dtype=torch.int32),
                     "attention_mask": torch.ones(len(input_ids_np), dtype=torch.int32),
                 }
+
+                # Optionally split context and answer
+                if split_context_answer:
+                    if bot_message_starts:
+                        split_point = bot_message_starts[-1]
+                        encoded.update(
+                            {
+                                "context_ids": torch.tensor(input_ids_np[:split_point], dtype=torch.int32),
+                                "answer_ids": torch.tensor(input_ids_np[split_point:], dtype=torch.int32),
+                            }
+                        )
+                    else:
+                        logger.warning(
+                            f"Record {rec.id}: split_context_answer=True but no bot_message_starts found. "
+                            "Skipping context/answer splitting."
+                        )
+
                 if inference:
                     encoded.update(
                         {
@@ -373,6 +396,13 @@ class ChatDataset(AlignmentDataset[ChatDatasetRecord], ABC):
 class TrainChatDataset(ChatDataset):
     def convert_records(self, records: list[ChatDatasetRecord]) -> list[dict[str, Any] | None]:
         return self._encode(records, inference=False, random_cut=False)
+
+
+class SplitChatDataset(ChatDataset):
+    """ChatDataset variant that splits context and answer at encoding time."""
+
+    def convert_records(self, records: list[ChatDatasetRecord]) -> list[dict[str, Any] | None]:
+        return self._encode(records, inference=False, random_cut=False, split_context_answer=True)
 
 
 @ChatDatasetTypeRegistry.register(DatasetStrategy.INFERENCE)

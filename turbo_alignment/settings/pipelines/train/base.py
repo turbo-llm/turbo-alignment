@@ -32,12 +32,12 @@ class BaseTrainExperimentSettings(BaseSettings):
     tokenizer_settings: TokenizerSettings
     special_tokens_settings: SpecialTokensSettings
 
-    model_settings: (ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings)
+    model_settings: ModelForPeftSettings | PreTrainedModelSettings | PreTrainedAdaptersModelSettings
 
     train_dataset_settings: MultiDatasetSettings
     val_dataset_settings: MultiDatasetSettings
 
-    logging_settings: (WandbSettings | ClearMLSettings)
+    logging_settings: WandbSettings | ClearMLSettings
 
     checkpoint_uploader_callback_parameters: CheckpointUploaderCallbackParameters | None = None
     cherry_pick_settings: CherryPickSettings | None = None

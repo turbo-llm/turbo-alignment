@@ -10,8 +10,8 @@ from turbo_alignment.dataset.base import AlignmentDataset
 from turbo_alignment.dataset.chat import (
     ChatDatasetRecord,
     ChatMessage,
-    TrainChatDataset,
 )
+from turbo_alignment.dataset.chat.chat import SplitChatDataset
 from turbo_alignment.dataset.pair_preferences.models import PairPreferenceRecord
 from turbo_alignment.dataset.registry import PairPreferenceDatasetTypeRegistry
 from turbo_alignment.settings.datasets.base import (
@@ -37,7 +37,7 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
     ):
         self._add_labels = settings.add_labels
         settings.chat_settings.keep_end = True
-        self._chat_dataset = TrainChatDataset(
+        self._chat_dataset = SplitChatDataset(
             source=source,
             settings=settings.chat_settings,
             tokenizer=tokenizer,
@@ -50,44 +50,37 @@ class PairPreferenceDataset(AlignmentDataset[PairPreferenceRecord]):
         if read:
             self._read()
 
+    def _build_chat_record(self, record: PairPreferenceRecord, answer: ChatMessage) -> ChatDatasetRecord:
+        context_messages = [
+            ChatMessage(role=msg.role, content=msg.content, disable_loss=True) for msg in record.context
+        ]
+        return ChatDatasetRecord(id=record.id, messages=context_messages + [answer])
+
     def convert_records(self, records: list[PairPreferenceRecord]) -> list[dict[str, Any] | None]:
-        chosen_chat_records: list[ChatDatasetRecord] = []
-        rejected_chat_records: list[ChatDatasetRecord] = []
+        # Build chat records for chosen and rejected using helper method
+        chosen_chat_records = [
+            self._build_chat_record(record, ChatMessage(role=record.answer_w.role, content=record.answer_w.content))
+            for record in records
+        ]
+        rejected_chat_records = [
+            self._build_chat_record(record, ChatMessage(role=record.answer_l.role, content=record.answer_l.content))
+            for record in records
+        ]
 
-        for record in records:
-            context = [
-                ChatMessage(role=message.role, content=message.content, disable_loss=True)
-                for message in record.context
-            ]
-
-            chosen = ChatMessage(role=record.answer_w.role, content=record.answer_w.content)
-            rejected = ChatMessage(role=record.answer_l.role, content=record.answer_l.content)
-
-            chosen_chat_records.append(ChatDatasetRecord(id=record.id, messages=context + [chosen]))
-            rejected_chat_records.append(ChatDatasetRecord(id=record.id, messages=context + [rejected]))
-
-        tokenized_chosen_records = self._chat_dataset.convert_records(chosen_chat_records)
-        tokenized_rejected_records = self._chat_dataset.convert_records(rejected_chat_records)
+        tokenized_chosen = self._chat_dataset.convert_records(chosen_chat_records)
+        tokenized_rejected = self._chat_dataset.convert_records(rejected_chat_records)
 
         output: list[dict[str, Any] | None] = []
-        for record, chosen_record, rejected_record in zip(
-            records, tokenized_chosen_records, tokenized_rejected_records
-        ):
-            if not (chosen_record and rejected_record):
+        for record, chosen_tok, rejected_tok in zip(records, tokenized_chosen, tokenized_rejected):
+            if not (chosen_tok and rejected_tok):
                 continue
-
-            ignore_keys = ['precomputed_margin']
-            if not self._add_labels:
-                ignore_keys.append('labels')
-
-            chosen_tokens = {k: v.squeeze(0) for k, v in chosen_record.items() if k not in ignore_keys}
-            rejected_tokens = {k: v.squeeze(0) for k, v in rejected_record.items() if k not in ignore_keys}
 
             output.append(
                 {
                     'id': record.id,
-                    'inputs_w': chosen_tokens,
-                    'inputs_l': rejected_tokens,
+                    'inputs_context': chosen_tok['context_ids'].squeeze(0),
+                    'inputs_chosen': chosen_tok['answer_ids'].squeeze(0),
+                    'inputs_rejected': rejected_tok['answer_ids'].squeeze(0),
                     'precomputed_margin': record.precomputed_margin,
                 }
             )

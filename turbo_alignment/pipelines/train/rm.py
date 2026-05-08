@@ -92,6 +92,7 @@ class TrainRMStrategy(BaseTrainStrategy[RMTrainExperimentSettings, TrainingArgum
         )
 
     def _dataset_and_collator_sanity_check(self, dataset: Dataset, collator: DataCollator) -> None:
-        logger.info(f'Train sample input_ids:\n{dataset[0]}')
-        logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["inputs_w"]["input_ids"])}')
-        logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["inputs_l"]["input_ids"])}')
+        # logger.info(f'Train sample input_ids:\n{dataset[0]}')
+        # logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["inputs_w"]["input_ids"])}')
+        # logger.info(f'Train sample example:\n{self.tokenizer.decode(dataset[0]["inputs_l"]["input_ids"])}')
+        pass
