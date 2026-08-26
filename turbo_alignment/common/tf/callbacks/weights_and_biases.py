@@ -6,7 +6,6 @@ from transformers import (
     TrainerState,
     TrainingArguments,
 )
-from wandb.sdk.lib.disabled import RunDisabled
 from wandb.sdk.wandb_run import Run
 
 from turbo_alignment.common.logging import get_project_logger
@@ -15,7 +14,7 @@ logger = get_project_logger()
 
 
 class BaseWandbCallback(TrainerCallback):
-    def __init__(self, wandb_run: Run | RunDisabled) -> None:
+    def __init__(self, wandb_run: Run) -> None:
         super().__init__()
         self._wandb_run = wandb_run
 
